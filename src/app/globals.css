@@ -7,9 +7,48 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading);
+  --font-serif: var(--font-heading);
+
+  /* Organic ramps expostas ao Tailwind */
+  --color-cream: var(--organic-bg);
+  --color-sand: var(--organic-surface);
+  --color-ink: var(--organic-text);
+  --color-terracotta: var(--organic-accent);
+  --color-sage: var(--organic-accent-2);
+
+  --color-accent-100: var(--organic-accent-100);
+  --color-accent-200: var(--organic-accent-200);
+  --color-accent-300: var(--organic-accent-300);
+  --color-accent-400: var(--organic-accent-400);
+  --color-accent-500: var(--organic-accent-500);
+  --color-accent-600: var(--organic-accent-600);
+  --color-accent-700: var(--organic-accent-700);
+  --color-accent-800: var(--organic-accent-800);
+  --color-accent-900: var(--organic-accent-900);
+
+  --color-sage-100: var(--organic-accent-2-100);
+  --color-sage-200: var(--organic-accent-2-200);
+  --color-sage-300: var(--organic-accent-2-300);
+  --color-sage-400: var(--organic-accent-2-400);
+  --color-sage-500: var(--organic-accent-2-500);
+  --color-sage-600: var(--organic-accent-2-600);
+  --color-sage-700: var(--organic-accent-2-700);
+  --color-sage-800: var(--organic-accent-2-800);
+  --color-sage-900: var(--organic-accent-2-900);
+
+  --color-neutral-100: var(--organic-neutral-100);
+  --color-neutral-200: var(--organic-neutral-200);
+  --color-neutral-300: var(--organic-neutral-300);
+  --color-neutral-400: var(--organic-neutral-400);
+  --color-neutral-500: var(--organic-neutral-500);
+  --color-neutral-600: var(--organic-neutral-600);
+  --color-neutral-700: var(--organic-neutral-700);
+  --color-neutral-800: var(--organic-neutral-800);
+  --color-neutral-900: var(--organic-neutral-900);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -39,82 +78,90 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) * 1.75);
+  --radius-xl: calc(var(--radius) * 2);
+  --radius-2xl: calc(var(--radius) * 2.5);
+  --radius-3xl: calc(var(--radius) * 3);
+  --radius-4xl: calc(var(--radius) * 4);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
+  /* ═══ Organic tokens (source of truth) ═══ */
+  --organic-bg: #f5ead8;
+  --organic-surface: #ebddc5;
+  --organic-text: #201e1d;
+  --organic-accent: #c67139;
+  --organic-accent-2: #7a8a5e;
+  --organic-divider: color-mix(in srgb, #201e1d 16%, transparent);
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --organic-neutral-100: #f9f4ed;
+  --organic-neutral-200: #eee7db;
+  --organic-neutral-300: #dcd3c4;
+  --organic-neutral-400: #c0b6a5;
+  --organic-neutral-500: #a19786;
+  --organic-neutral-600: #82796a;
+  --organic-neutral-700: #645c50;
+  --organic-neutral-800: #474238;
+  --organic-neutral-900: #2e2b25;
+
+  --organic-accent-100: #fff2eb;
+  --organic-accent-200: #ffe1d0;
+  --organic-accent-300: #ffc6a5;
+  --organic-accent-400: #f6a06b;
+  --organic-accent-500: #d67f48;
+  --organic-accent-600: #b2622d;
+  --organic-accent-700: #8c491a;
+  --organic-accent-800: #643312;
+  --organic-accent-900: #402310;
+
+  --organic-accent-2-100: #f0fae1;
+  --organic-accent-2-200: #e1eecc;
+  --organic-accent-2-300: #ccdbb2;
+  --organic-accent-2-400: #aebf92;
+  --organic-accent-2-500: #8fa073;
+  --organic-accent-2-600: #728157;
+  --organic-accent-2-700: #56633f;
+  --organic-accent-2-800: #3d472b;
+  --organic-accent-2-900: #272e1b;
+
+  /* ═══ Shadcn tokens remapeados para Organic ═══ */
+  --background: var(--organic-bg);
+  --foreground: var(--organic-text);
+  --card: var(--organic-surface);
+  --card-foreground: var(--organic-text);
+  --popover: var(--organic-surface);
+  --popover-foreground: var(--organic-text);
+  --primary: var(--organic-accent);
+  --primary-foreground: var(--organic-bg);
+  --secondary: var(--organic-neutral-200);
+  --secondary-foreground: var(--organic-neutral-800);
+  --muted: var(--organic-neutral-200);
+  --muted-foreground: color-mix(in srgb, var(--organic-text) 60%, transparent);
+  --accent: var(--organic-accent-100);
+  --accent-foreground: var(--organic-accent-800);
+  --destructive: var(--organic-accent-700);
+  --border: var(--organic-divider);
+  --input: var(--organic-divider);
+  --ring: var(--organic-accent);
+
+  --chart-1: var(--organic-accent-2-500);
+  --chart-2: var(--organic-accent-500);
+  --chart-3: var(--organic-accent-2-700);
+  --chart-4: var(--organic-accent-700);
+  --chart-5: var(--organic-neutral-500);
+
+  --radius: 1rem;
+
+  --sidebar: color-mix(in srgb, var(--organic-surface) 55%, var(--organic-bg));
+  --sidebar-foreground: var(--organic-text);
+  --sidebar-primary: var(--organic-accent);
+  --sidebar-primary-foreground: var(--organic-bg);
+  --sidebar-accent: color-mix(in srgb, var(--organic-text) 6%, transparent);
+  --sidebar-accent-foreground: var(--organic-text);
+  --sidebar-border: var(--organic-divider);
+  --sidebar-ring: var(--organic-accent);
 }
 
 @layer base {
@@ -123,8 +170,28 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body), system-ui, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04";
   }
   html {
-    @apply font-sans;
+    font-family: var(--font-body), system-ui, sans-serif;
   }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading), system-ui, serif;
+    font-weight: 400;
+    letter-spacing: -0.015em;
+    line-height: 1.12;
+  }
+  h6 {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--organic-accent) 30%, transparent);
+  }
+}
+
+/* Utilitário para números tabulares em toda a app */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
 }
