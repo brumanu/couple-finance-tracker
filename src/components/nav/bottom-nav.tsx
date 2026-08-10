@@ -10,8 +10,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 backdrop-blur md:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-4">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur md:hidden">
+      <div className="mx-auto grid max-w-md grid-cols-4 px-2 py-2">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === "/"
@@ -20,16 +20,29 @@ export function BottomNav() {
           const Icon = item.icon;
           const content = (
             <>
-              <div className="relative">
-                <Icon className="size-5" />
+              <div
+                className={cn(
+                  "relative flex size-9 items-center justify-center rounded-full transition-colors",
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-foreground/70",
+                )}
+              >
+                <Icon className="size-4" strokeWidth={2.75} />
                 <LinkPendingDot className="absolute -right-2 -top-1" />
               </div>
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <span
+                className={cn(
+                  "text-[10px] font-medium tracking-wide",
+                  active ? "text-foreground" : "text-muted-foreground",
+                )}
+              >
+                {item.label}
+              </span>
             </>
           );
           const baseClass = cn(
-            "flex flex-col items-center justify-center gap-1 py-2 transition-colors",
-            active ? "text-primary" : "text-muted-foreground",
+            "flex flex-col items-center justify-center gap-1",
             item.disabled && "opacity-40",
           );
           return item.disabled ? (
