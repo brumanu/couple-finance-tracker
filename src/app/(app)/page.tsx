@@ -1,20 +1,15 @@
 import Link from "next/link";
+import { AlertTriangleIcon, CheckIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { parseMesParam } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "./month-switcher";
 import { PagarDialog } from "./pagar/pagar-dialog";
 import { DesmarcarButton } from "./pagar/desmarcar-button";
+import { DespesaFormDialog } from "./despesas/despesa-form-dialog";
 
 type RendaRow = {
   descricao: string;
@@ -42,15 +37,43 @@ type LancamentoRow = {
   conta_recorrente_id: string | null;
 };
 
+const QUINZENA_META = {
+  15: {
+    label: "dia 15",
+    subtitle: "Adiantamento",
+    tokenBg: "bg-sage-200",
+    tokenText: "text-sage-800",
+    barra: "bg-sage-500",
+    barraSecundaria: "bg-sage-400",
+    tag: "sage",
+    blob: "bg-sage-300/45",
+  },
+  30: {
+    label: "dia 30",
+    subtitle: "Salário final",
+    tokenBg: "bg-accent-200",
+    tokenText: "text-accent-800",
+    barra: "bg-accent-500",
+    barraSecundaria: "bg-accent-400",
+    tag: "accent",
+    blob: "bg-accent-300/45",
+  },
+} as const;
+
 export default async function DashboardPage({
   searchParams,
 }: PageProps<"/">) {
-  await requireSession();
+  const session = await requireSession();
   const supabase = await createClient();
 
   const params = await searchParams;
   const mesParam = typeof params.mes === "string" ? params.mes : undefined;
   const mes = parseMesParam(mesParam);
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const hojeDia = Number(hoje.slice(8, 10));
+  const noMesAtual =
+    hoje.slice(0, 7) === `${mes.ano}-${String(mes.mes).padStart(2, "0")}`;
 
   const [rendasRes, contasRes, lancRes] = await Promise.all([
     supabase
@@ -71,49 +94,41 @@ export default async function DashboardPage({
         "id, tipo, descricao, valor, data_pagamento, quinzena, categoria, conta_recorrente_id",
       )
       .gte("data_referencia", mes.primeiroDia)
-      .lte("data_referencia", mes.ultimoDia),
+      .lte("data_referencia", mes.ultimoDia)
+      .order("data_pagamento", { ascending: false }),
   ]);
 
   const rendas = (rendasRes.data ?? []) as RendaRow[];
   const contas = (contasRes.data ?? []) as RecorrenteRow[];
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
 
-  // Mapa recorrenteId -> lancamento (para substituir previsto por real)
   const pagamentos = new Map<string, LancamentoRow>();
   for (const l of lancamentos) {
     if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
       pagamentos.set(l.conta_recorrente_id, l);
     }
   }
-
   const despesasAvulsas = lancamentos.filter(
     (l) => l.tipo === "despesa_avulsa",
   );
 
-  const quinzenas = [15, 30] as const;
-  const resumo = quinzenas.map((q) => {
+  const quinzenaAtual: 15 | 30 = noMesAtual && hojeDia > 15 ? 30 : 15;
+  const proxima: 15 | 30 = quinzenaAtual === 15 ? 30 : 15;
+
+  function calc(q: 15 | 30) {
     const rendasQ = rendas.filter((r) => r.dia_recebimento === q);
     const contasQ = contas.filter((c) => c.quinzena === q);
     const despesasQ = despesasAvulsas.filter((d) => d.quinzena === q);
-
     const totalRenda = rendasQ.reduce(
-      (sum, r) => sum + Number(r.valor_previsto),
+      (s, r) => s + Number(r.valor_previsto),
       0,
     );
-
-    // Contas: usa valor pago se existe lancamento, senão usa previsto
-    const totalContas = contasQ.reduce((sum, c) => {
+    const totalContas = contasQ.reduce((s, c) => {
       const pago = pagamentos.get(c.id);
-      return sum + (pago ? Number(pago.valor) : Number(c.valor_previsto));
+      return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
     }, 0);
-
-    const totalDespesas = despesasQ.reduce(
-      (sum, d) => sum + Number(d.valor),
-      0,
-    );
-
+    const totalDespesas = despesasQ.reduce((s, d) => s + Number(d.valor), 0);
     return {
-      quinzena: q,
       rendas: rendasQ,
       contas: contasQ,
       despesas: despesasQ,
@@ -122,33 +137,49 @@ export default async function DashboardPage({
       totalDespesas,
       saldo: totalRenda - totalContas - totalDespesas,
     };
-  });
+  }
 
-  const rendaTotal = resumo.reduce((sum, r) => sum + r.totalRenda, 0);
-  const contasTotal = resumo.reduce((sum, r) => sum + r.totalContas, 0);
-  const despesasTotal = resumo.reduce((sum, r) => sum + r.totalDespesas, 0);
-  const saldoTotal = rendaTotal - contasTotal - despesasTotal;
-  const nenhumDado =
-    rendas.length === 0 && contas.length === 0 && despesasAvulsas.length === 0;
+  const atual = calc(quinzenaAtual);
+  const outra = calc(proxima);
+
+  const nenhumDado = rendas.length === 0 && contas.length === 0;
+
+  const contasEmAtraso = noMesAtual
+    ? atual.contas.filter((c) => {
+        const paga = pagamentos.get(c.id);
+        if (paga) return false;
+        return c.dia_vencimento != null && hojeDia > c.dia_vencimento;
+      })
+    : [];
+
+  const primeiroNome = session.nome.split(/\s+/)[0];
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">Dashboard</h2>
-          <p className="text-sm text-muted-foreground">
-            Saldo por quinzena — atualiza conforme você paga contas e lança
-            despesas.
+          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+            Oi, {primeiroNome}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {noMesAtual
+              ? `Isto é o que sobra nesta quinzena e na próxima em ${mes.label}.`
+              : `Estimativa para ${mes.label}.`}
           </p>
         </div>
-        <MonthSwitcher mes={mes} />
-      </div>
+        <div className="flex items-center gap-3">
+          <MonthSwitcher mes={mes} />
+          <div className="hidden md:block">
+            <DespesaFormDialog />
+          </div>
+        </div>
+      </header>
 
       {nenhumDado ? (
         <Card>
-          <CardContent className="flex flex-col items-center gap-3 p-8 text-center">
+          <div className="flex flex-col items-center gap-3 p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              Nenhuma renda ou conta cadastrada para {mes.label}.
+              Ainda não tem nenhuma renda ou conta cadastrada em {mes.label}.
             </p>
             <div className="flex gap-2">
               <Button
@@ -160,217 +191,401 @@ export default async function DashboardPage({
               <Button
                 size="sm"
                 nativeButton={false}
-                render={<Link href="/recorrentes">Cadastrar contas</Link>}
+                render={
+                  <Link href="/recorrentes">Cadastrar contas</Link>
+                }
               />
             </div>
-          </CardContent>
+          </div>
         </Card>
       ) : (
         <>
-          <Card className="border-primary/40 bg-primary/5">
-            <CardContent className="grid grid-cols-2 gap-4 p-4 md:grid-cols-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Renda
+          <div className="grid gap-4 md:grid-cols-[1.55fr_1fr]">
+            <QuinzenaHeroCard
+              quinzena={quinzenaAtual}
+              dados={atual}
+              titulo="Sobra nesta quinzena"
+            />
+            <QuinzenaResumoCard quinzena={proxima} dados={outra} />
+          </div>
+
+          {contasEmAtraso.length > 0 && (
+            <div className="flex items-start gap-3 rounded-2xl border border-accent-300 bg-accent-100 p-4">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <AlertTriangleIcon className="size-4" strokeWidth={2.75} />
+              </div>
+              <div className="flex-1">
+                <p className="font-heading text-lg text-accent-800">
+                  {contasEmAtraso.length === 1
+                    ? "1 conta em atraso"
+                    : `${contasEmAtraso.length} contas em atraso`}
                 </p>
-                <p className="text-xl font-semibold tabular-nums">
-                  {formatBRL(rendaTotal)}
+                <p className="text-sm text-accent-800/80">
+                  {contasEmAtraso.map((c) => c.descricao).join(", ")}
                 </p>
               </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Contas
-                </p>
-                <p className="text-xl font-semibold tabular-nums text-red-600">
-                  −{formatBRL(contasTotal)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Despesas
-                </p>
-                <p className="text-xl font-semibold tabular-nums text-red-600">
-                  −{formatBRL(despesasTotal)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Saldo
-                </p>
-                <p
-                  className={`text-xl font-semibold tabular-nums ${
-                    saldoTotal >= 0 ? "text-emerald-600" : "text-red-600"
-                  }`}
-                >
-                  {formatBRL(saldoTotal)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            </div>
+          )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            {resumo.map((q) => (
-              <Card key={q.quinzena}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle>Quinzena do dia {q.quinzena}</CardTitle>
-                    <Badge
-                      variant={q.saldo >= 0 ? "default" : "destructive"}
-                      className="tabular-nums"
-                    >
-                      {formatBRL(q.saldo)}
-                    </Badge>
-                  </div>
-                  <CardDescription>
-                    {q.quinzena === 15 ? "Adiantamento" : "Salário final"}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-4">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="rounded-md bg-emerald-50 p-2 dark:bg-emerald-950/30">
-                      <p className="text-[10px] uppercase text-muted-foreground">
-                        Renda
-                      </p>
-                      <p className="text-sm font-semibold tabular-nums text-emerald-700 dark:text-emerald-400">
-                        {formatBRL(q.totalRenda)}
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-red-50 p-2 dark:bg-red-950/30">
-                      <p className="text-[10px] uppercase text-muted-foreground">
-                        Contas
-                      </p>
-                      <p className="text-sm font-semibold tabular-nums text-red-700 dark:text-red-400">
-                        −{formatBRL(q.totalContas)}
-                      </p>
-                    </div>
-                    <div className="rounded-md bg-red-50 p-2 dark:bg-red-950/30">
-                      <p className="text-[10px] uppercase text-muted-foreground">
-                        Despesas
-                      </p>
-                      <p className="text-sm font-semibold tabular-nums text-red-700 dark:text-red-400">
-                        −{formatBRL(q.totalDespesas)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {q.rendas.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Rendas
-                      </p>
-                      {q.rendas.map((r, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between text-sm"
-                        >
-                          <span className="truncate">{r.descricao}</span>
-                          <span className="tabular-nums text-emerald-700 dark:text-emerald-400">
-                            {formatBRL(r.valor_previsto)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {q.contas.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Contas
-                      </p>
-                      {q.contas.map((c) => {
-                        const pago = pagamentos.get(c.id);
-                        const valor = pago
-                          ? Number(pago.valor)
-                          : Number(c.valor_previsto);
-                        return (
-                          <div
-                            key={c.id}
-                            className="flex items-center justify-between gap-2 text-sm"
-                          >
-                            <span className="min-w-0 flex-1 truncate">
-                              {c.descricao}
-                              {c.dia_vencimento && (
-                                <span className="ml-1 text-xs text-muted-foreground">
-                                  (dia {c.dia_vencimento})
-                                </span>
-                              )}
-                              {pago && (
-                                <Badge
-                                  variant="secondary"
-                                  className="ml-2 h-4 text-[10px]"
-                                >
-                                  paga
-                                </Badge>
-                              )}
-                            </span>
-                            <span
-                              className={`whitespace-nowrap tabular-nums ${
-                                pago
-                                  ? "font-medium text-foreground"
-                                  : "text-red-700 dark:text-red-400"
-                              }`}
-                            >
-                              −{formatBRL(valor)}
-                            </span>
-                            {pago ? (
-                              <DesmarcarButton
-                                lancamentoId={pago.id}
-                                descricao={c.descricao}
-                              />
-                            ) : (
-                              <PagarDialog
-                                contaRecorrenteId={c.id}
-                                descricao={c.descricao}
-                                valorPrevisto={c.valor_previsto}
-                                dataReferencia={mes.primeiroDia}
-                                quinzena={c.quinzena as 15 | 30}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {q.despesas.length > 0 && (
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                        Despesas
-                      </p>
-                      {q.despesas.map((d) => (
-                        <div
-                          key={d.id}
-                          className="flex items-center justify-between gap-2 text-sm"
-                        >
-                          <span className="min-w-0 flex-1 truncate">
-                            {d.descricao}
-                            {d.categoria && (
-                              <span className="ml-1 text-xs text-muted-foreground">
-                                · {d.categoria}
-                              </span>
-                            )}
-                          </span>
-                          <span className="whitespace-nowrap tabular-nums text-red-700 dark:text-red-400">
-                            −{formatBRL(d.valor)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {q.rendas.length === 0 &&
-                    q.contas.length === 0 &&
-                    q.despesas.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        Nenhum lançamento nesta quinzena.
-                      </p>
-                    )}
-                </CardContent>
-              </Card>
-            ))}
+          <div className="grid gap-4 md:grid-cols-[1.1fr_1fr]">
+            <ContasQuinzenaCard
+              quinzena={quinzenaAtual}
+              contas={atual.contas}
+              pagamentos={pagamentos}
+              mes={mes}
+              hojeDia={hojeDia}
+              noMesAtual={noMesAtual}
+            />
+            <UltimasDespesasCard despesas={despesasAvulsas.slice(0, 6)} />
           </div>
         </>
       )}
     </div>
   );
+}
+
+type CalcResult = {
+  rendas: RendaRow[];
+  contas: RecorrenteRow[];
+  despesas: LancamentoRow[];
+  totalRenda: number;
+  totalContas: number;
+  totalDespesas: number;
+  saldo: number;
+};
+
+function QuinzenaHeroCard({
+  quinzena,
+  dados,
+  titulo,
+}: {
+  quinzena: 15 | 30;
+  dados: CalcResult;
+  titulo: string;
+}) {
+  const meta = QUINZENA_META[quinzena];
+  const total = dados.totalRenda || 1;
+  const pctContas = Math.min(100, (dados.totalContas / total) * 100);
+  const pctDespesas = Math.min(
+    100 - pctContas,
+    (dados.totalDespesas / total) * 100,
+  );
+  const pctLivre = Math.max(0, 100 - pctContas - pctDespesas);
+
+  return (
+    <Card className="relative overflow-hidden">
+      <div
+        className={`pointer-events-none absolute -right-16 -top-16 size-56 rounded-full ${meta.blob}`}
+        aria-hidden
+      />
+      <div className="relative flex flex-col gap-5 p-6">
+        <div>
+          <p className="text-[11px] uppercase tracking-widest text-primary">
+            {titulo}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Quinzena {meta.label} · {meta.subtitle}
+          </p>
+        </div>
+
+        <p
+          className={`font-heading tabular-nums ${dados.saldo >= 0 ? "text-foreground" : "text-primary"}`}
+          style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)", lineHeight: 1 }}
+        >
+          {formatBRL(dados.saldo)}
+        </p>
+
+        <div className="flex flex-col gap-2">
+          <div className="flex h-3 w-full overflow-hidden rounded-full bg-neutral-200">
+            {pctContas > 0 && (
+              <div
+                className={meta.barra}
+                style={{ width: `${pctContas}%` }}
+                title={`Contas ${formatBRL(dados.totalContas)}`}
+              />
+            )}
+            {pctDespesas > 0 && (
+              <div
+                className={meta.barraSecundaria}
+                style={{ width: `${pctDespesas}%` }}
+                title={`Despesas ${formatBRL(dados.totalDespesas)}`}
+              />
+            )}
+            {pctLivre > 0 && (
+              <div
+                className="bg-neutral-300"
+                style={{ width: `${pctLivre}%` }}
+              />
+            )}
+          </div>
+          <div className="flex flex-wrap gap-4 text-xs">
+            <LegendaDot
+              className={meta.barra}
+              label="Contas"
+              valor={dados.totalContas}
+            />
+            <LegendaDot
+              className={meta.barraSecundaria}
+              label="Despesas"
+              valor={dados.totalDespesas}
+            />
+            <LegendaDot
+              className="bg-neutral-300"
+              label="Renda"
+              valor={dados.totalRenda}
+              muted
+            />
+          </div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function QuinzenaResumoCard({
+  quinzena,
+  dados,
+}: {
+  quinzena: 15 | 30;
+  dados: CalcResult;
+}) {
+  const meta = QUINZENA_META[quinzena];
+  return (
+    <Card>
+      <div className="flex flex-col gap-4 p-6">
+        <div>
+          <p className="text-[11px] uppercase tracking-widest text-primary">
+            Próxima quinzena · {meta.label}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">{meta.subtitle}</p>
+        </div>
+        <p
+          className="font-heading tabular-nums"
+          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", lineHeight: 1 }}
+        >
+          {formatBRL(dados.saldo)}
+        </p>
+        <div className="flex flex-col gap-2 text-sm">
+          <ResumoLinha label="Renda" valor={dados.totalRenda} />
+          <ResumoLinha
+            label="Contas"
+            valor={-dados.totalContas}
+            variant="danger"
+          />
+          <ResumoLinha
+            label="Despesas"
+            valor={-dados.totalDespesas}
+            variant="danger"
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function LegendaDot({
+  className,
+  label,
+  valor,
+  muted,
+}: {
+  className: string;
+  label: string;
+  valor: number;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className={`inline-block size-2 rounded-full ${className}`} />
+      <span className={muted ? "text-muted-foreground" : "text-foreground/80"}>
+        {label}{" "}
+        <span className="font-medium tabular-nums text-foreground">
+          {formatBRL(valor)}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+function ResumoLinha({
+  label,
+  valor,
+  variant,
+}: {
+  label: string;
+  valor: number;
+  variant?: "danger";
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={`tabular-nums font-medium ${variant === "danger" ? "text-primary" : "text-foreground"}`}
+      >
+        {valor < 0 ? "−" : ""}
+        {formatBRL(Math.abs(valor))}
+      </span>
+    </div>
+  );
+}
+
+function ContasQuinzenaCard({
+  quinzena,
+  contas,
+  pagamentos,
+  mes,
+  hojeDia,
+  noMesAtual,
+}: {
+  quinzena: 15 | 30;
+  contas: RecorrenteRow[];
+  pagamentos: Map<string, LancamentoRow>;
+  mes: { primeiroDia: string; label: string };
+  hojeDia: number;
+  noMesAtual: boolean;
+}) {
+  return (
+    <Card>
+      <div className="flex flex-col gap-4 p-6">
+        <div className="flex items-baseline justify-between">
+          <p className="font-heading text-lg">Contas desta quinzena</p>
+          <p className="text-xs text-muted-foreground">{mes.label}</p>
+        </div>
+        {contas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhuma conta cadastrada para o dia {quinzena}.
+          </p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border/60">
+            {contas.map((c) => {
+              const pago = pagamentos.get(c.id);
+              const atrasada =
+                noMesAtual &&
+                !pago &&
+                c.dia_vencimento != null &&
+                hojeDia > c.dia_vencimento;
+              return (
+                <li
+                  key={c.id}
+                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                >
+                  <div
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
+                      pago
+                        ? "bg-sage-300 text-sage-800"
+                        : atrasada
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-neutral-200 text-foreground"
+                    }`}
+                  >
+                    {pago ? (
+                      <CheckIcon className="size-4" strokeWidth={2.75} />
+                    ) : atrasada ? (
+                      <AlertTriangleIcon
+                        className="size-4"
+                        strokeWidth={2.75}
+                      />
+                    ) : (
+                      <span className="font-heading text-xs">
+                        {c.descricao[0]?.toUpperCase() ?? "?"}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`truncate text-sm ${pago ? "text-muted-foreground line-through" : ""}`}
+                    >
+                      {c.descricao}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {pago
+                        ? `Paga${pago.data_pagamento ? " em " + formatDataCurta(pago.data_pagamento) : ""}`
+                        : c.dia_vencimento
+                          ? atrasada
+                            ? `Venceu dia ${c.dia_vencimento}`
+                            : `Vence dia ${c.dia_vencimento}`
+                          : ""}
+                    </p>
+                  </div>
+                  <span
+                    className={`tabular-nums text-sm font-medium ${pago ? "text-muted-foreground line-through" : ""}`}
+                  >
+                    {formatBRL(pago ? pago.valor : c.valor_previsto)}
+                  </span>
+                  {pago ? (
+                    <DesmarcarButton
+                      lancamentoId={pago.id}
+                      descricao={c.descricao}
+                    />
+                  ) : (
+                    <PagarDialog
+                      contaRecorrenteId={c.id}
+                      descricao={c.descricao}
+                      valorPrevisto={c.valor_previsto}
+                      dataReferencia={mes.primeiroDia}
+                      quinzena={c.quinzena as 15 | 30}
+                    />
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function UltimasDespesasCard({ despesas }: { despesas: LancamentoRow[] }) {
+  return (
+    <Card>
+      <div className="flex flex-col gap-4 p-6">
+        <div className="flex items-baseline justify-between">
+          <p className="font-heading text-lg">Últimas despesas</p>
+          <Link
+            href="/despesas"
+            className="text-xs text-primary hover:underline"
+          >
+            Ver todas
+          </Link>
+        </div>
+        {despesas.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhuma despesa lançada neste mês.
+          </p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border/60">
+            {despesas.map((d) => (
+              <li
+                key={d.id}
+                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-neutral-200 font-heading text-xs text-foreground">
+                  {d.descricao[0]?.toUpperCase() ?? "?"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">{d.descricao}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {d.data_pagamento
+                      ? formatDataCurta(d.data_pagamento)
+                      : ""}
+                    {d.categoria ? ` · ${d.categoria}` : ""}
+                    {d.quinzena ? ` · quinzena ${d.quinzena}` : ""}
+                  </p>
+                </div>
+                <span className="tabular-nums text-sm font-medium text-primary">
+                  −{formatBRL(d.valor)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function formatDataCurta(iso: string): string {
+  const [, m, d] = iso.split("-");
+  return `${d}/${m}`;
 }
