@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
+import { LinkPendingDot } from "./link-pending-dot";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -19,7 +20,10 @@ export function BottomNav() {
           const Icon = item.icon;
           const content = (
             <>
-              <Icon className="size-5" />
+              <div className="relative">
+                <Icon className="size-5" />
+                <LinkPendingDot className="absolute -right-2 -top-1" />
+              </div>
               <span className="text-[10px] font-medium">{item.label}</span>
             </>
           );

@@ -6,6 +6,7 @@ import { LogOutIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
 import { signOut } from "@/lib/auth-actions";
+import { LinkPendingDot } from "./link-pending-dot";
 
 type Props = {
   nomeUsuario: string;
@@ -55,6 +56,7 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
             >
               <Icon className="size-4" />
               {item.label}
+              <LinkPendingDot className="ml-auto" />
             </Link>
           );
         })}
