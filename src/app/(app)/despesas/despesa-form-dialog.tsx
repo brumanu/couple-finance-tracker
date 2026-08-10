@@ -95,8 +95,8 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
         <DialogTrigger
           render={
             <Button size="sm">
-              <PlusIcon className="size-4" />
-              Nova despesa
+              <PlusIcon className="size-4" strokeWidth={2.75} />
+              Lançar despesa
             </Button>
           }
         />
@@ -104,10 +104,10 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {isEdit ? "Editar despesa" : "Nova despesa"}
+            {isEdit ? "Editar despesa" : "Lançar despesa"}
           </DialogTitle>
           <DialogDescription>
-            Gastos do dia a dia (mercado, gasolina, restaurante…).
+            Mercado, gasolina, aquele jantar de sexta.
           </DialogDescription>
         </DialogHeader>
 
