@@ -1,0 +1,28 @@
+import { requireSession } from "@/lib/auth";
+import { Sidebar } from "@/components/nav/sidebar";
+import { BottomNav } from "@/components/nav/bottom-nav";
+import { MobileHeader } from "@/components/nav/mobile-header";
+
+export default async function AppLayout({ children }: LayoutProps<"/">) {
+  const session = await requireSession();
+
+  return (
+    <div className="flex min-h-screen w-full">
+      <Sidebar
+        nomeUsuario={session.nome}
+        emailUsuario={session.email}
+        nomeCasal={session.casalNome}
+      />
+
+      <div className="flex flex-1 flex-col">
+        <MobileHeader
+          nomeCasal={session.casalNome}
+          nomeUsuario={session.nome}
+        />
+        <main className="flex-1 pb-20 md:pb-6">{children}</main>
+      </div>
+
+      <BottomNav />
+    </div>
+  );
+}
