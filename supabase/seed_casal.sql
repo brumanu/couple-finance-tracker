@@ -24,11 +24,11 @@ declare
   v_casal_id       uuid;
   v_titular_id     uuid;
   v_conjuge_id     uuid;
-  v_email_titular  text := 'TITULAR@EXEMPLO.COM';   -- ⚠️ TROQUE
-  v_email_conjuge  text := 'CONJUGE@EXEMPLO.COM';   -- ⚠️ TROQUE
+  v_email_titular  text := 'bruno.manuel99@hotmail.com';   -- ⚠️ TROQUE
+  v_email_conjuge  text := 'js3011@hotmail.com';   -- ⚠️ TROQUE
   v_nome_titular   text := 'Bruno';                  -- ⚠️ TROQUE
-  v_nome_conjuge   text := 'Esposa';                 -- ⚠️ TROQUE
-  v_nome_casal     text := 'Bruno & Esposa';         -- ⚠️ TROQUE
+  v_nome_conjuge   text := 'Jacqueline';                 -- ⚠️ TROQUE
+  v_nome_casal     text := 'Bruno & Jacqueline';         -- ⚠️ TROQUE
 begin
   select id into v_titular_id from auth.users where email = v_email_titular;
   select id into v_conjuge_id from auth.users where email = v_email_conjuge;
