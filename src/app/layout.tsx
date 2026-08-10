@@ -15,6 +15,19 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Financeiro do Casal",
   description: "Controle financeiro quinzenal — Bruno & Esposa",
+  applicationName: "Financeiro",
+  appleWebApp: {
+    capable: true,
+    title: "Financeiro",
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
+};
+
+export const viewport = {
+  themeColor: "#0f172a",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
