@@ -1,0 +1,30 @@
+name: Keepalive Supabase
+
+# O free tier do Supabase pausa o projeto após 7 dias sem requests.
+# Este workflow faz um ping semanal para evitar a pausa.
+# Requer 2 secrets no repositório:
+#   SUPABASE_URL       → ex: https://xxxx.supabase.co
+#   SUPABASE_ANON_KEY  → chave anon (não a service_role)
+
+on:
+  schedule:
+    - cron: "0 12 * * 1" # toda segunda-feira 12:00 UTC
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST
+        run: |
+          set -e
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/casais?select=id&limit=1")
+          echo "HTTP $RESPONSE"
+          # 200 (com dados) ou 401 (RLS bloqueou anon) — ambos indicam DB ativo
+          if [ "$RESPONSE" != "200" ] && [ "$RESPONSE" != "401" ]; then
+            echo "Supabase respondeu com status inesperado: $RESPONSE"
+            exit 1
+          fi
