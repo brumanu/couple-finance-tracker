@@ -78,7 +78,7 @@ export default async function CartaoDetailPage({
     supabase
       .from("compras_cartao")
       .select(
-        "id, cartao_id, descricao, valor_total, data_compra, parcelas, categoria",
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria",
       )
       .eq("cartao_id", id)
       .order("data_compra", { ascending: false }),

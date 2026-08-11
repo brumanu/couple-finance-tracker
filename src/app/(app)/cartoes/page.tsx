@@ -49,7 +49,9 @@ export default async function CartoesPage({
       .order("apelido", { ascending: true }),
     supabase
       .from("compras_cartao")
-      .select("id, cartao_id, descricao, valor_total, data_compra, parcelas, categoria"),
+      .select(
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria",
+      ),
   ]);
 
   const bancos = (bancosRes.data ?? []) as BancoOption[];

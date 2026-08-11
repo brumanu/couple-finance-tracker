@@ -12,6 +12,7 @@ type Parsed = {
   valor_total: number;
   data_compra: string;
   parcelas: number;
+  parcelas_ja_pagas: number;
   categoria: string | null;
 };
 
@@ -21,6 +22,12 @@ function parseFormData(formData: FormData): Parsed | string {
   const valorRaw = String(formData.get("valor_total") ?? "").trim();
   const data_compra = String(formData.get("data_compra") ?? "").trim();
   const parcelas = Number(formData.get("parcelas"));
+  const emAndamento =
+    formData.get("em_andamento") === "on" ||
+    formData.get("em_andamento") === "true";
+  const parcelaAtualRaw = formData.get("parcela_atual");
+  const parcela_atual =
+    emAndamento && parcelaAtualRaw ? Number(parcelaAtualRaw) : 1;
   const categoria = String(formData.get("categoria") ?? "").trim() || null;
 
   if (!cartao_id) return "Cartão inválido.";
@@ -30,6 +37,15 @@ function parseFormData(formData: FormData): Parsed | string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data_compra)) return "Data inválida.";
   if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > 60)
     return "Parcelas inválidas (1 a 60).";
+  if (
+    emAndamento &&
+    (!Number.isInteger(parcela_atual) ||
+      parcela_atual < 1 ||
+      parcela_atual > parcelas)
+  )
+    return `Parcela atual deve estar entre 1 e ${parcelas}.`;
+
+  const parcelas_ja_pagas = emAndamento ? parcela_atual - 1 : 0;
 
   return {
     cartao_id,
@@ -37,6 +53,7 @@ function parseFormData(formData: FormData): Parsed | string {
     valor_total: valor,
     data_compra,
     parcelas,
+    parcelas_ja_pagas,
     categoria,
   };
 }

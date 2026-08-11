@@ -13,6 +13,7 @@ export type CompraCartaoInfo = {
   valor_total: number | string;
   data_compra: string; // YYYY-MM-DD
   parcelas: number;
+  parcelas_ja_pagas?: number; // default 0 quando ausente
   categoria: string | null;
 };
 
@@ -70,11 +71,13 @@ export function parcelaNoMes(
 } | null {
   const primeira = mesPrimeiraParcela(compra.data_compra, diaFechamento);
   const parcelas = compra.parcelas;
+  const jaPagas = Math.max(0, compra.parcelas_ja_pagas ?? 0);
 
   // Índice do mês alvo relativo à primeira parcela
   const meses =
     (mesAlvo.ano - primeira.ano) * 12 + (mesAlvo.mes - primeira.mes);
-  if (meses < 0 || meses >= parcelas) return null;
+  // Pula as parcelas 1..jaPagas — elas ficaram no passado antes do cadastro
+  if (meses < jaPagas || meses >= parcelas) return null;
 
   const valores = valoresParcelas(Number(compra.valor_total), parcelas);
   const numero = meses + 1;
