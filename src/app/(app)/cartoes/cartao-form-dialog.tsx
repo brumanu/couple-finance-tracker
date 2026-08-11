@@ -85,11 +85,15 @@ export function CartaoFormDialog({ cartao, bancos, trigger }: Props) {
     ],
   );
 
+  const [bancoId, setBancoId] = useState(defaults.banco_id);
+  useEffect(() => setBancoId(defaults.banco_id), [defaults.banco_id]);
+
   useEffect(() => {
     if (state.ok) setOpen(false);
   }, [state]);
 
   const semBanco = bancos.length === 0;
+  const bancoSelecionado = bancos.find((b) => b.id === bancoId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -121,13 +125,33 @@ export function CartaoFormDialog({ cartao, bancos, trigger }: Props) {
           </p>
         ) : (
           <form action={formAction} className="flex flex-col gap-4">
+            <input type="hidden" name="banco_id" value={bancoId} />
             <div className="flex flex-col gap-2">
               <Label htmlFor="banco_id" className="text-xs text-muted-foreground">
                 Banco
               </Label>
-              <Select name="banco_id" defaultValue={defaults.banco_id}>
+              <Select
+                value={bancoId}
+                onValueChange={(v) => v && setBancoId(v)}
+              >
                 <SelectTrigger id="banco_id">
-                  <SelectValue />
+                  <SelectValue>
+                    {bancoSelecionado ? (
+                      <span className="inline-flex items-center gap-2">
+                        <BancoIcone
+                          icone={bancoSelecionado.icone}
+                          corFallback={bancoSelecionado.cor}
+                          nomeFallback={bancoSelecionado.nome}
+                          size={20}
+                        />
+                        <span>{bancoSelecionado.nome}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Selecione um banco
+                      </span>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {bancos.map((b) => (
