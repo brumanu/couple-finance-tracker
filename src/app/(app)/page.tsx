@@ -15,6 +15,7 @@ import {
   type AssinaturaCartaoInfo,
 } from "@/lib/cartao-calc";
 import { BancoIcone } from "@/lib/bancos-icones";
+import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "./month-switcher";
@@ -76,6 +77,7 @@ export default async function DashboardPage({
 }: PageProps<"/">) {
   const session = await requireSession();
   const supabase = await createClient();
+  const cartoesSel = await getCartoesParaSelecao();
 
   const params = await searchParams;
   const mesParam = typeof params.mes === "string" ? params.mes : undefined;
@@ -300,7 +302,7 @@ export default async function DashboardPage({
         <div className="flex items-center gap-3">
           <MonthSwitcher mes={mes} />
           <div className="hidden md:block">
-            <DespesaFormDialog />
+            <DespesaFormDialog cartoes={cartoesSel} />
           </div>
         </div>
       </header>

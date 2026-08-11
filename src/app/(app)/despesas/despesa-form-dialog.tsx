@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BancoIcone } from "@/lib/bancos-icones";
+import type { CartaoOpcao } from "@/lib/cartoes-selection";
 import {
   createDespesa,
   updateDespesa,
@@ -39,9 +41,12 @@ export type DespesaRow = {
 type Props = {
   despesa?: DespesaRow;
   trigger?: React.ReactElement;
+  cartoes?: CartaoOpcao[];
 };
 
 const INITIAL_STATE: DespesaFormState = {};
+
+const NENHUM = "__nenhum__";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -52,7 +57,11 @@ function inferQuinzena(dateISO: string): "15" | "30" {
   return day <= 15 ? "15" : "30";
 }
 
-export function DespesaFormDialog({ despesa, trigger }: Props) {
+export function DespesaFormDialog({
+  despesa,
+  trigger,
+  cartoes = [],
+}: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(despesa);
 
@@ -83,6 +92,29 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
     despesa?.categoria,
   ]);
 
+  const [cartaoId, setCartaoId] = useState<string>(NENHUM);
+  const [parcelada, setParcelada] = useState(false);
+  const [parcelasRaw, setParcelasRaw] = useState("2");
+
+  useEffect(() => {
+    // Ao (re)abrir para uma nova despesa, sempre começa sem cartão
+    if (!isEdit) {
+      setCartaoId(NENHUM);
+      setParcelada(false);
+      setParcelasRaw("2");
+    }
+  }, [isEdit, open]);
+
+  // Se desmarca cartão, reseta o estado de parcelamento
+  useEffect(() => {
+    if (cartaoId === NENHUM) {
+      setParcelada(false);
+    }
+  }, [cartaoId]);
+
+  const usaCartao = cartaoId !== NENHUM;
+  const cartaoSelecionado = cartoes.find((c) => c.id === cartaoId);
+
   useEffect(() => {
     if (state.ok) setOpen(false);
   }, [state]);
@@ -107,13 +139,19 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
             {isEdit ? "Editar despesa" : "Lançar despesa"}
           </DialogTitle>
           <DialogDescription>
-            Mercado, gasolina, aquele jantar de sexta.
+            {usaCartao
+              ? parcelada
+                ? "Vira uma compra parcelada no cartão — cada parcela cai na fatura do mês certo."
+                : "Vira uma compra à vista no cartão — some do saldo da quinzena e entra na próxima fatura."
+              : "Mercado, gasolina, aquele jantar de sexta."}
           </DialogDescription>
         </DialogHeader>
 
         <form action={formAction} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="descricao">Descrição</Label>
+            <Label htmlFor="descricao" className="text-xs text-muted-foreground">
+              Descrição
+            </Label>
             <Input
               id="descricao"
               name="descricao"
@@ -125,7 +163,9 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="valor">Valor (R$)</Label>
+              <Label htmlFor="valor" className="text-xs text-muted-foreground">
+                Valor (R$)
+              </Label>
               <Input
                 id="valor"
                 name="valor"
@@ -136,7 +176,9 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="data">Data</Label>
+              <Label htmlFor="data" className="text-xs text-muted-foreground">
+                Data
+              </Label>
               <Input
                 id="data"
                 name="data"
@@ -147,21 +189,147 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {!isEdit && cartoes.length > 0 && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="quinzena">Quinzena</Label>
-              <Select name="quinzena" defaultValue={defaults.quinzena}>
-                <SelectTrigger id="quinzena">
-                  <SelectValue />
+              <Label
+                htmlFor="cartao_id"
+                className="text-xs text-muted-foreground"
+              >
+                Cartão (opcional)
+              </Label>
+              <input type="hidden" name="cartao_id" value={usaCartao ? cartaoId : ""} />
+              <input
+                type="hidden"
+                name="parcelas"
+                value={usaCartao && parcelada ? parcelasRaw : "1"}
+              />
+              <Select
+                value={cartaoId}
+                onValueChange={(v) => v && setCartaoId(v)}
+              >
+                <SelectTrigger id="cartao_id">
+                  <SelectValue>
+                    {cartaoSelecionado ? (
+                      <span className="inline-flex items-center gap-2">
+                        <BancoIcone
+                          icone={cartaoSelecionado.bancoIcone}
+                          corFallback={cartaoSelecionado.bancoCor}
+                          nomeFallback={cartaoSelecionado.bancoNome}
+                          size={20}
+                        />
+                        <span>{cartaoSelecionado.label}</span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        Sem cartão — despesa do dia a dia
+                      </span>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="15">Dia 15</SelectItem>
-                  <SelectItem value="30">Dia 30</SelectItem>
+                  <SelectItem value={NENHUM}>
+                    <span className="text-muted-foreground">
+                      Sem cartão — despesa do dia a dia
+                    </span>
+                  </SelectItem>
+                  {cartoes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <BancoIcone
+                          icone={c.bancoIcone}
+                          corFallback={c.bancoCor}
+                          nomeFallback={c.bancoNome}
+                          size={20}
+                        />
+                        <span>{c.label}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+
+              {usaCartao && (
+                <div className="mt-2 flex flex-col gap-2 rounded-2xl border border-border/60 p-3">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={parcelada}
+                      onChange={(e) => setParcelada(e.target.checked)}
+                      className="size-4 rounded border-input"
+                    />
+                    Foi parcelada
+                  </label>
+                  {parcelada && (
+                    <div className="flex items-center gap-2 pl-6">
+                      <Label
+                        htmlFor="parcelas_compra"
+                        className="text-xs text-muted-foreground"
+                      >
+                        Em
+                      </Label>
+                      <Input
+                        id="parcelas_compra"
+                        type="number"
+                        min={2}
+                        max={60}
+                        value={parcelasRaw}
+                        onChange={(e) => setParcelasRaw(e.target.value)}
+                        className="max-w-[100px]"
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        parcelas
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+          )}
+
+          {!usaCartao && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-2">
+                <Label
+                  htmlFor="quinzena"
+                  className="text-xs text-muted-foreground"
+                >
+                  Quinzena
+                </Label>
+                <Select name="quinzena" defaultValue={defaults.quinzena}>
+                  <SelectTrigger id="quinzena">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="15">Dia 15</SelectItem>
+                    <SelectItem value="30">Dia 30</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label
+                  htmlFor="categoria"
+                  className="text-xs text-muted-foreground"
+                >
+                  Categoria (opcional)
+                </Label>
+                <Input
+                  id="categoria"
+                  name="categoria"
+                  defaultValue={defaults.categoria}
+                  placeholder="Ex: mercado, lazer"
+                />
+              </div>
+            </div>
+          )}
+
+          {usaCartao && (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="categoria">Categoria (opcional)</Label>
+              <Label
+                htmlFor="categoria"
+                className="text-xs text-muted-foreground"
+              >
+                Categoria (opcional)
+              </Label>
               <Input
                 id="categoria"
                 name="categoria"
@@ -169,10 +337,10 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
                 placeholder="Ex: mercado, lazer"
               />
             </div>
-          </div>
+          )}
 
           {state.error && (
-            <p className="text-sm text-red-600" role="alert">
+            <p className="text-sm text-primary" role="alert">
               {state.error}
             </p>
           )}
@@ -187,7 +355,11 @@ export function DespesaFormDialog({ despesa, trigger }: Props) {
               Cancelar
             </Button>
             <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
+              {pending
+                ? "Salvando…"
+                : usaCartao
+                  ? "Lançar no cartão"
+                  : "Salvar"}
             </Button>
           </DialogFooter>
         </form>
@@ -201,8 +373,8 @@ export function EditDespesaTrigger({ despesa }: { despesa: DespesaRow }) {
     <DespesaFormDialog
       despesa={despesa}
       trigger={
-        <Button variant="ghost" size="sm" aria-label="Editar">
-          <PencilIcon className="size-4" />
+        <Button variant="ghost" size="icon-sm" aria-label="Editar">
+          <PencilIcon className="size-4" strokeWidth={2.75} />
         </Button>
       }
     />

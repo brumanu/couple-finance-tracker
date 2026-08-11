@@ -3,11 +3,17 @@
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DespesaFormDialog } from "@/app/(app)/despesas/despesa-form-dialog";
+import type { CartaoOpcao } from "@/lib/cartoes-selection";
 
-export function MobileFab() {
+type Props = {
+  cartoes: CartaoOpcao[];
+};
+
+export function MobileFab({ cartoes }: Props) {
   return (
     <div className="fixed bottom-24 right-5 z-40 md:hidden">
       <DespesaFormDialog
+        cartoes={cartoes}
         trigger={
           <Button
             size="icon-lg"

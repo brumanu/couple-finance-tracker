@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/auth";
+import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { Sidebar } from "@/components/nav/sidebar";
 import { BottomNav } from "@/components/nav/bottom-nav";
 import { MobileHeader } from "@/components/nav/mobile-header";
@@ -6,6 +7,7 @@ import { MobileFab } from "@/components/nav/mobile-fab";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const session = await requireSession();
+  const cartoes = await getCartoesParaSelecao();
 
   return (
     <div className="flex min-h-screen w-full">
@@ -24,7 +26,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </div>
 
       <BottomNav />
-      <MobileFab />
+      <MobileFab cartoes={cartoes} />
     </div>
   );
 }
