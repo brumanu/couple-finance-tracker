@@ -1,5 +1,6 @@
 import { LogOutIcon } from "lucide-react";
 import { signOut } from "@/lib/auth-actions";
+import { ThemeToggle } from "./theme-toggle";
 
 type Props = {
   nomeCasal: string;
@@ -27,15 +28,18 @@ export function MobileHeader({ nomeCasal, nomeUsuario }: Props) {
           <p className="text-xs text-muted-foreground">{nomeCasal}</p>
         </div>
       </div>
-      <form action={signOut}>
-        <button
-          type="submit"
-          aria-label="Sair"
-          className="rounded-full p-2 text-muted-foreground hover:bg-neutral-200 hover:text-foreground"
-        >
-          <LogOutIcon className="size-4" strokeWidth={2.75} />
-        </button>
-      </form>
+      <div className="flex items-center gap-1">
+        <ThemeToggle />
+        <form action={signOut}>
+          <button
+            type="submit"
+            aria-label="Sair"
+            className="rounded-full p-2 text-muted-foreground hover:bg-neutral-200 hover:text-foreground"
+          >
+            <LogOutIcon className="size-4" strokeWidth={2.75} />
+          </button>
+        </form>
+      </div>
     </header>
   );
 }

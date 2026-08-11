@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Figtree, Caprasimo } from "next/font/google";
 import "./globals.css";
+import { ThemeInitScript } from "@/components/nav/theme-init";
 
 const figtree = Figtree({
   variable: "--font-body",
@@ -27,7 +28,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#c67139",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#c67139" },
+    { media: "(prefers-color-scheme: dark)", color: "#1c1714" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
@@ -37,7 +41,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="pt-BR"
       className={`${figtree.variable} ${caprasimo.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <ThemeInitScript />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         {children}
       </body>

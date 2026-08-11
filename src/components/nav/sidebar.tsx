@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
 import { signOut } from "@/lib/auth-actions";
 import { LinkPendingDot } from "./link-pending-dot";
+import { ThemeToggle } from "./theme-toggle";
 
 type Props = {
   nomeUsuario: string;
@@ -81,6 +82,7 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
             {emailUsuario}
           </p>
         </div>
+        <ThemeToggle />
         <form action={signOut}>
           <button
             type="submit"

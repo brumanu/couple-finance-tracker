@@ -164,6 +164,63 @@
   --sidebar-ring: var(--organic-accent);
 }
 
+/* ═══════════════════════════════════════════════════════════════════
+   Modo escuro — inverte as rampas mantendo a temperatura quente do
+   sistema (paleta importada do design Organic).
+   Aplicada em <html class="dark">.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.dark {
+  --organic-bg: #1c1714;
+  --organic-surface: #2a231d;
+  --organic-text: #f5ead8;
+  --organic-accent: #e08a52;
+  --organic-accent-2: #aebf92;
+  --organic-divider: color-mix(in srgb, #f5ead8 14%, transparent);
+
+  --organic-neutral-100: #201b16;
+  --organic-neutral-200: #2b241d;
+  --organic-neutral-300: #3a3128;
+  --organic-neutral-400: #6b6153;
+  --organic-neutral-500: #a19786;
+  --organic-neutral-600: #b8ae9d;
+  --organic-neutral-700: #cabfae;
+  --organic-neutral-800: #ddd3c2;
+  --organic-neutral-900: #f2e9d8;
+
+  --organic-accent-100: #38220f;
+  --organic-accent-200: #4a2d16;
+  --organic-accent-300: #6b3e1f;
+  --organic-accent-400: #b2622d;
+  --organic-accent-500: #d67f48;
+  --organic-accent-600: #f6a06b;
+  --organic-accent-700: #ffc6a5;
+  --organic-accent-800: #ffe1d0;
+  --organic-accent-900: #fff2eb;
+
+  --organic-accent-2-100: #232b16;
+  --organic-accent-2-200: #2f3a1e;
+  --organic-accent-2-300: #3d472b;
+  --organic-accent-2-400: #728157;
+  --organic-accent-2-500: #8fa073;
+  --organic-accent-2-600: #aebf92;
+  --organic-accent-2-700: #ccdbb2;
+  --organic-accent-2-800: #e1eecc;
+  --organic-accent-2-900: #f0fae1;
+
+  /* Ajustes semânticos por causa da inversão das rampas */
+  --primary-foreground: var(--organic-neutral-100);
+  --accent: var(--organic-accent-200);
+  --accent-foreground: var(--organic-accent-900);
+  --muted: var(--organic-neutral-200);
+  --secondary: var(--organic-neutral-200);
+  --secondary-foreground: var(--organic-neutral-800);
+  --destructive: var(--organic-accent-500);
+
+  --sidebar: color-mix(in srgb, var(--organic-surface) 60%, var(--organic-bg));
+  --sidebar-accent: color-mix(in srgb, var(--organic-text) 8%, transparent);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
