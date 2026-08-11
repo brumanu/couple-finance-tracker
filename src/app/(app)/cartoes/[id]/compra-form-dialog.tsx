@@ -269,7 +269,8 @@ export function CompraFormDialog({
                 required
                 value={dataRaw}
                 onChange={(e) => setDataRaw(e.target.value)}
-                disabled={emAndamento}
+                readOnly={emAndamento}
+                className={emAndamento ? "opacity-60" : undefined}
                 title={
                   emAndamento
                     ? "Calculada automaticamente pela parcela atual"
