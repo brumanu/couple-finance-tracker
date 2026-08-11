@@ -18,6 +18,7 @@ import {
   type AssinaturaCartaoInfo,
 } from "@/lib/cartao-calc";
 import { BancoIcone } from "@/lib/bancos-icones";
+import { getCategorias } from "@/lib/categorias-server";
 import { MonthSwitcher } from "../../month-switcher";
 import {
   CompraFormDialog,
@@ -77,7 +78,7 @@ export default async function CartaoDetailPage({
   const cartao = cartaoRes.data;
   if (!cartao) notFound();
 
-  const [bancoRes, comprasRes, assinRes] = await Promise.all([
+  const [bancoRes, comprasRes, assinRes, categorias] = await Promise.all([
     supabase
       .from("bancos")
       .select("id, nome, cor, icone")
@@ -86,18 +87,19 @@ export default async function CartaoDetailPage({
     supabase
       .from("compras_cartao")
       .select(
-        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria",
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id",
       )
       .eq("cartao_id", id)
       .order("data_compra", { ascending: false }),
     supabase
       .from("assinaturas_cartao")
       .select(
-        "id, cartao_id, descricao, valor_mensal, categoria, inicio_vigencia, fim_vigencia, ativa",
+        "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa",
       )
       .eq("cartao_id", id)
       .order("ativa", { ascending: false })
       .order("descricao", { ascending: true }),
+    getCategorias(),
   ]);
 
   const banco = bancoRes.data;
@@ -158,10 +160,14 @@ export default async function CartaoDetailPage({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <MonthSwitcher mes={mes} />
-          <AssinaturaFormDialog cartaoId={cartao.id} />
+          <AssinaturaFormDialog
+            cartaoId={cartao.id}
+            categorias={categorias}
+          />
           <CompraFormDialog
             cartaoId={cartao.id}
             diaFechamento={cartao.dia_fechamento}
+            categorias={categorias}
           />
         </div>
       </header>
@@ -213,6 +219,7 @@ export default async function CartaoDetailPage({
               <CompraFormDialog
                 cartaoId={cartao.id}
                 diaFechamento={cartao.dia_fechamento}
+                categorias={categorias}
               />
             </div>
           </Card>
@@ -329,6 +336,7 @@ export default async function CartaoDetailPage({
                       <EditCompraTrigger
                         compra={c}
                         diaFechamento={cartao.dia_fechamento}
+                        categorias={categorias}
                       />
                       <CompraActionsMenu
                         id={c.id}

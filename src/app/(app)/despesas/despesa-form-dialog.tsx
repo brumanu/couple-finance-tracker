@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/select";
 import { BancoIcone } from "@/lib/bancos-icones";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
+import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
+import { CategoriaSelectField } from "@/components/categoria-select";
 import {
   createDespesa,
   updateDespesa,
@@ -36,12 +38,14 @@ export type DespesaRow = {
   data_pagamento: string;
   quinzena: number | null;
   categoria: string | null;
+  categoria_id: string | null;
 };
 
 type Props = {
   despesa?: DespesaRow;
   trigger?: React.ReactElement;
   cartoes?: CartaoOpcao[];
+  categorias?: CategoriaOpcao[];
 };
 
 const INITIAL_STATE: DespesaFormState = {};
@@ -61,6 +65,7 @@ export function DespesaFormDialog({
   despesa,
   trigger,
   cartoes = [],
+  categorias = [],
 }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(despesa);
@@ -81,7 +86,7 @@ export function DespesaFormDialog({
           : "",
       data,
       quinzena: String(despesa?.quinzena ?? inferQuinzena(data)),
-      categoria: despesa?.categoria ?? "",
+      categoriaId: despesa?.categoria_id ?? NENHUMA_CATEGORIA,
     };
   }, [
     despesa?.id,
@@ -89,15 +94,17 @@ export function DespesaFormDialog({
     despesa?.valor,
     despesa?.data_pagamento,
     despesa?.quinzena,
-    despesa?.categoria,
+    despesa?.categoria_id,
   ]);
 
   const [cartaoId, setCartaoId] = useState<string>(NENHUM);
   const [parcelada, setParcelada] = useState(false);
   const [parcelasRaw, setParcelasRaw] = useState("2");
+  const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
+
+  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
 
   useEffect(() => {
-    // Ao (re)abrir para uma nova despesa, sempre começa sem cartão
     if (!isEdit) {
       setCartaoId(NENHUM);
       setParcelada(false);
@@ -105,7 +112,6 @@ export function DespesaFormDialog({
     }
   }, [isEdit, open]);
 
-  // Se desmarca cartão, reseta o estado de parcelamento
   useEffect(() => {
     if (cartaoId === NENHUM) {
       setParcelada(false);
@@ -307,16 +313,15 @@ export function DespesaFormDialog({
               </div>
               <div className="flex flex-col gap-2">
                 <Label
-                  htmlFor="categoria"
+                  htmlFor="categoria_id"
                   className="text-xs text-muted-foreground"
                 >
-                  Categoria (opcional)
+                  Categoria
                 </Label>
-                <Input
-                  id="categoria"
-                  name="categoria"
-                  defaultValue={defaults.categoria}
-                  placeholder="Ex: mercado, lazer"
+                <CategoriaSelectField
+                  categorias={categorias}
+                  value={categoriaId}
+                  onValueChange={setCategoriaId}
                 />
               </div>
             </div>
@@ -325,16 +330,15 @@ export function DespesaFormDialog({
           {usaCartao && (
             <div className="flex flex-col gap-2">
               <Label
-                htmlFor="categoria"
+                htmlFor="categoria_id"
                 className="text-xs text-muted-foreground"
               >
-                Categoria (opcional)
+                Categoria
               </Label>
-              <Input
-                id="categoria"
-                name="categoria"
-                defaultValue={defaults.categoria}
-                placeholder="Ex: mercado, lazer"
+              <CategoriaSelectField
+                categorias={categorias}
+                value={categoriaId}
+                onValueChange={setCategoriaId}
               />
             </div>
           )}
@@ -368,10 +372,17 @@ export function DespesaFormDialog({
   );
 }
 
-export function EditDespesaTrigger({ despesa }: { despesa: DespesaRow }) {
+export function EditDespesaTrigger({
+  despesa,
+  categorias,
+}: {
+  despesa: DespesaRow;
+  categorias?: CategoriaOpcao[];
+}) {
   return (
     <DespesaFormDialog
       despesa={despesa}
+      categorias={categorias}
       trigger={
         <Button variant="ghost" size="icon-sm" aria-label="Editar">
           <PencilIcon className="size-4" strokeWidth={2.75} />

@@ -14,6 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
+import { CategoriaSelectField } from "@/components/categoria-select";
 import {
   createAssinatura,
   updateAssinatura,
@@ -26,6 +28,7 @@ export type AssinaturaRow = {
   descricao: string;
   valor_mensal: number | string;
   categoria: string | null;
+  categoria_id: string | null;
   inicio_vigencia: string;
   fim_vigencia: string | null;
   ativa: boolean;
@@ -35,6 +38,7 @@ type Props = {
   cartaoId: string;
   assinatura?: AssinaturaRow;
   trigger?: React.ReactElement;
+  categorias?: CategoriaOpcao[];
 };
 
 const INITIAL_STATE: AssinaturaFormState = {};
@@ -47,6 +51,7 @@ export function AssinaturaFormDialog({
   cartaoId,
   assinatura,
   trigger,
+  categorias = [],
 }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(assinatura);
@@ -62,7 +67,7 @@ export function AssinaturaFormDialog({
         assinatura?.valor_mensal != null
           ? Number(assinatura.valor_mensal).toFixed(2).replace(".", ",")
           : "",
-      categoria: assinatura?.categoria ?? "",
+      categoriaId: assinatura?.categoria_id ?? NENHUMA_CATEGORIA,
       inicio_vigencia: assinatura?.inicio_vigencia ?? todayISO(),
       fim_vigencia: assinatura?.fim_vigencia ?? "",
       ativa: assinatura?.ativa ?? true,
@@ -71,12 +76,15 @@ export function AssinaturaFormDialog({
       assinatura?.id,
       assinatura?.descricao,
       assinatura?.valor_mensal,
-      assinatura?.categoria,
+      assinatura?.categoria_id,
       assinatura?.inicio_vigencia,
       assinatura?.fim_vigencia,
       assinatura?.ativa,
     ],
   );
+
+  const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
+  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
 
   useEffect(() => {
     if (state.ok) setOpen(false);
@@ -142,16 +150,15 @@ export function AssinaturaFormDialog({
             </div>
             <div className="flex flex-col gap-2">
               <Label
-                htmlFor="categoria"
+                htmlFor="categoria_id"
                 className="text-xs text-muted-foreground"
               >
                 Categoria (opcional)
               </Label>
-              <Input
-                id="categoria"
-                name="categoria"
-                defaultValue={defaults.categoria}
-                placeholder="Ex: streaming"
+              <CategoriaSelectField
+                categorias={categorias}
+                value={categoriaId}
+                onValueChange={setCategoriaId}
               />
             </div>
           </div>
@@ -229,14 +236,17 @@ export function AssinaturaFormDialog({
 export function EditAssinaturaTrigger({
   assinatura,
   cartaoId,
+  categorias,
 }: {
   assinatura: AssinaturaRow;
   cartaoId: string;
+  categorias?: CategoriaOpcao[];
 }) {
   return (
     <AssinaturaFormDialog
       cartaoId={cartaoId}
       assinatura={assinatura}
+      categorias={categorias}
       trigger={
         <Button variant="ghost" size="icon-sm" aria-label="Editar">
           <PencilIcon className="size-4" strokeWidth={2.75} />

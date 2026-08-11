@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
+import { getCategorias } from "@/lib/categorias-server";
 import { parseMesParam, mesAnterior } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -40,12 +41,17 @@ export default async function DespesasPage({
   const mes = parseMesParam(mesParam);
   const anterior = mesAnterior(mes);
 
-  const cartoes = await getCartoesParaSelecao();
+  const [cartoes, categorias] = await Promise.all([
+    getCartoesParaSelecao(),
+    getCategorias(),
+  ]);
 
   const [atualRes, anteriorRes] = await Promise.all([
     supabase
       .from("lancamentos")
-      .select("id, descricao, valor, data_pagamento, quinzena, categoria")
+      .select(
+        "id, descricao, valor, data_pagamento, quinzena, categoria, categoria_id",
+      )
       .eq("tipo", "despesa_avulsa")
       .gte("data_referencia", mes.primeiroDia)
       .lte("data_referencia", mes.ultimoDia)
@@ -99,7 +105,7 @@ export default async function DespesasPage({
         <div className="flex items-center gap-3">
           <MonthSwitcher mes={mes} />
           <div className="hidden md:block">
-            <DespesaFormDialog cartoes={cartoes} />
+            <DespesaFormDialog cartoes={cartoes} categorias={categorias} />
           </div>
         </div>
       </header>
@@ -165,7 +171,7 @@ export default async function DespesasPage({
             <p className="text-sm text-muted-foreground">
               Nenhuma despesa lançada em {mes.label}.
             </p>
-            <DespesaFormDialog cartoes={cartoes} />
+            <DespesaFormDialog cartoes={cartoes} categorias={categorias} />
           </div>
         </Card>
       ) : (
@@ -212,7 +218,10 @@ export default async function DespesasPage({
                         <span className="whitespace-nowrap text-sm font-medium tabular-nums text-primary">
                           −{formatBRL(d.valor)}
                         </span>
-                        <EditDespesaTrigger despesa={d} />
+                        <EditDespesaTrigger
+                          despesa={d}
+                          categorias={categorias}
+                        />
                         <DespesaActionsMenu
                           id={d.id}
                           descricao={d.descricao}

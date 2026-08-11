@@ -12,7 +12,7 @@ export function BottomNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur md:hidden">
       <div className="mx-auto grid max-w-md grid-cols-6 px-1 py-2">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((i) => !i.desktopOnly).map((item) => {
           const active =
             item.href === "/"
               ? pathname === "/"

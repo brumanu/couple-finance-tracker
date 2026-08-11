@@ -5,6 +5,7 @@ import {
   ShoppingCartIcon,
   CreditCardIcon,
   HandCoinsIcon,
+  TagIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -13,6 +14,8 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   disabled?: boolean;
+  /** Se true, aparece só no sidebar (desktop) — não no bottom-nav mobile */
+  desktopOnly?: boolean;
 };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -22,4 +25,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/cartoes", label: "Cartões", icon: CreditCardIcon },
   { href: "/despesas", label: "Despesas", icon: ShoppingCartIcon },
   { href: "/dividas", label: "Dívidas", icon: HandCoinsIcon },
+  { href: "/categorias", label: "Categorias", icon: TagIcon, desktopOnly: true },
 ];

@@ -1,5 +1,6 @@
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getCategorias } from "@/lib/categorias-server";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format";
@@ -25,14 +26,17 @@ export default async function RecorrentesPage() {
   await requireSession();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("contas_recorrentes")
-    .select(
-      "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, ativa",
-    )
-    .order("quinzena", { ascending: true })
-    .order("dia_vencimento", { ascending: true, nullsFirst: false })
-    .order("descricao", { ascending: true });
+  const [{ data }, categorias] = await Promise.all([
+    supabase
+      .from("contas_recorrentes")
+      .select(
+        "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, ativa",
+      )
+      .order("quinzena", { ascending: true })
+      .order("dia_vencimento", { ascending: true, nullsFirst: false })
+      .order("descricao", { ascending: true }),
+    getCategorias(),
+  ]);
 
   const lista = (data ?? []) as RecorrenteRow[];
   const contas15 = lista.filter((r) => r.quinzena === 15);
@@ -55,7 +59,7 @@ export default async function RecorrentesPage() {
             As que voltam todo mês. Cada uma mora numa quinzena.
           </p>
         </div>
-        <RecorrenteFormDialog />
+        <RecorrenteFormDialog categorias={categorias} />
       </header>
 
       {lista.length === 0 ? (
@@ -64,7 +68,7 @@ export default async function RecorrentesPage() {
             <p className="text-sm text-muted-foreground">
               Nenhuma conta cadastrada ainda.
             </p>
-            <RecorrenteFormDialog />
+            <RecorrenteFormDialog categorias={categorias} />
           </div>
         </Card>
       ) : (
@@ -74,12 +78,14 @@ export default async function RecorrentesPage() {
             corDot="bg-sage-500"
             total={total15}
             itens={contas15}
+            categorias={categorias}
           />
           <ColunaContas
             titulo="Quinzena do dia 30"
             corDot="bg-accent-500"
             total={total30}
             itens={contas30}
+            categorias={categorias}
           />
         </div>
       )}
@@ -92,11 +98,13 @@ function ColunaContas({
   corDot,
   total,
   itens,
+  categorias,
 }: {
   titulo: string;
   corDot: string;
   total: number;
   itens: RecorrenteRow[];
+  categorias: Awaited<ReturnType<typeof getCategorias>>;
 }) {
   return (
     <Card>
@@ -151,7 +159,10 @@ function ColunaContas({
                 <span className="whitespace-nowrap text-sm font-medium tabular-nums">
                   {formatBRL(r.valor_previsto)}
                 </span>
-                <EditRecorrenteTrigger recorrente={r} />
+                <EditRecorrenteTrigger
+                  recorrente={r}
+                  categorias={categorias}
+                />
                 <RecorrenteActionsMenu
                   id={r.id}
                   ativa={r.ativa}

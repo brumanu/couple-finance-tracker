@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
+import { resolverCategoria } from "@/lib/categorias-server";
 
 export type DespesaFormState = { error?: string; ok?: boolean };
 
@@ -12,7 +13,6 @@ type ParsedDespesa = {
   data_pagamento: string;
   data_referencia: string; // primeiro dia do mês da data
   quinzena: 15 | 30;
-  categoria: string | null;
 };
 
 type ParsedCompra = {
@@ -21,18 +21,17 @@ type ParsedCompra = {
   valor: number;
   data_compra: string;
   parcelas: number;
-  categoria: string | null;
 };
 
 type ParsedInput =
-  | { tipo: "despesa"; dados: ParsedDespesa }
-  | { tipo: "compra_cartao"; dados: ParsedCompra };
+  | { tipo: "despesa"; dados: ParsedDespesa; categoria_id_raw: string }
+  | { tipo: "compra_cartao"; dados: ParsedCompra; categoria_id_raw: string };
 
 function parseFormData(formData: FormData): ParsedInput | string {
   const descricao = String(formData.get("descricao") ?? "").trim();
   const valorRaw = String(formData.get("valor") ?? "").trim();
   const data = String(formData.get("data") ?? "").trim();
-  const categoria = String(formData.get("categoria") ?? "").trim() || null;
+  const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
   const cartao_id = String(formData.get("cartao_id") ?? "").trim();
 
   if (!descricao) return "Descrição é obrigatória.";
@@ -49,13 +48,13 @@ function parseFormData(formData: FormData): ParsedInput | string {
         : 1;
     return {
       tipo: "compra_cartao",
+      categoria_id_raw,
       dados: {
         cartao_id,
         descricao,
         valor,
         data_compra: data,
         parcelas,
-        categoria,
       },
     };
   }
@@ -67,13 +66,13 @@ function parseFormData(formData: FormData): ParsedInput | string {
 
   return {
     tipo: "despesa",
+    categoria_id_raw,
     dados: {
       descricao,
       valor,
       data_pagamento: data,
       data_referencia,
       quinzena: quinzena as 15 | 30,
-      categoria,
     },
   };
 }
@@ -98,6 +97,13 @@ export async function createDespesa(
     .maybeSingle();
   if (!profile) return { error: "Profile não encontrado." };
 
+  const categoriaResolved = await resolverCategoria(
+    supabase,
+    parsed.categoria_id_raw,
+  );
+  if (typeof categoriaResolved === "string")
+    return { error: categoriaResolved };
+
   if (parsed.tipo === "compra_cartao") {
     const { error } = await supabase.from("compras_cartao").insert({
       casal_id: profile.casal_id,
@@ -108,7 +114,7 @@ export async function createDespesa(
       data_compra: parsed.dados.data_compra,
       parcelas: parsed.dados.parcelas,
       parcelas_ja_pagas: 0,
-      categoria: parsed.dados.categoria,
+      ...categoriaResolved,
     });
     if (error) return { error: error.message };
 
@@ -124,6 +130,7 @@ export async function createDespesa(
     tipo: "despesa_avulsa",
     criado_por: user.id,
     ...parsed.dados,
+    ...categoriaResolved,
   });
   if (error) return { error: error.message };
 
@@ -149,9 +156,16 @@ export async function updateDespesa(
     };
 
   const supabase = await createClient();
+  const categoriaResolved = await resolverCategoria(
+    supabase,
+    parsed.categoria_id_raw,
+  );
+  if (typeof categoriaResolved === "string")
+    return { error: categoriaResolved };
+
   const { error } = await supabase
     .from("lancamentos")
-    .update(parsed.dados)
+    .update({ ...parsed.dados, ...categoriaResolved })
     .eq("id", id)
     .eq("tipo", "despesa_avulsa");
   if (error) return { error: error.message };

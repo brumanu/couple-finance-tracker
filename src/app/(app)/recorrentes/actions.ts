@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
+import { resolverCategoria } from "@/lib/categorias-server";
 
 export type RecorrenteFormState = {
   error?: string;
@@ -14,7 +15,7 @@ type Parsed = {
   valor_previsto: number;
   quinzena: 15 | 30;
   dia_vencimento: number | null;
-  categoria: string | null;
+  categoria_id_raw: string;
   ativa: boolean;
 };
 
@@ -23,7 +24,7 @@ function parseFormData(formData: FormData): Parsed | string {
   const valorRaw = String(formData.get("valor_previsto") ?? "").trim();
   const quinzena = Number(formData.get("quinzena"));
   const diaVencRaw = String(formData.get("dia_vencimento") ?? "").trim();
-  const categoria = String(formData.get("categoria") ?? "").trim() || null;
+  const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
   const ativa =
     formData.get("ativa") === "on" || formData.get("ativa") === "true";
 
@@ -45,7 +46,7 @@ function parseFormData(formData: FormData): Parsed | string {
     valor_previsto: valor,
     quinzena: quinzena as 15 | 30,
     dia_vencimento,
-    categoria,
+    categoria_id_raw,
     ativa,
   };
 }
@@ -70,9 +71,20 @@ export async function createRecorrente(
     .maybeSingle();
   if (!profile) return { error: "Profile não encontrado." };
 
+  const categoriaResolved = await resolverCategoria(
+    supabase,
+    parsed.categoria_id_raw,
+  );
+  if (typeof categoriaResolved === "string")
+    return { error: categoriaResolved };
+
+  const { categoria_id_raw, ...rest } = parsed;
+  void categoria_id_raw;
+
   const { error } = await supabase.from("contas_recorrentes").insert({
     casal_id: profile.casal_id,
-    ...parsed,
+    ...rest,
+    ...categoriaResolved,
   });
 
   if (error) return { error: error.message };
@@ -91,9 +103,19 @@ export async function updateRecorrente(
   if (typeof parsed === "string") return { error: parsed };
 
   const supabase = await createClient();
+  const categoriaResolved = await resolverCategoria(
+    supabase,
+    parsed.categoria_id_raw,
+  );
+  if (typeof categoriaResolved === "string")
+    return { error: categoriaResolved };
+
+  const { categoria_id_raw, ...rest } = parsed;
+  void categoria_id_raw;
+
   const { error } = await supabase
     .from("contas_recorrentes")
-    .update(parsed)
+    .update({ ...rest, ...categoriaResolved })
     .eq("id", id);
   if (error) return { error: error.message };
 

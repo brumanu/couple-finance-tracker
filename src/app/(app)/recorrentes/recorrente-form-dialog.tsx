@@ -21,6 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
+import { CategoriaSelectField } from "@/components/categoria-select";
 import {
   createRecorrente,
   updateRecorrente,
@@ -34,17 +36,23 @@ export type RecorrenteRow = {
   quinzena: number;
   dia_vencimento: number | null;
   categoria: string | null;
+  categoria_id: string | null;
   ativa: boolean;
 };
 
 type Props = {
   recorrente?: RecorrenteRow;
   trigger?: React.ReactElement;
+  categorias?: CategoriaOpcao[];
 };
 
 const INITIAL_STATE: RecorrenteFormState = {};
 
-export function RecorrenteFormDialog({ recorrente, trigger }: Props) {
+export function RecorrenteFormDialog({
+  recorrente,
+  trigger,
+  categorias = [],
+}: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(recorrente);
 
@@ -66,7 +74,7 @@ export function RecorrenteFormDialog({ recorrente, trigger }: Props) {
         recorrente?.dia_vencimento != null
           ? String(recorrente.dia_vencimento)
           : "",
-      categoria: recorrente?.categoria ?? "",
+      categoriaId: recorrente?.categoria_id ?? NENHUMA_CATEGORIA,
       ativa: recorrente?.ativa ?? true,
     }),
     [
@@ -75,10 +83,13 @@ export function RecorrenteFormDialog({ recorrente, trigger }: Props) {
       recorrente?.valor_previsto,
       recorrente?.quinzena,
       recorrente?.dia_vencimento,
-      recorrente?.categoria,
+      recorrente?.categoria_id,
       recorrente?.ativa,
     ],
   );
+
+  const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
+  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
 
   useEffect(() => {
     if (state.ok) setOpen(false);
@@ -161,12 +172,11 @@ export function RecorrenteFormDialog({ recorrente, trigger }: Props) {
           </div>
 
           <div className="flex flex-col gap-2">
-            <Label htmlFor="categoria">Categoria (opcional)</Label>
-            <Input
-              id="categoria"
-              name="categoria"
-              defaultValue={defaults.categoria}
-              placeholder="Ex: moradia, utilidades, transporte"
+            <Label htmlFor="categoria_id">Categoria (opcional)</Label>
+            <CategoriaSelectField
+              categorias={categorias}
+              value={categoriaId}
+              onValueChange={setCategoriaId}
             />
           </div>
 
@@ -210,12 +220,15 @@ export function RecorrenteFormDialog({ recorrente, trigger }: Props) {
 
 export function EditRecorrenteTrigger({
   recorrente,
+  categorias,
 }: {
   recorrente: RecorrenteRow;
+  categorias?: CategoriaOpcao[];
 }) {
   return (
     <RecorrenteFormDialog
       recorrente={recorrente}
+      categorias={categorias}
       trigger={
         <Button variant="ghost" size="sm" aria-label="Editar">
           <PencilIcon className="size-4" />
