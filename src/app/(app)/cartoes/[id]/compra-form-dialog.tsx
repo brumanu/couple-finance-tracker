@@ -128,13 +128,24 @@ export function CompraFormDialog({
     [defaults.parcela_atual],
   );
 
-  // Quando marca "em andamento", sobrescreve data_compra retroativamente
+  // Quando marca "em andamento", sobrescreve data_compra retroativamente.
+  // Só recalcula se parcela_atual >= 2 (parcela 1 = compra nova; nesse caso
+  // deveria desmarcar o checkbox).
   useEffect(() => {
     if (!emAndamento) return;
     const parcelaAtual = Number(parcelaAtualRaw);
-    if (!Number.isInteger(parcelaAtual) || parcelaAtual < 1) return;
+    if (!Number.isInteger(parcelaAtual) || parcelaAtual < 2) return;
     setDataRaw(calcularDataCompraRetro(parcelaAtual));
   }, [emAndamento, parcelaAtualRaw]);
+
+  // Se o usuário marca o checkbox pela primeira vez (numa compra nova),
+  // limpa o campo de parcela atual pra forçar ele a digitar um número real.
+  // No modo edição, mantém o valor original da compra.
+  useEffect(() => {
+    if (!emAndamento) return;
+    if (!isEdit && parcelaAtualRaw === "1") setParcelaAtualRaw("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emAndamento]);
 
   useEffect(() => {
     if (state.ok) setOpen(false);

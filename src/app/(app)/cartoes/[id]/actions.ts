@@ -40,10 +40,10 @@ function parseFormData(formData: FormData): Parsed | string {
   if (
     emAndamento &&
     (!Number.isInteger(parcela_atual) ||
-      parcela_atual < 1 ||
+      parcela_atual < 2 ||
       parcela_atual > parcelas)
   )
-    return `Parcela atual deve estar entre 1 e ${parcelas}.`;
+    return `Se a compra está em andamento, a parcela atual deve estar entre 2 e ${parcelas}. Se você está na parcela 1, desmarque "Compra em andamento".`;
 
   const parcelas_ja_pagas = emAndamento ? parcela_atual - 1 : 0;
 
