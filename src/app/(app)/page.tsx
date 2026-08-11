@@ -1,9 +1,18 @@
 import Link from "next/link";
-import { AlertTriangleIcon, CheckIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  ChevronRightIcon,
+} from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { parseMesParam } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
+import {
+  faturaDoMes,
+  quinzenaDoCartao,
+  type CompraCartaoInfo,
+} from "@/lib/cartao-calc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "./month-switcher";
@@ -75,32 +84,94 @@ export default async function DashboardPage({
   const noMesAtual =
     hoje.slice(0, 7) === `${mes.ano}-${String(mes.mes).padStart(2, "0")}`;
 
-  const [rendasRes, contasRes, lancRes] = await Promise.all([
-    supabase
-      .from("rendas")
-      .select("descricao, valor_previsto, dia_recebimento")
-      .eq("ativa", true),
-    supabase
-      .from("contas_recorrentes")
-      .select(
-        "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, inicio_vigencia, fim_vigencia",
-      )
-      .eq("ativa", true)
-      .lte("inicio_vigencia", mes.ultimoDia)
-      .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
-    supabase
-      .from("lancamentos")
-      .select(
-        "id, tipo, descricao, valor, data_pagamento, quinzena, categoria, conta_recorrente_id",
-      )
-      .gte("data_referencia", mes.primeiroDia)
-      .lte("data_referencia", mes.ultimoDia)
-      .order("data_pagamento", { ascending: false }),
-  ]);
+  const [rendasRes, contasRes, lancRes, cartoesRes, comprasRes, bancosRes] =
+    await Promise.all([
+      supabase
+        .from("rendas")
+        .select("descricao, valor_previsto, dia_recebimento")
+        .eq("ativa", true),
+      supabase
+        .from("contas_recorrentes")
+        .select(
+          "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, inicio_vigencia, fim_vigencia",
+        )
+        .eq("ativa", true)
+        .lte("inicio_vigencia", mes.ultimoDia)
+        .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
+      supabase
+        .from("lancamentos")
+        .select(
+          "id, tipo, descricao, valor, data_pagamento, quinzena, categoria, conta_recorrente_id",
+        )
+        .gte("data_referencia", mes.primeiroDia)
+        .lte("data_referencia", mes.ultimoDia)
+        .order("data_pagamento", { ascending: false }),
+      supabase
+        .from("cartoes")
+        .select(
+          "id, banco_id, apelido, dia_fechamento, dia_vencimento, ativo",
+        )
+        .eq("ativo", true),
+      supabase
+        .from("compras_cartao")
+        .select(
+          "id, cartao_id, descricao, valor_total, data_compra, parcelas, categoria",
+        ),
+      supabase.from("bancos").select("id, nome, cor"),
+    ]);
 
   const rendas = (rendasRes.data ?? []) as RendaRow[];
   const contas = (contasRes.data ?? []) as RecorrenteRow[];
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
+  const cartoes = (cartoesRes.data ?? []) as {
+    id: string;
+    banco_id: string;
+    apelido: string | null;
+    dia_fechamento: number;
+    dia_vencimento: number;
+  }[];
+  const compras = (comprasRes.data ?? []) as CompraCartaoInfo[];
+  const bancos = (bancosRes.data ?? []) as {
+    id: string;
+    nome: string;
+    cor: string;
+  }[];
+  const bancoById = new Map(bancos.map((b) => [b.id, b]));
+
+  // Calcula fatura de cada cartão nesse mês
+  type FaturaCartao = {
+    cartaoId: string;
+    label: string;
+    bancoCor: string;
+    total: number;
+    quinzena: 15 | 30;
+  };
+  const faturas: FaturaCartao[] = cartoes
+    .map((c) => {
+      const banco = bancoById.get(c.banco_id);
+      const label = banco?.nome
+        ? c.apelido
+          ? `${banco.nome} · ${c.apelido}`
+          : banco.nome
+        : c.apelido ?? "Cartão";
+      const f = faturaDoMes(
+        {
+          id: c.id,
+          dia_fechamento: c.dia_fechamento,
+          dia_vencimento: c.dia_vencimento,
+        },
+        compras,
+        mes,
+      );
+      return {
+        cartaoId: c.id,
+        label,
+        bancoCor: banco?.cor ?? "#c67139",
+        total: f.total,
+        quinzena: quinzenaDoCartao(c.dia_vencimento),
+      };
+    })
+    .filter((f) => f.total > 0);
 
   const pagamentos = new Map<string, LancamentoRow>();
   for (const l of lancamentos) {
@@ -119,19 +190,23 @@ export default async function DashboardPage({
     const rendasQ = rendas.filter((r) => r.dia_recebimento === q);
     const contasQ = contas.filter((c) => c.quinzena === q);
     const despesasQ = despesasAvulsas.filter((d) => d.quinzena === q);
+    const faturasQ = faturas.filter((f) => f.quinzena === q);
     const totalRenda = rendasQ.reduce(
       (s, r) => s + Number(r.valor_previsto),
       0,
     );
-    const totalContas = contasQ.reduce((s, c) => {
+    const totalContasRec = contasQ.reduce((s, c) => {
       const pago = pagamentos.get(c.id);
       return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
     }, 0);
+    const totalFaturas = faturasQ.reduce((s, f) => s + f.total, 0);
+    const totalContas = totalContasRec + totalFaturas;
     const totalDespesas = despesasQ.reduce((s, d) => s + Number(d.valor), 0);
     return {
       rendas: rendasQ,
       contas: contasQ,
       despesas: despesasQ,
+      faturas: faturasQ,
       totalRenda,
       totalContas,
       totalDespesas,
@@ -142,7 +217,8 @@ export default async function DashboardPage({
   const atual = calc(quinzenaAtual);
   const outra = calc(proxima);
 
-  const nenhumDado = rendas.length === 0 && contas.length === 0;
+  const nenhumDado =
+    rendas.length === 0 && contas.length === 0 && faturas.length === 0;
 
   const contasEmAtraso = noMesAtual
     ? atual.contas.filter((c) => {
@@ -231,6 +307,7 @@ export default async function DashboardPage({
             <ContasQuinzenaCard
               quinzena={quinzenaAtual}
               contas={atual.contas}
+              faturas={atual.faturas}
               pagamentos={pagamentos}
               mes={mes}
               hojeDia={hojeDia}
@@ -244,10 +321,19 @@ export default async function DashboardPage({
   );
 }
 
+type FaturaResumo = {
+  cartaoId: string;
+  label: string;
+  bancoCor: string;
+  total: number;
+  quinzena: 15 | 30;
+};
+
 type CalcResult = {
   rendas: RendaRow[];
   contas: RecorrenteRow[];
   despesas: LancamentoRow[];
+  faturas: FaturaResumo[];
   totalRenda: number;
   totalContas: number;
   totalDespesas: number;
@@ -432,6 +518,7 @@ function ResumoLinha({
 function ContasQuinzenaCard({
   quinzena,
   contas,
+  faturas,
   pagamentos,
   mes,
   hojeDia,
@@ -439,11 +526,13 @@ function ContasQuinzenaCard({
 }: {
   quinzena: 15 | 30;
   contas: RecorrenteRow[];
+  faturas: FaturaResumo[];
   pagamentos: Map<string, LancamentoRow>;
-  mes: { primeiroDia: string; label: string };
+  mes: { primeiroDia: string; label: string; chave: string };
   hojeDia: number;
   noMesAtual: boolean;
 }) {
+  const semItens = contas.length === 0 && faturas.length === 0;
   return (
     <Card>
       <div className="flex flex-col gap-4 p-6">
@@ -451,12 +540,50 @@ function ContasQuinzenaCard({
           <p className="font-heading text-lg">Contas desta quinzena</p>
           <p className="text-xs text-muted-foreground">{mes.label}</p>
         </div>
-        {contas.length === 0 ? (
+        {semItens ? (
           <p className="text-sm text-muted-foreground">
-            Nenhuma conta cadastrada para o dia {quinzena}.
+            Nada cadastrado para o dia {quinzena}.
           </p>
         ) : (
           <ul className="flex flex-col divide-y divide-border/60">
+            {faturas.map((f) => (
+              <li
+                key={f.cartaoId}
+                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+              >
+                <div
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full font-heading text-xs text-white"
+                  style={{ background: f.bancoCor }}
+                >
+                  {f.label
+                    .split("·")[0]
+                    .trim()
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm">Fatura {f.label}</p>
+                  <p className="text-xs text-muted-foreground">Cartão</p>
+                </div>
+                <span className="tabular-nums text-sm font-medium">
+                  {formatBRL(f.total)}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  nativeButton={false}
+                  aria-label="Ver fatura"
+                  render={
+                    <Link href={`/cartoes/${f.cartaoId}?mes=${mes.chave}`}>
+                      <ChevronRightIcon
+                        className="size-4"
+                        strokeWidth={2.75}
+                      />
+                    </Link>
+                  }
+                />
+              </li>
+            ))}
             {contas.map((c) => {
               const pago = pagamentos.get(c.id);
               const atrasada =

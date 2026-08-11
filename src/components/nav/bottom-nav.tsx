@@ -11,7 +11,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/95 backdrop-blur md:hidden">
-      <div className="mx-auto grid max-w-md grid-cols-4 px-2 py-2">
+      <div className="mx-auto grid max-w-md grid-cols-5 px-2 py-2">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === "/"
