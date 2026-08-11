@@ -12,6 +12,7 @@ import {
   faturaDoMes,
   quinzenaDoCartao,
   type CompraCartaoInfo,
+  type AssinaturaCartaoInfo,
 } from "@/lib/cartao-calc";
 import { BancoIcone } from "@/lib/bancos-icones";
 import { Button } from "@/components/ui/button";
@@ -94,6 +95,7 @@ export default async function DashboardPage({
     bancosRes,
     dividasRes,
     pagDividasRes,
+    assinRes,
   ] = await Promise.all([
     supabase
       .from("rendas")
@@ -129,6 +131,12 @@ export default async function DashboardPage({
     supabase.from("bancos").select("id, nome, cor, icone"),
     supabase.from("dividas").select("id, descricao, valor_total"),
     supabase.from("pagamentos_divida").select("divida_id, valor"),
+    supabase
+      .from("assinaturas_cartao")
+      .select(
+        "id, cartao_id, descricao, valor_mensal, categoria, inicio_vigencia, fim_vigencia, ativa",
+      )
+      .eq("ativa", true),
   ]);
 
   const rendas = (rendasRes.data ?? []) as RendaRow[];
@@ -142,6 +150,7 @@ export default async function DashboardPage({
     dia_vencimento: number;
   }[];
   const compras = (comprasRes.data ?? []) as CompraCartaoInfo[];
+  const assinaturas = (assinRes.data ?? []) as AssinaturaCartaoInfo[];
   const bancos = (bancosRes.data ?? []) as {
     id: string;
     nome: string;
@@ -204,6 +213,7 @@ export default async function DashboardPage({
         },
         compras,
         mes,
+        assinaturas,
       );
       return {
         cartaoId: c.id,

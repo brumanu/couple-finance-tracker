@@ -13,7 +13,9 @@ import {
   mesPrimeiraParcela,
   parcelaNoMes,
   valoresParcelas,
+  assinaturaAtivaNoMes,
   type CompraCartaoInfo,
+  type AssinaturaCartaoInfo,
 } from "@/lib/cartao-calc";
 import { BancoIcone } from "@/lib/bancos-icones";
 import { MonthSwitcher } from "../../month-switcher";
@@ -23,6 +25,12 @@ import {
   type CompraRow,
 } from "./compra-form-dialog";
 import { CompraActionsMenu } from "./compra-actions-menu";
+import {
+  AssinaturaFormDialog,
+  EditAssinaturaTrigger,
+  type AssinaturaRow,
+} from "./assinatura-form-dialog";
+import { AssinaturaActionsMenu } from "./assinatura-actions-menu";
 
 const BANDEIRA_LABEL: Record<string, string> = {
   visa: "Visa",
@@ -69,7 +77,7 @@ export default async function CartaoDetailPage({
   const cartao = cartaoRes.data;
   if (!cartao) notFound();
 
-  const [bancoRes, comprasRes] = await Promise.all([
+  const [bancoRes, comprasRes, assinRes] = await Promise.all([
     supabase
       .from("bancos")
       .select("id, nome, cor, icone")
@@ -82,10 +90,19 @@ export default async function CartaoDetailPage({
       )
       .eq("cartao_id", id)
       .order("data_compra", { ascending: false }),
+    supabase
+      .from("assinaturas_cartao")
+      .select(
+        "id, cartao_id, descricao, valor_mensal, categoria, inicio_vigencia, fim_vigencia, ativa",
+      )
+      .eq("cartao_id", id)
+      .order("ativa", { ascending: false })
+      .order("descricao", { ascending: true }),
   ]);
 
   const banco = bancoRes.data;
   const compras = (comprasRes.data ?? []) as CompraRow[];
+  const assinaturas = (assinRes.data ?? []) as AssinaturaRow[];
 
   const label = banco?.nome
     ? cartao.apelido
@@ -101,6 +118,7 @@ export default async function CartaoDetailPage({
     },
     compras as CompraCartaoInfo[],
     mes,
+    assinaturas as AssinaturaCartaoInfo[],
   );
 
   return (
@@ -138,8 +156,9 @@ export default async function CartaoDetailPage({
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <MonthSwitcher mes={mes} />
+          <AssinaturaFormDialog cartaoId={cartao.id} />
           <CompraFormDialog
             cartaoId={cartao.id}
             diaFechamento={cartao.dia_fechamento}
@@ -159,9 +178,20 @@ export default async function CartaoDetailPage({
             {formatBRL(fatura.total)}
           </p>
           <p className="text-sm text-muted-foreground">
-            {fatura.parcelas.length === 0
-              ? "Nenhuma compra cai nesta fatura."
-              : `${fatura.parcelas.length} ${fatura.parcelas.length === 1 ? "compra" : "compras"} nesta fatura · vence dia ${cartao.dia_vencimento}`}
+            {(() => {
+              const nC = fatura.parcelas.length;
+              const nA = fatura.assinaturas.length;
+              if (nC === 0 && nA === 0)
+                return "Nenhum lançamento nesta fatura.";
+              const partes: string[] = [];
+              if (nC > 0)
+                partes.push(`${nC} ${nC === 1 ? "compra" : "compras"}`);
+              if (nA > 0)
+                partes.push(
+                  `${nA} ${nA === 1 ? "assinatura" : "assinaturas"}`,
+                );
+              return `${partes.join(" · ")} · vence dia ${cartao.dia_vencimento}`;
+            })()}
           </p>
         </div>
       </Card>
@@ -306,6 +336,87 @@ export default async function CartaoDetailPage({
                         descricao={c.descricao}
                       />
                     </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline justify-between px-1">
+          <h3 className="font-heading text-lg">Assinaturas</h3>
+          <p className="text-xs text-muted-foreground">
+            {assinaturas.length}{" "}
+            {assinaturas.length === 1 ? "cadastrada" : "cadastradas"}
+          </p>
+        </div>
+        {assinaturas.length === 0 ? (
+          <Card>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Nenhuma assinatura recorrente cadastrada.
+              </p>
+              <AssinaturaFormDialog cartaoId={cartao.id} />
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <ul className="flex flex-col divide-y divide-border/60">
+              {assinaturas.map((a) => {
+                const ativaHoje = assinaturaAtivaNoMes(
+                  a as AssinaturaCartaoInfo,
+                  mes,
+                );
+                return (
+                  <li
+                    key={a.id}
+                    className={`flex flex-wrap items-center gap-3 p-5 ${
+                      ativaHoje ? "" : "opacity-60"
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">{a.descricao}</p>
+                        {a.categoria && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            {a.categoria}
+                          </Badge>
+                        )}
+                        {!a.ativa && (
+                          <Badge variant="neutral" className="text-[10px]">
+                            pausada
+                          </Badge>
+                        )}
+                        {a.fim_vigencia && (
+                          <Badge variant="neutral" className="text-[10px]">
+                            até {formatDataBR(a.fim_vigencia)}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Ativa desde {formatDataBR(a.inicio_vigencia)}
+                      </p>
+                    </div>
+                    <p className="text-sm font-medium tabular-nums">
+                      {formatBRL(a.valor_mensal)}
+                      <span className="text-xs text-muted-foreground">
+                        {" "}
+                        /mês
+                      </span>
+                    </p>
+                    <EditAssinaturaTrigger
+                      assinatura={a}
+                      cartaoId={cartao.id}
+                    />
+                    <AssinaturaActionsMenu
+                      id={a.id}
+                      cartaoId={cartao.id}
+                      descricao={a.descricao}
+                      ativa={a.ativa}
+                      ativaHoje={ativaHoje}
+                    />
                   </li>
                 );
               })}

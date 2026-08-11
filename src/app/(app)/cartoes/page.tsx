@@ -7,7 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { parseMesParam } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
-import { faturaDoMes, type CompraCartaoInfo } from "@/lib/cartao-calc";
+import {
+  faturaDoMes,
+  type CompraCartaoInfo,
+  type AssinaturaCartaoInfo,
+} from "@/lib/cartao-calc";
 import { BancoIcone } from "@/lib/bancos-icones";
 import {
   CartaoFormDialog,
@@ -36,7 +40,7 @@ export default async function CartoesPage({
   const mesParam = typeof params.mes === "string" ? params.mes : undefined;
   const mes = parseMesParam(mesParam);
 
-  const [bancosRes, cartoesRes, comprasRes] = await Promise.all([
+  const [bancosRes, cartoesRes, comprasRes, assinRes] = await Promise.all([
     supabase
       .from("bancos")
       .select("id, nome, cor, icone")
@@ -52,11 +56,17 @@ export default async function CartoesPage({
       .select(
         "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria",
       ),
+    supabase
+      .from("assinaturas_cartao")
+      .select(
+        "id, cartao_id, descricao, valor_mensal, categoria, inicio_vigencia, fim_vigencia, ativa",
+      ),
   ]);
 
   const bancos = (bancosRes.data ?? []) as BancoOption[];
   const cartoes = (cartoesRes.data ?? []) as CartaoRow[];
   const compras = (comprasRes.data ?? []) as CompraCartaoInfo[];
+  const assinaturas = (assinRes.data ?? []) as AssinaturaCartaoInfo[];
 
   const bancoById = new Map(bancos.map((b) => [b.id, b]));
 
@@ -120,6 +130,7 @@ export default async function CartoesPage({
               { id: c.id, dia_fechamento: c.dia_fechamento, dia_vencimento: c.dia_vencimento },
               compras,
               mes,
+              assinaturas,
             );
             return (
               <Card key={c.id} className={c.ativo ? "" : "opacity-60"}>

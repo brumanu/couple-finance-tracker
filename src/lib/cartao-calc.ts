@@ -17,6 +17,36 @@ export type CompraCartaoInfo = {
   categoria: string | null;
 };
 
+export type AssinaturaCartaoInfo = {
+  id: string;
+  cartao_id: string;
+  descricao: string;
+  valor_mensal: number | string;
+  categoria: string | null;
+  inicio_vigencia: string; // YYYY-MM-DD
+  fim_vigencia: string | null; // YYYY-MM-DD | null
+  ativa: boolean;
+};
+
+/**
+ * Uma assinatura entra na fatura de um mês se estiver ativa e sua
+ * vigência intersecta o mês. Não depende de dia_fechamento — o valor
+ * mensal cai integral em toda fatura enquanto vigente.
+ */
+export function assinaturaAtivaNoMes(
+  assinatura: AssinaturaCartaoInfo,
+  mes: MesRef,
+): boolean {
+  if (!assinatura.ativa) return false;
+  if (assinatura.inicio_vigencia > mes.ultimoDia) return false;
+  if (
+    assinatura.fim_vigencia !== null &&
+    assinatura.fim_vigencia < mes.primeiroDia
+  )
+    return false;
+  return true;
+}
+
 /**
  * Retorna o mês em que a PRIMEIRA parcela da compra cai.
  *
@@ -104,12 +134,13 @@ export function parcelaNoMes(
 
 /**
  * Calcula a fatura consolidada de um cartão para o mês alvo:
- * total + parcelas que compõem essa fatura.
+ * total + parcelas de compras + assinaturas ativas.
  */
 export function faturaDoMes(
   cartao: CartaoInfo,
   compras: CompraCartaoInfo[],
   mesAlvo: MesRef,
+  assinaturas: AssinaturaCartaoInfo[] = [],
 ): {
   total: number;
   parcelas: {
@@ -118,11 +149,19 @@ export function faturaDoMes(
     total: number;
     valor: number;
   }[];
+  assinaturas: {
+    assinatura: AssinaturaCartaoInfo;
+    valor: number;
+  }[];
 } {
   const parcelas: {
     compra: CompraCartaoInfo;
     numero: number;
     total: number;
+    valor: number;
+  }[] = [];
+  const assinaturasAtivas: {
+    assinatura: AssinaturaCartaoInfo;
     valor: number;
   }[] = [];
   let total = 0;
@@ -138,7 +177,18 @@ export function faturaDoMes(
     });
     total += info.valor;
   }
-  return { total: Number(total.toFixed(2)), parcelas };
+  for (const a of assinaturas) {
+    if (a.cartao_id !== cartao.id) continue;
+    if (!assinaturaAtivaNoMes(a, mesAlvo)) continue;
+    const v = Number(a.valor_mensal);
+    assinaturasAtivas.push({ assinatura: a, valor: v });
+    total += v;
+  }
+  return {
+    total: Number(total.toFixed(2)),
+    parcelas,
+    assinaturas: assinaturasAtivas,
+  };
 }
 
 /**
