@@ -15,6 +15,7 @@ import {
   valoresParcelas,
   type CompraCartaoInfo,
 } from "@/lib/cartao-calc";
+import { BancoIcone } from "@/lib/bancos-icones";
 import { MonthSwitcher } from "../../month-switcher";
 import {
   CompraFormDialog,
@@ -71,7 +72,7 @@ export default async function CartaoDetailPage({
   const [bancoRes, comprasRes] = await Promise.all([
     supabase
       .from("bancos")
-      .select("id, nome, cor")
+      .select("id, nome, cor, icone")
       .eq("id", cartao.banco_id)
       .maybeSingle(),
     supabase
@@ -120,12 +121,12 @@ export default async function CartaoDetailPage({
 
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <div
-            className="flex size-14 shrink-0 items-center justify-center rounded-full font-heading text-xl text-white"
-            style={{ background: banco?.cor ?? "#c67139" }}
-          >
-            {iniciais(banco?.nome ?? label) || "?"}
-          </div>
+          <BancoIcone
+            icone={banco?.icone ?? null}
+            corFallback={banco?.cor}
+            nomeFallback={banco?.nome ?? label}
+            size={56}
+          />
           <div>
             <h2 className="font-heading text-3xl leading-tight md:text-4xl">
               {label}

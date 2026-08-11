@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
+import { BancoIcone } from "@/lib/bancos-icones";
 import {
   BancoFormDialog,
   EditBancoTrigger,
@@ -8,25 +9,25 @@ import {
 } from "./banco-form-dialog";
 import { BancoActionsMenu } from "./banco-actions-menu";
 
-function iniciais(nome: string): string {
-  return nome
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 export default async function BancosPage() {
   await requireSession();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("bancos")
-    .select("id, nome, cor")
-    .order("nome", { ascending: true });
+  const [bancosRes, cartoesRes] = await Promise.all([
+    supabase
+      .from("bancos")
+      .select("id, nome, cor, icone")
+      .order("nome", { ascending: true }),
+    supabase.from("cartoes").select("banco_id"),
+  ]);
 
-  const lista = (data ?? []) as BancoRow[];
+  const lista = (bancosRes.data ?? []) as BancoRow[];
+  const cartoes = (cartoesRes.data ?? []) as { banco_id: string }[];
+
+  const contagem = new Map<string, number>();
+  for (const c of cartoes) {
+    contagem.set(c.banco_id, (contagem.get(c.banco_id) ?? 0) + 1);
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
@@ -36,7 +37,7 @@ export default async function BancosPage() {
             Bancos
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Onde vivem seus cartões. Cadastre para começar a lançar compras.
+            Onde vivem os cartões. O ícone identifica cada um de bate-pronto.
           </p>
         </div>
         <BancoFormDialog />
@@ -53,26 +54,37 @@ export default async function BancosPage() {
         </Card>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
-          {lista.map((b) => (
-            <Card key={b.id}>
-              <div className="flex items-center gap-4 p-4">
-                <div
-                  className="flex size-12 shrink-0 items-center justify-center rounded-full font-heading text-lg text-white"
-                  style={{ background: b.cor }}
-                >
-                  {iniciais(b.nome) || "?"}
+          {lista.map((b) => {
+            const n = contagem.get(b.id) ?? 0;
+            const subtitulo =
+              n === 0
+                ? "Sem cartões"
+                : n === 1
+                  ? "1 cartão"
+                  : `${n} cartões`;
+            return (
+              <Card key={b.id}>
+                <div className="flex items-center gap-4 p-4">
+                  <BancoIcone
+                    icone={b.icone}
+                    corFallback={b.cor}
+                    nomeFallback={b.nome}
+                    size={44}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-heading text-lg leading-tight">
+                      {b.nome}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {subtitulo}
+                    </p>
+                  </div>
+                  <EditBancoTrigger banco={b} />
+                  <BancoActionsMenu id={b.id} nome={b.nome} />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="font-heading text-lg leading-tight">
-                    {b.nome}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{b.cor}</p>
-                </div>
-                <EditBancoTrigger banco={b} />
-                <BancoActionsMenu id={b.id} nome={b.nome} />
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

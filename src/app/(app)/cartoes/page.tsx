@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { parseMesParam } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import { faturaDoMes, type CompraCartaoInfo } from "@/lib/cartao-calc";
+import { BancoIcone } from "@/lib/bancos-icones";
 import {
   CartaoFormDialog,
   EditCartaoTrigger,
@@ -25,15 +26,6 @@ const BANDEIRA_LABEL: Record<string, string> = {
   outra: "Outra",
 };
 
-function iniciais(nome: string): string {
-  return nome
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 export default async function CartoesPage({
   searchParams,
 }: PageProps<"/cartoes">) {
@@ -47,7 +39,7 @@ export default async function CartoesPage({
   const [bancosRes, cartoesRes, comprasRes] = await Promise.all([
     supabase
       .from("bancos")
-      .select("id, nome, cor")
+      .select("id, nome, cor, icone")
       .order("nome", { ascending: true }),
     supabase
       .from("cartoes")
@@ -131,12 +123,12 @@ export default async function CartoesPage({
               <Card key={c.id} className={c.ativo ? "" : "opacity-60"}>
                 <div className="flex flex-col gap-4 p-5">
                   <div className="flex items-center gap-3">
-                    <div
-                      className="flex size-11 shrink-0 items-center justify-center rounded-full font-heading text-base text-white"
-                      style={{ background: banco?.cor ?? "#c67139" }}
-                    >
-                      {iniciais(banco?.nome ?? label) || "?"}
-                    </div>
+                    <BancoIcone
+                      icone={banco?.icone ?? null}
+                      corFallback={banco?.cor}
+                      nomeFallback={banco?.nome ?? label}
+                      size={44}
+                    />
                     <div className="min-w-0 flex-1">
                       <p className="font-heading text-lg leading-tight">
                         {label}

@@ -2,19 +2,23 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { isBancoIconeId, type BancoIconeId } from "@/lib/bancos-icones";
 
 export type BancoFormState = { error?: string; ok?: boolean };
 
-function parseFormData(formData: FormData):
-  | { nome: string; cor: string }
-  | string {
+type Parsed = {
+  nome: string;
+  icone: BancoIconeId;
+};
+
+function parseFormData(formData: FormData): Parsed | string {
   const nome = String(formData.get("nome") ?? "").trim();
-  const cor = String(formData.get("cor") ?? "").trim();
+  const icone = String(formData.get("icone") ?? "").trim();
 
   if (!nome) return "Nome é obrigatório.";
-  if (!/^#[0-9a-fA-F]{6}$/.test(cor)) return "Cor inválida.";
+  if (!isBancoIconeId(icone)) return "Ícone inválido.";
 
-  return { nome, cor };
+  return { nome, icone };
 }
 
 export async function createBanco(

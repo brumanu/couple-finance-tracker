@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { BancoIcone } from "@/lib/bancos-icones";
 import { createCartao, updateCartao, type CartaoFormState } from "./actions";
 
 export type CartaoRow = {
@@ -37,6 +38,7 @@ export type BancoOption = {
   id: string;
   nome: string;
   cor: string;
+  icone: string | null;
 };
 
 type Props = {
@@ -130,11 +132,15 @@ export function CartaoFormDialog({ cartao, bancos, trigger }: Props) {
                 <SelectContent>
                   {bancos.map((b) => (
                     <SelectItem key={b.id} value={b.id}>
-                      <span
-                        className="inline-block size-3 rounded-full"
-                        style={{ background: b.cor }}
-                      />
-                      {b.nome}
+                      <span className="inline-flex items-center gap-2">
+                        <BancoIcone
+                          icone={b.icone}
+                          corFallback={b.cor}
+                          nomeFallback={b.nome}
+                          size={20}
+                        />
+                        <span>{b.nome}</span>
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

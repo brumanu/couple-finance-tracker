@@ -13,6 +13,7 @@ import {
   quinzenaDoCartao,
   type CompraCartaoInfo,
 } from "@/lib/cartao-calc";
+import { BancoIcone } from "@/lib/bancos-icones";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "./month-switcher";
@@ -117,7 +118,7 @@ export default async function DashboardPage({
         .select(
           "id, cartao_id, descricao, valor_total, data_compra, parcelas, categoria",
         ),
-      supabase.from("bancos").select("id, nome, cor"),
+      supabase.from("bancos").select("id, nome, cor, icone"),
     ]);
 
   const rendas = (rendasRes.data ?? []) as RendaRow[];
@@ -135,6 +136,7 @@ export default async function DashboardPage({
     id: string;
     nome: string;
     cor: string;
+    icone: string | null;
   }[];
   const bancoById = new Map(bancos.map((b) => [b.id, b]));
 
@@ -142,7 +144,9 @@ export default async function DashboardPage({
   type FaturaCartao = {
     cartaoId: string;
     label: string;
+    bancoNome: string;
     bancoCor: string;
+    bancoIcone: string | null;
     total: number;
     quinzena: 15 | 30;
   };
@@ -166,7 +170,9 @@ export default async function DashboardPage({
       return {
         cartaoId: c.id,
         label,
+        bancoNome: banco?.nome ?? label,
         bancoCor: banco?.cor ?? "#c67139",
+        bancoIcone: banco?.icone ?? null,
         total: f.total,
         quinzena: quinzenaDoCartao(c.dia_vencimento),
       };
@@ -324,7 +330,9 @@ export default async function DashboardPage({
 type FaturaResumo = {
   cartaoId: string;
   label: string;
+  bancoNome: string;
   bancoCor: string;
+  bancoIcone: string | null;
   total: number;
   quinzena: 15 | 30;
 };
@@ -551,16 +559,12 @@ function ContasQuinzenaCard({
                 key={f.cartaoId}
                 className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
               >
-                <div
-                  className="flex size-9 shrink-0 items-center justify-center rounded-full font-heading text-xs text-white"
-                  style={{ background: f.bancoCor }}
-                >
-                  {f.label
-                    .split("·")[0]
-                    .trim()
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </div>
+                <BancoIcone
+                  icone={f.bancoIcone}
+                  corFallback={f.bancoCor}
+                  nomeFallback={f.bancoNome}
+                  size={36}
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm">Fatura {f.label}</p>
                   <p className="text-xs text-muted-foreground">Cartão</p>
