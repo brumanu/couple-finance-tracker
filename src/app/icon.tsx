@@ -1,9 +1,18 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
 export const size = { width: 512, height: 512 };
 export const contentType = "image/png";
 
-export default function Icon() {
+async function loadCaprasimo() {
+  const p = path.join(process.cwd(), "src/app/_fonts/Caprasimo-Regular.ttf");
+  return fs.readFile(p);
+}
+
+export default async function Icon() {
+  const fontData = await loadCaprasimo();
+
   return new ImageResponse(
     (
       <div
@@ -13,18 +22,22 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background:
-            "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #334155 100%)",
-          color: "#f0fdf4",
-          fontSize: 320,
-          fontWeight: 800,
-          fontFamily: "system-ui, sans-serif",
-          letterSpacing: "-0.05em",
+          background: "#c67139",
+          borderRadius: 118,
+          color: "#f5ead8",
+          fontFamily: "Caprasimo",
+          fontSize: 240,
+          letterSpacing: "-0.03em",
         }}
       >
         R$
       </div>
     ),
-    { ...size },
+    {
+      ...size,
+      fonts: [
+        { name: "Caprasimo", data: fontData, style: "normal", weight: 400 },
+      ],
+    },
   );
 }
