@@ -4,6 +4,7 @@ import {
   FileTextIcon,
   ShoppingCartIcon,
   CreditCardIcon,
+  HandCoinsIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,4 +21,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/recorrentes", label: "Contas", icon: FileTextIcon },
   { href: "/cartoes", label: "Cartões", icon: CreditCardIcon },
   { href: "/despesas", label: "Despesas", icon: ShoppingCartIcon },
+  { href: "/dividas", label: "Dívidas", icon: HandCoinsIcon },
 ];

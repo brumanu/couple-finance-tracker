@@ -85,41 +85,51 @@ export default async function DashboardPage({
   const noMesAtual =
     hoje.slice(0, 7) === `${mes.ano}-${String(mes.mes).padStart(2, "0")}`;
 
-  const [rendasRes, contasRes, lancRes, cartoesRes, comprasRes, bancosRes] =
-    await Promise.all([
-      supabase
-        .from("rendas")
-        .select("descricao, valor_previsto, dia_recebimento")
-        .eq("ativa", true),
-      supabase
-        .from("contas_recorrentes")
-        .select(
-          "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, inicio_vigencia, fim_vigencia",
-        )
-        .eq("ativa", true)
-        .lte("inicio_vigencia", mes.ultimoDia)
-        .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
-      supabase
-        .from("lancamentos")
-        .select(
-          "id, tipo, descricao, valor, data_pagamento, quinzena, categoria, conta_recorrente_id",
-        )
-        .gte("data_referencia", mes.primeiroDia)
-        .lte("data_referencia", mes.ultimoDia)
-        .order("data_pagamento", { ascending: false }),
-      supabase
-        .from("cartoes")
-        .select(
-          "id, banco_id, apelido, dia_fechamento, dia_vencimento, ativo",
-        )
-        .eq("ativo", true),
-      supabase
-        .from("compras_cartao")
-        .select(
-          "id, cartao_id, descricao, valor_total, data_compra, parcelas, categoria",
-        ),
-      supabase.from("bancos").select("id, nome, cor, icone"),
-    ]);
+  const [
+    rendasRes,
+    contasRes,
+    lancRes,
+    cartoesRes,
+    comprasRes,
+    bancosRes,
+    dividasRes,
+    pagDividasRes,
+  ] = await Promise.all([
+    supabase
+      .from("rendas")
+      .select("descricao, valor_previsto, dia_recebimento")
+      .eq("ativa", true),
+    supabase
+      .from("contas_recorrentes")
+      .select(
+        "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, inicio_vigencia, fim_vigencia",
+      )
+      .eq("ativa", true)
+      .lte("inicio_vigencia", mes.ultimoDia)
+      .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
+    supabase
+      .from("lancamentos")
+      .select(
+        "id, tipo, descricao, valor, data_pagamento, quinzena, categoria, conta_recorrente_id",
+      )
+      .gte("data_referencia", mes.primeiroDia)
+      .lte("data_referencia", mes.ultimoDia)
+      .order("data_pagamento", { ascending: false }),
+    supabase
+      .from("cartoes")
+      .select(
+        "id, banco_id, apelido, dia_fechamento, dia_vencimento, ativo",
+      )
+      .eq("ativo", true),
+    supabase
+      .from("compras_cartao")
+      .select(
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, categoria",
+      ),
+    supabase.from("bancos").select("id, nome, cor, icone"),
+    supabase.from("dividas").select("id, descricao, valor_total"),
+    supabase.from("pagamentos_divida").select("divida_id, valor"),
+  ]);
 
   const rendas = (rendasRes.data ?? []) as RendaRow[];
   const contas = (contasRes.data ?? []) as RecorrenteRow[];
@@ -139,6 +149,34 @@ export default async function DashboardPage({
     icone: string | null;
   }[];
   const bancoById = new Map(bancos.map((b) => [b.id, b]));
+
+  const dividasRaw = (dividasRes.data ?? []) as {
+    id: string;
+    descricao: string;
+    valor_total: number | string;
+  }[];
+  const pagDividasRaw = (pagDividasRes.data ?? []) as {
+    divida_id: string;
+    valor: number | string;
+  }[];
+  const pagoPorDivida = new Map<string, number>();
+  for (const p of pagDividasRaw) {
+    pagoPorDivida.set(
+      p.divida_id,
+      (pagoPorDivida.get(p.divida_id) ?? 0) + Number(p.valor),
+    );
+  }
+  const dividasAbertas = dividasRaw
+    .map((d) => {
+      const pago = pagoPorDivida.get(d.id) ?? 0;
+      const total = Number(d.valor_total);
+      const restante = Math.max(0, total - pago);
+      const progresso = total > 0 ? Math.min(100, (pago / total) * 100) : 0;
+      return { id: d.id, descricao: d.descricao, total, pago, restante, progresso };
+    })
+    .filter((d) => d.restante > 0)
+    .sort((a, b) => b.restante - a.restante);
+  const totalDividas = dividasAbertas.reduce((s, d) => s + d.restante, 0);
 
   // Calcula fatura de cada cartão nesse mês
   type FaturaCartao = {
@@ -321,9 +359,96 @@ export default async function DashboardPage({
             />
             <UltimasDespesasCard despesas={despesasAvulsas.slice(0, 6)} />
           </div>
+
+          {dividasAbertas.length > 0 && (
+            <DividasCard
+              total={totalDividas}
+              topDividas={dividasAbertas.slice(0, 3)}
+              temMais={dividasAbertas.length > 3}
+            />
+          )}
         </>
       )}
     </div>
+  );
+}
+
+function DividasCard({
+  total,
+  topDividas,
+  temMais,
+}: {
+  total: number;
+  topDividas: {
+    id: string;
+    descricao: string;
+    total: number;
+    pago: number;
+    restante: number;
+    progresso: number;
+  }[];
+  temMais: boolean;
+}) {
+  return (
+    <Card>
+      <div className="flex flex-col gap-4 p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <p className="text-[11px] uppercase tracking-widest text-primary">
+              Dívidas em aberto
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Não entra no saldo — é só pra não esquecer.
+            </p>
+          </div>
+          <p
+            className="font-heading tabular-nums text-primary"
+            style={{ fontSize: "clamp(1.5rem, 4vw, 2.25rem)", lineHeight: 1 }}
+          >
+            {formatBRL(total)}
+          </p>
+        </div>
+
+        <ul className="flex flex-col gap-3">
+          {topDividas.map((d) => (
+            <li key={d.id} className="flex flex-col gap-1.5">
+              <div className="flex items-baseline justify-between gap-2">
+                <p className="truncate text-sm font-medium">{d.descricao}</p>
+                <p className="whitespace-nowrap text-sm tabular-nums text-primary">
+                  {formatBRL(d.restante)}
+                </p>
+              </div>
+              <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-neutral-200">
+                <div
+                  className="bg-primary/70"
+                  style={{ width: `${d.progresso}%` }}
+                />
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <div className="flex items-center justify-between border-t border-border/60 pt-3">
+          {temMais && (
+            <p className="text-xs text-muted-foreground">
+              +{topDividas.length === 3 ? "outras" : ""} não mostradas
+            </p>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            nativeButton={false}
+            className="ml-auto"
+            render={
+              <Link href="/dividas">
+                Ver dívidas
+                <ChevronRightIcon className="size-4" strokeWidth={2.75} />
+              </Link>
+            }
+          />
+        </div>
+      </div>
+    </Card>
   );
 }
 
