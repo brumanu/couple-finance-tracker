@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { parseMesParam } from "@/lib/mes";
+import { mesAnterior, parseMesParam, type MesRef } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import {
   faturaDoMes,
@@ -38,6 +38,8 @@ type RecorrenteRow = {
   quinzena: number;
   dia_vencimento: number | null;
   categoria: string | null;
+  inicio_vigencia: string;
+  fim_vigencia: string | null;
 };
 
 type LancamentoRow = {
@@ -45,34 +47,83 @@ type LancamentoRow = {
   tipo: string;
   descricao: string;
   valor: number | string;
+  data_referencia: string;
   data_pagamento: string | null;
   quinzena: number | null;
   categoria: string | null;
   conta_recorrente_id: string | null;
 };
 
+type CartaoRow = {
+  id: string;
+  banco_id: string;
+  apelido: string | null;
+  dia_fechamento: number;
+  dia_vencimento: number;
+};
+
+type BancoRow = {
+  id: string;
+  nome: string;
+  cor: string;
+  icone: string | null;
+};
+
 const QUINZENA_META = {
   15: {
     label: "dia 15",
     subtitle: "Adiantamento",
-    tokenBg: "bg-sage-200",
-    tokenText: "text-sage-800",
     barra: "bg-sage-500",
-    barraSecundaria: "bg-sage-400",
-    tag: "sage",
-    blob: "bg-sage-300/45",
   },
   30: {
     label: "dia 30",
     subtitle: "Salário final",
-    tokenBg: "bg-accent-200",
-    tokenText: "text-accent-800",
     barra: "bg-accent-500",
-    barraSecundaria: "bg-accent-400",
-    tag: "accent",
-    blob: "bg-accent-300/45",
   },
 } as const;
+
+const MESES_ABREV = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+];
+
+const HISTORICO_MESES = 6;
+
+type CalcMes = {
+  totalRenda: number;
+  totalContasRec: number;
+  totalCartoes: number;
+  totalDespesas: number;
+  saldo: number;
+};
+
+type CalcQuinzena = CalcMes & {
+  quinzena: 15 | 30;
+  rendas: RendaRow[];
+  contas: RecorrenteRow[];
+  despesas: LancamentoRow[];
+  faturas: FaturaResumo[];
+};
+
+type FaturaResumo = {
+  cartaoId: string;
+  label: string;
+  bancoNome: string;
+  bancoCor: string;
+  bancoIcone: string | null;
+  total: number;
+  quinzena: 15 | 30;
+};
 
 export default async function DashboardPage({
   searchParams,
@@ -92,6 +143,15 @@ export default async function DashboardPage({
   const hojeDia = Number(hoje.slice(8, 10));
   const noMesAtual =
     hoje.slice(0, 7) === `${mes.ano}-${String(mes.mes).padStart(2, "0")}`;
+
+  // Range histórico: 5 meses anteriores + selecionado
+  const mesesHistorico: MesRef[] = [];
+  let cursor = mes;
+  for (let i = 0; i < HISTORICO_MESES; i += 1) {
+    mesesHistorico.unshift(cursor);
+    cursor = mesAnterior(cursor);
+  }
+  const primeiroDiaHistorico = mesesHistorico[0].primeiroDia;
 
   const [
     rendasRes,
@@ -114,21 +174,18 @@ export default async function DashboardPage({
         "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, inicio_vigencia, fim_vigencia",
       )
       .eq("ativa", true)
-      .lte("inicio_vigencia", mes.ultimoDia)
-      .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
+      .or(`fim_vigencia.is.null,fim_vigencia.gte.${primeiroDiaHistorico}`),
     supabase
       .from("lancamentos")
       .select(
-        "id, tipo, descricao, valor, data_pagamento, quinzena, categoria, conta_recorrente_id",
+        "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, conta_recorrente_id",
       )
-      .gte("data_referencia", mes.primeiroDia)
+      .gte("data_referencia", primeiroDiaHistorico)
       .lte("data_referencia", mes.ultimoDia)
       .order("data_pagamento", { ascending: false }),
     supabase
       .from("cartoes")
-      .select(
-        "id, banco_id, apelido, dia_fechamento, dia_vencimento, ativo",
-      )
+      .select("id, banco_id, apelido, dia_fechamento, dia_vencimento, ativo")
       .eq("ativo", true),
     supabase
       .from("compras_cartao")
@@ -147,23 +204,12 @@ export default async function DashboardPage({
   ]);
 
   const rendas = (rendasRes.data ?? []) as RendaRow[];
-  const contas = (contasRes.data ?? []) as RecorrenteRow[];
+  const contasAll = (contasRes.data ?? []) as RecorrenteRow[];
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
-  const cartoes = (cartoesRes.data ?? []) as {
-    id: string;
-    banco_id: string;
-    apelido: string | null;
-    dia_fechamento: number;
-    dia_vencimento: number;
-  }[];
+  const cartoes = (cartoesRes.data ?? []) as CartaoRow[];
   const compras = (comprasRes.data ?? []) as CompraCartaoInfo[];
   const assinaturas = (assinRes.data ?? []) as AssinaturaCartaoInfo[];
-  const bancos = (bancosRes.data ?? []) as {
-    id: string;
-    nome: string;
-    cor: string;
-    icone: string | null;
-  }[];
+  const bancos = (bancosRes.data ?? []) as BancoRow[];
   const bancoById = new Map(bancos.map((b) => [b.id, b]));
 
   const dividasRaw = (dividasRes.data ?? []) as {
@@ -188,102 +234,172 @@ export default async function DashboardPage({
       const total = Number(d.valor_total);
       const restante = Math.max(0, total - pago);
       const progresso = total > 0 ? Math.min(100, (pago / total) * 100) : 0;
-      return { id: d.id, descricao: d.descricao, total, pago, restante, progresso };
+      return {
+        id: d.id,
+        descricao: d.descricao,
+        total,
+        pago,
+        restante,
+        progresso,
+      };
     })
     .filter((d) => d.restante > 0)
     .sort((a, b) => b.restante - a.restante);
   const totalDividas = dividasAbertas.reduce((s, d) => s + d.restante, 0);
 
-  // Calcula fatura de cada cartão nesse mês
-  type FaturaCartao = {
-    cartaoId: string;
-    label: string;
-    bancoNome: string;
-    bancoCor: string;
-    bancoIcone: string | null;
-    total: number;
-    quinzena: 15 | 30;
-  };
-  const faturas: FaturaCartao[] = cartoes
-    .map((c) => {
-      const banco = bancoById.get(c.banco_id);
-      const label = banco?.nome
-        ? c.apelido
-          ? `${banco.nome} · ${c.apelido}`
-          : banco.nome
-        : c.apelido ?? "Cartão";
-      const f = faturaDoMes(
-        {
-          id: c.id,
-          dia_fechamento: c.dia_fechamento,
-          dia_vencimento: c.dia_vencimento,
-        },
-        compras,
-        mes,
-        assinaturas,
-      );
-      return {
-        cartaoId: c.id,
-        label,
-        bancoNome: banco?.nome ?? label,
-        bancoCor: banco?.cor ?? "#c67139",
-        bancoIcone: banco?.icone ?? null,
-        total: f.total,
-        quinzena: quinzenaDoCartao(c.dia_vencimento),
-      };
-    })
-    .filter((f) => f.total > 0);
-
-  const pagamentos = new Map<string, LancamentoRow>();
-  for (const l of lancamentos) {
-    if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
-      pagamentos.set(l.conta_recorrente_id, l);
-    }
+  function faturasDoMes(mesRef: MesRef): FaturaResumo[] {
+    return cartoes
+      .map((c) => {
+        const banco = bancoById.get(c.banco_id);
+        const label = banco?.nome
+          ? c.apelido
+            ? `${banco.nome} · ${c.apelido}`
+            : banco.nome
+          : (c.apelido ?? "Cartão");
+        const f = faturaDoMes(
+          {
+            id: c.id,
+            dia_fechamento: c.dia_fechamento,
+            dia_vencimento: c.dia_vencimento,
+          },
+          compras,
+          mesRef,
+          assinaturas,
+        );
+        return {
+          cartaoId: c.id,
+          label,
+          bancoNome: banco?.nome ?? label,
+          bancoCor: banco?.cor ?? "#c67139",
+          bancoIcone: banco?.icone ?? null,
+          total: f.total,
+          quinzena: quinzenaDoCartao(c.dia_vencimento),
+        };
+      })
+      .filter((f) => f.total > 0);
   }
-  const despesasAvulsas = lancamentos.filter(
-    (l) => l.tipo === "despesa_avulsa",
-  );
 
-  const quinzenaAtual: 15 | 30 = noMesAtual && hojeDia > 15 ? 30 : 15;
-  const proxima: 15 | 30 = quinzenaAtual === 15 ? 30 : 15;
+  function contasVigentesNoMes(mesRef: MesRef): RecorrenteRow[] {
+    return contasAll.filter(
+      (c) =>
+        c.inicio_vigencia <= mesRef.ultimoDia &&
+        (c.fim_vigencia === null || c.fim_vigencia >= mesRef.primeiroDia),
+    );
+  }
 
-  function calc(q: 15 | 30) {
+  function lancamentosDoMes(mesRef: MesRef): LancamentoRow[] {
+    return lancamentos.filter(
+      (l) =>
+        l.data_referencia >= mesRef.primeiroDia &&
+        l.data_referencia <= mesRef.ultimoDia,
+    );
+  }
+
+  function calcMes(mesRef: MesRef): CalcMes {
+    const lancsMes = lancamentosDoMes(mesRef);
+    const contasMes = contasVigentesNoMes(mesRef);
+    const faturas = faturasDoMes(mesRef);
+    const pagosMes = new Map<string, LancamentoRow>();
+    for (const l of lancsMes) {
+      if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
+        pagosMes.set(l.conta_recorrente_id, l);
+      }
+    }
+    const totalRenda = rendas.reduce(
+      (s, r) => s + Number(r.valor_previsto),
+      0,
+    );
+    const totalContasRec = contasMes.reduce((s, c) => {
+      const pago = pagosMes.get(c.id);
+      return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
+    }, 0);
+    const totalCartoes = faturas.reduce((s, f) => s + f.total, 0);
+    const totalDespesas = lancsMes
+      .filter((l) => l.tipo === "despesa_avulsa")
+      .reduce((s, l) => s + Number(l.valor), 0);
+    return {
+      totalRenda,
+      totalContasRec,
+      totalCartoes,
+      totalDespesas,
+      saldo: totalRenda - totalContasRec - totalCartoes - totalDespesas,
+    };
+  }
+
+  function calcQuinzena(q: 15 | 30, mesRef: MesRef): CalcQuinzena {
+    const lancsMes = lancamentosDoMes(mesRef);
+    const faturas = faturasDoMes(mesRef);
+    const pagosMes = new Map<string, LancamentoRow>();
+    for (const l of lancsMes) {
+      if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
+        pagosMes.set(l.conta_recorrente_id, l);
+      }
+    }
     const rendasQ = rendas.filter((r) => r.dia_recebimento === q);
-    const contasQ = contas.filter((c) => c.quinzena === q);
-    const despesasQ = despesasAvulsas.filter((d) => d.quinzena === q);
+    const contasQ = contasVigentesNoMes(mesRef).filter(
+      (c) => c.quinzena === q,
+    );
+    const despesasQ = lancsMes.filter(
+      (l) => l.tipo === "despesa_avulsa" && l.quinzena === q,
+    );
     const faturasQ = faturas.filter((f) => f.quinzena === q);
     const totalRenda = rendasQ.reduce(
       (s, r) => s + Number(r.valor_previsto),
       0,
     );
     const totalContasRec = contasQ.reduce((s, c) => {
-      const pago = pagamentos.get(c.id);
+      const pago = pagosMes.get(c.id);
       return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
     }, 0);
-    const totalFaturas = faturasQ.reduce((s, f) => s + f.total, 0);
-    const totalContas = totalContasRec + totalFaturas;
-    const totalDespesas = despesasQ.reduce((s, d) => s + Number(d.valor), 0);
+    const totalCartoes = faturasQ.reduce((s, f) => s + f.total, 0);
+    const totalDespesas = despesasQ.reduce((s, l) => s + Number(l.valor), 0);
     return {
+      quinzena: q,
       rendas: rendasQ,
       contas: contasQ,
       despesas: despesasQ,
       faturas: faturasQ,
       totalRenda,
-      totalContas,
+      totalContasRec,
+      totalCartoes,
       totalDespesas,
-      saldo: totalRenda - totalContas - totalDespesas,
+      saldo: totalRenda - totalContasRec - totalCartoes - totalDespesas,
     };
   }
 
-  const atual = calc(quinzenaAtual);
-  const outra = calc(proxima);
+  const dadosMes = calcMes(mes);
+  const q15 = calcQuinzena(15, mes);
+  const q30 = calcQuinzena(30, mes);
+
+  const historico = mesesHistorico.map((m) => ({
+    mes: m,
+    calc: calcMes(m),
+  }));
+
+  const pagamentosMes = new Map<string, LancamentoRow>();
+  const lancsMesAtual = lancamentosDoMes(mes);
+  for (const l of lancsMesAtual) {
+    if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
+      pagamentosMes.set(l.conta_recorrente_id, l);
+    }
+  }
+  const despesasAvulsasMes = lancsMesAtual
+    .filter((l) => l.tipo === "despesa_avulsa")
+    .sort((a, b) =>
+      (b.data_pagamento ?? "").localeCompare(a.data_pagamento ?? ""),
+    );
+
+  const quinzenaAtual: 15 | 30 = noMesAtual && hojeDia > 15 ? 30 : 15;
+  const quinzenaAtualDados = quinzenaAtual === 15 ? q15 : q30;
 
   const nenhumDado =
-    rendas.length === 0 && contas.length === 0 && faturas.length === 0;
+    rendas.length === 0 &&
+    contasAll.length === 0 &&
+    dadosMes.totalCartoes === 0;
 
   const contasEmAtraso = noMesAtual
-    ? atual.contas.filter((c) => {
-        const paga = pagamentos.get(c.id);
+    ? quinzenaAtualDados.contas.filter((c) => {
+        const paga = pagamentosMes.get(c.id);
         if (paga) return false;
         return c.dia_vencimento != null && hojeDia > c.dia_vencimento;
       })
@@ -327,22 +443,33 @@ export default async function DashboardPage({
               <Button
                 size="sm"
                 nativeButton={false}
-                render={
-                  <Link href="/recorrentes">Cadastrar contas</Link>
-                }
+                render={<Link href="/recorrentes">Cadastrar contas</Link>}
               />
             </div>
           </div>
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-[1.55fr_1fr]">
-            <QuinzenaHeroCard
-              quinzena={quinzenaAtual}
-              dados={atual}
-              titulo="Sobra nesta quinzena"
+          <SobraMesHeroCard
+            dados={dadosMes}
+            mesLabel={mes.label}
+            noMesAtual={noMesAtual}
+          />
+
+          <SobraHistoricoChart
+            historico={historico}
+            selecionadaChave={mes.chave}
+          />
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <QuinzenaSaldoCard
+              dados={q15}
+              ehAtual={noMesAtual && quinzenaAtual === 15}
             />
-            <QuinzenaResumoCard quinzena={proxima} dados={outra} />
+            <QuinzenaSaldoCard
+              dados={q30}
+              ehAtual={noMesAtual && quinzenaAtual === 30}
+            />
           </div>
 
           {contasEmAtraso.length > 0 && (
@@ -358,7 +485,7 @@ export default async function DashboardPage({
                 </p>
                 <p className="text-sm text-accent-800/85">
                   {contasEmAtraso.length === 1
-                    ? `${formatBRL(pagamentos.get(contasEmAtraso[0].id)?.valor ?? contasEmAtraso[0].valor_previsto)} · vencimento dia ${contasEmAtraso[0].dia_vencimento}`
+                    ? `${formatBRL(pagamentosMes.get(contasEmAtraso[0].id)?.valor ?? contasEmAtraso[0].valor_previsto)} · vencimento dia ${contasEmAtraso[0].dia_vencimento}`
                     : contasEmAtraso.map((c) => c.descricao).join(", ")}
                 </p>
               </div>
@@ -368,14 +495,14 @@ export default async function DashboardPage({
           <div className="grid gap-4 md:grid-cols-[1.1fr_1fr]">
             <ContasQuinzenaCard
               quinzena={quinzenaAtual}
-              contas={atual.contas}
-              faturas={atual.faturas}
-              pagamentos={pagamentos}
+              contas={quinzenaAtualDados.contas}
+              faturas={quinzenaAtualDados.faturas}
+              pagamentos={pagamentosMes}
               mes={mes}
               hojeDia={hojeDia}
               noMesAtual={noMesAtual}
             />
-            <UltimasDespesasCard despesas={despesasAvulsas.slice(0, 6)} />
+            <UltimasDespesasCard despesas={despesasAvulsasMes.slice(0, 6)} />
           </div>
 
           {dividasAbertas.length > 0 && (
@@ -387,6 +514,339 @@ export default async function DashboardPage({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function SobraMesHeroCard({
+  dados,
+  mesLabel,
+  noMesAtual,
+}: {
+  dados: CalcMes;
+  mesLabel: string;
+  noMesAtual: boolean;
+}) {
+  const totalGastos =
+    dados.totalContasRec + dados.totalCartoes + dados.totalDespesas;
+  const pctGasto = dados.totalRenda > 0
+    ? Math.min(100, (totalGastos / dados.totalRenda) * 100)
+    : 0;
+  const pctLivre = Math.max(0, 100 - pctGasto);
+
+  return (
+    <div className="relative flex flex-col gap-5 overflow-hidden rounded-[28px] bg-card p-7 md:gap-6 md:p-8">
+      <div
+        className="pointer-events-none absolute -right-16 -top-16 size-60 rounded-full bg-accent-200/70"
+        aria-hidden
+      />
+      <div className="relative flex flex-col gap-1.5">
+        <p className="text-[11px] uppercase tracking-widest text-accent-700">
+          Sobra em {mesLabel}
+          {noMesAtual ? " · mês corrente" : ""}
+        </p>
+        <p
+          className={`font-heading tabular-nums ${dados.saldo >= 0 ? "text-foreground" : "text-primary"}`}
+          style={{
+            fontSize: "clamp(2.75rem, 6vw, 4.125rem)",
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {formatBRL(dados.saldo)}
+        </p>
+        <p className="mt-1 max-w-[52ch] text-[15px] text-neutral-800">
+          {dados.saldo >= 0
+            ? "É o que sobra depois de contas, cartões e despesas do mês."
+            : "O previsto já supera as entradas do mês — atenção aos próximos gastos."}
+        </p>
+      </div>
+
+      <div className="relative grid gap-3 sm:grid-cols-4">
+        <ResumoBloco
+          label="Entradas"
+          valor={dados.totalRenda}
+          tom="positivo"
+        />
+        <ResumoBloco
+          label="Contas"
+          valor={dados.totalContasRec}
+          tom="gasto"
+        />
+        <ResumoBloco
+          label="Cartões"
+          valor={dados.totalCartoes}
+          tom="gasto"
+        />
+        <ResumoBloco
+          label="Despesas"
+          valor={dados.totalDespesas}
+          tom="gasto"
+        />
+      </div>
+
+      <div className="relative flex flex-col gap-2">
+        <div className="flex h-3 w-full overflow-hidden rounded-full bg-neutral-200">
+          <div
+            className={dados.saldo >= 0 ? "bg-accent-500" : "bg-primary"}
+            style={{ width: `${pctGasto}%` }}
+          />
+        </div>
+        <div className="flex items-center justify-between text-[13px] text-neutral-700">
+          <span>{Math.round(pctGasto)}% do previsto comprometido</span>
+          <span className="tabular-nums">
+            Livre {Math.round(pctLivre)}%
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResumoBloco({
+  label,
+  valor,
+  tom,
+}: {
+  label: string;
+  valor: number;
+  tom: "positivo" | "gasto";
+}) {
+  return (
+    <div className="rounded-[18px] bg-surface-soft px-4 py-3">
+      <p className="text-[10px] uppercase tracking-widest text-neutral-700">
+        {label}
+      </p>
+      <p
+        className={`mt-1.5 font-heading tabular-nums ${
+          tom === "gasto" && valor > 0 ? "text-primary" : "text-foreground"
+        }`}
+        style={{ fontSize: "clamp(1rem, 2.4vw, 1.25rem)", lineHeight: 1.1 }}
+      >
+        {tom === "gasto" && valor > 0 ? "−" : ""}
+        {formatBRL(valor)}
+      </p>
+    </div>
+  );
+}
+
+function SobraHistoricoChart({
+  historico,
+  selecionadaChave,
+}: {
+  historico: { mes: MesRef; calc: CalcMes }[];
+  selecionadaChave: string;
+}) {
+  const maxAbs = historico.reduce(
+    (m, h) => Math.max(m, Math.abs(h.calc.saldo)),
+    0,
+  );
+  const temSaldoNegativo = historico.some((h) => h.calc.saldo < 0);
+  const alturaBarra = 128; // px
+
+  return (
+    <div className="flex flex-col gap-4 rounded-[26px] bg-card p-5 md:p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <p className="text-[11px] uppercase tracking-widest text-accent-700">
+            Sobra mês a mês
+          </p>
+          <p className="mt-1 text-[13px] text-neutral-700">
+            Últimos {historico.length} meses. Barras acima do eixo indicam
+            sobra positiva.
+          </p>
+        </div>
+      </div>
+
+      <div className="-mx-1 overflow-x-auto pb-1">
+        <div className="flex min-w-full items-stretch gap-2 px-1">
+          {historico.map((h) => {
+            const saldo = h.calc.saldo;
+            const alturaPct =
+              maxAbs > 0 ? (Math.abs(saldo) / maxAbs) * 100 : 0;
+            const positivo = saldo >= 0;
+            const selecionada = h.mes.chave === selecionadaChave;
+            const semDados =
+              h.calc.totalRenda === 0 &&
+              h.calc.totalContasRec === 0 &&
+              h.calc.totalCartoes === 0 &&
+              h.calc.totalDespesas === 0;
+
+            const barraCor = semDados
+              ? "bg-neutral-200"
+              : positivo
+                ? selecionada
+                  ? "bg-sage-500"
+                  : "bg-sage-400"
+                : selecionada
+                  ? "bg-primary"
+                  : "bg-primary/70";
+
+            return (
+              <div
+                key={h.mes.chave}
+                className={`flex min-w-[52px] flex-1 flex-col items-center gap-1.5 rounded-2xl px-1 py-2 transition-colors ${
+                  selecionada ? "bg-surface-soft" : ""
+                }`}
+                title={`${h.mes.label}: ${formatBRL(saldo)}`}
+              >
+                <span
+                  className={`text-[10px] tabular-nums font-medium ${
+                    semDados ? "text-neutral-400" : ""
+                  }`}
+                >
+                  {semDados
+                    ? "—"
+                    : formatBRL(saldo).replace("R$ ", "").replace(",00", "")}
+                </span>
+
+                {temSaldoNegativo ? (
+                  <div
+                    className="relative flex w-full items-center"
+                    style={{ height: alturaBarra }}
+                  >
+                    <div className="absolute left-0 right-0 top-1/2 h-px bg-border/70" />
+                    <div className="absolute inset-x-0 top-1/2 flex flex-col items-center">
+                      {positivo ? (
+                        <div className="absolute bottom-0 w-full">
+                          <div
+                            className={`w-full rounded-t-md ${barraCor}`}
+                            style={{
+                              height: `${(alturaBarra / 2) * (alturaPct / 100)}px`,
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="absolute top-0 w-full">
+                          <div
+                            className={`w-full rounded-b-md ${barraCor}`}
+                            style={{
+                              height: `${(alturaBarra / 2) * (alturaPct / 100)}px`,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="flex w-full items-end overflow-hidden rounded-md bg-muted/50"
+                    style={{ height: alturaBarra }}
+                  >
+                    <div
+                      className={`w-full rounded-md ${barraCor}`}
+                      style={{ height: `${Math.max(2, alturaPct)}%` }}
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col items-center gap-0.5">
+                  <span
+                    className={`text-[10px] uppercase tracking-wide ${
+                      selecionada
+                        ? "font-heading text-accent-700"
+                        : "text-neutral-700"
+                    }`}
+                  >
+                    {MESES_ABREV[h.mes.mes - 1]}
+                  </span>
+                  <span className="text-[9px] text-neutral-500">
+                    {String(h.mes.ano).slice(2)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuinzenaSaldoCard({
+  dados,
+  ehAtual,
+}: {
+  dados: CalcQuinzena;
+  ehAtual: boolean;
+}) {
+  const meta = QUINZENA_META[dados.quinzena];
+  const totalGastos =
+    dados.totalContasRec + dados.totalCartoes + dados.totalDespesas;
+  const pctGasto = dados.totalRenda > 0
+    ? Math.min(100, (totalGastos / dados.totalRenda) * 100)
+    : 0;
+
+  return (
+    <div className="flex flex-col gap-4 rounded-[26px] bg-surface-soft p-6">
+      <div className="flex items-baseline justify-between gap-2">
+        <div>
+          <p className="text-[11px] uppercase tracking-widest text-neutral-700">
+            Sobra quinzena · {meta.label}
+          </p>
+          <p className="text-[13px] text-neutral-700">{meta.subtitle}</p>
+        </div>
+        {ehAtual && (
+          <Badge variant="secondary" className="text-[10px]">
+            atual
+          </Badge>
+        )}
+      </div>
+
+      <p
+        className={`font-heading tabular-nums ${dados.saldo >= 0 ? "text-foreground" : "text-primary"}`}
+        style={{
+          fontSize: "clamp(1.875rem, 4.5vw, 2.5rem)",
+          lineHeight: 1,
+        }}
+      >
+        {formatBRL(dados.saldo)}
+      </p>
+
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-neutral-200">
+        <div className={meta.barra} style={{ width: `${pctGasto}%` }} />
+      </div>
+
+      <div className="flex flex-col gap-2 text-[13px]">
+        <ResumoLinha label="Entradas" valor={dados.totalRenda} />
+        <ResumoLinha
+          label="Contas"
+          valor={-dados.totalContasRec}
+          variant="danger"
+        />
+        <ResumoLinha
+          label="Cartões"
+          valor={-dados.totalCartoes}
+          variant="danger"
+        />
+        <ResumoLinha
+          label="Despesas"
+          valor={-dados.totalDespesas}
+          variant="danger"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ResumoLinha({
+  label,
+  valor,
+  variant,
+}: {
+  label: string;
+  valor: number;
+  variant?: "danger";
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-muted-foreground">{label}</span>
+      <span
+        className={`tabular-nums font-medium ${variant === "danger" ? "text-primary" : "text-foreground"}`}
+      >
+        {valor < 0 ? "−" : ""}
+        {formatBRL(Math.abs(valor))}
+      </span>
     </div>
   );
 }
@@ -470,228 +930,6 @@ function DividasCard({
   );
 }
 
-type FaturaResumo = {
-  cartaoId: string;
-  label: string;
-  bancoNome: string;
-  bancoCor: string;
-  bancoIcone: string | null;
-  total: number;
-  quinzena: 15 | 30;
-};
-
-type CalcResult = {
-  rendas: RendaRow[];
-  contas: RecorrenteRow[];
-  despesas: LancamentoRow[];
-  faturas: FaturaResumo[];
-  totalRenda: number;
-  totalContas: number;
-  totalDespesas: number;
-  saldo: number;
-};
-
-function QuinzenaHeroCard({
-  quinzena,
-  dados,
-  titulo,
-}: {
-  quinzena: 15 | 30;
-  dados: CalcResult;
-  titulo: string;
-}) {
-  const meta = QUINZENA_META[quinzena];
-  const total = dados.totalRenda || 1;
-  const pctContas = Math.min(100, (dados.totalContas / total) * 100);
-  const pctDespesas = Math.min(
-    100 - pctContas,
-    (dados.totalDespesas / total) * 100,
-  );
-  const pctLivre = Math.max(0, 100 - pctContas - pctDespesas);
-
-  return (
-    <div className="relative flex flex-col gap-5 overflow-hidden rounded-[28px] bg-card p-7 md:gap-6 md:p-8">
-      <div
-        className="pointer-events-none absolute -right-16 -top-16 size-60 rounded-full bg-accent-200/70"
-        aria-hidden
-      />
-      <div className="relative flex flex-col gap-1.5">
-        <p className="text-[11px] uppercase tracking-widest text-accent-700">
-          {titulo} · {meta.label}
-        </p>
-        <p
-          className={`font-heading tabular-nums ${dados.saldo >= 0 ? "text-foreground" : "text-primary"}`}
-          style={{ fontSize: "clamp(2.75rem, 6vw, 4.125rem)", lineHeight: 1, letterSpacing: "-0.02em" }}
-        >
-          {formatBRL(dados.saldo)}
-        </p>
-        <p className="mt-1 max-w-[44ch] text-[15px] text-neutral-800">
-          {meta.subtitle}. {dados.saldo >= 0
-            ? "Ainda dá até o fim da quinzena, se as contas vierem como previsto."
-            : "Já passou do que entrou — atenção aos próximos gastos."}
-        </p>
-      </div>
-
-      <div className="relative flex flex-col gap-3">
-        <div className="flex h-4 w-full overflow-hidden rounded-full bg-neutral-200">
-          {pctContas > 0 && (
-            <div
-              className={meta.barra}
-              style={{ width: `${pctContas}%` }}
-              title={`Contas ${formatBRL(dados.totalContas)}`}
-            />
-          )}
-          {pctDespesas > 0 && (
-            <div
-              className={meta.barraSecundaria}
-              style={{ width: `${pctDespesas}%` }}
-              title={`Despesas ${formatBRL(dados.totalDespesas)}`}
-            />
-          )}
-          {pctLivre > 0 && (
-            <div
-              className="bg-neutral-200"
-              style={{ width: `${pctLivre}%` }}
-            />
-          )}
-        </div>
-        <div className="flex flex-wrap gap-4 text-[13px] text-neutral-800">
-          <LegendaDot
-            className={meta.barra}
-            label="Contas"
-            valor={dados.totalContas}
-          />
-          <LegendaDot
-            className={meta.barraSecundaria}
-            label="Despesas"
-            valor={dados.totalDespesas}
-          />
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-full bg-neutral-300" />
-            <span className="text-muted-foreground">
-              Livre {Math.round(pctLivre)}%
-            </span>
-          </span>
-        </div>
-      </div>
-
-      <div className="relative flex flex-wrap gap-2">
-        {dados.totalRenda > 0 && (
-          <Badge variant="neutral" className="text-[12px]">
-            Entrou {formatBRL(dados.totalRenda)} no dia {quinzena}
-          </Badge>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function QuinzenaResumoCard({
-  quinzena,
-  dados,
-}: {
-  quinzena: 15 | 30;
-  dados: CalcResult;
-}) {
-  const meta = QUINZENA_META[quinzena];
-  return (
-    <div className="flex flex-col gap-5 rounded-[28px] bg-surface-soft p-7 md:p-8">
-      <div>
-        <p className="text-[11px] uppercase tracking-widest text-neutral-700">
-          Próxima quinzena · {meta.label}
-        </p>
-        <p
-          className="mt-2 font-heading tabular-nums"
-          style={{ fontSize: "clamp(1.875rem, 4vw, 2.375rem)", lineHeight: 1 }}
-        >
-          {formatBRL(dados.saldo)}
-        </p>
-        <p className="mt-2 text-sm text-neutral-700">
-          {meta.subtitle}, nada pago ainda.
-        </p>
-      </div>
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-neutral-200">
-        <div
-          className={meta.barra}
-          style={{
-            width: `${Math.min(
-              100,
-              ((dados.totalContas + dados.totalDespesas) /
-                (dados.totalRenda || 1)) *
-                100,
-            )}%`,
-          }}
-        />
-      </div>
-      <div className="flex flex-col gap-3 text-sm">
-        <ResumoLinha label="Renda" valor={dados.totalRenda} />
-        <ResumoLinha
-          label="Contas"
-          valor={-dados.totalContas}
-          variant="danger"
-        />
-        <ResumoLinha
-          label="Despesas"
-          valor={-dados.totalDespesas}
-          variant="danger"
-        />
-        <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-3">
-          <span className="font-heading text-base">Sobra do mês</span>
-          <span className="font-heading text-lg tabular-nums text-sage-700">
-            {formatBRL(dados.saldo)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LegendaDot({
-  className,
-  label,
-  valor,
-  muted,
-}: {
-  className: string;
-  label: string;
-  valor: number;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`inline-block size-2 rounded-full ${className}`} />
-      <span className={muted ? "text-muted-foreground" : "text-foreground/80"}>
-        {label}{" "}
-        <span className="font-medium tabular-nums text-foreground">
-          {formatBRL(valor)}
-        </span>
-      </span>
-    </div>
-  );
-}
-
-function ResumoLinha({
-  label,
-  valor,
-  variant,
-}: {
-  label: string;
-  valor: number;
-  variant?: "danger";
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span
-        className={`tabular-nums font-medium ${variant === "danger" ? "text-primary" : "text-foreground"}`}
-      >
-        {valor < 0 ? "−" : ""}
-        {formatBRL(Math.abs(valor))}
-      </span>
-    </div>
-  );
-}
-
 function ContasQuinzenaCard({
   quinzena,
   contas,
@@ -720,7 +958,11 @@ function ContasQuinzenaCard({
         {!semItens && (
           <span className="text-[13px] text-neutral-700">
             {pagas} de {total}{" "}
-            {total === 1 ? "paga" : contas.length + faturas.length > pagas + 1 ? "pagas" : "paga"}
+            {total === 1
+              ? "paga"
+              : contas.length + faturas.length > pagas + 1
+                ? "pagas"
+                : "paga"}
           </span>
         )}
       </div>
@@ -821,7 +1063,7 @@ function ContasQuinzenaCard({
                         ? atrasada
                           ? `Venceu dia ${c.dia_vencimento}${c.categoria ? " · " + c.categoria : ""}`
                           : `Vence dia ${c.dia_vencimento}${c.categoria ? " · " + c.categoria : ""}`
-                        : c.categoria ?? ""}
+                        : (c.categoria ?? "")}
                   </p>
                 </div>
                 <span
@@ -874,10 +1116,7 @@ function UltimasDespesasCard({ despesas }: { despesas: LancamentoRow[] }) {
         <div className="rounded-[26px] bg-surface-soft px-6">
           <ul className="flex flex-col divide-y divide-border/60">
             {despesas.map((d) => (
-              <li
-                key={d.id}
-                className="flex items-center gap-3.5 py-3.5"
-              >
+              <li key={d.id} className="flex items-center gap-3.5 py-3.5">
                 <div className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-card font-heading text-xs text-neutral-800">
                   {d.descricao[0]?.toUpperCase() ?? "?"}
                 </div>
@@ -945,3 +1184,4 @@ function saudacaoContexto(hojeDia: number): string {
   else momento = "reta final da quinzena do salário";
   return `${dia}, ${nDia} de ${mes} — ${momento}.`;
 }
+
