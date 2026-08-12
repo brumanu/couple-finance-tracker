@@ -169,18 +169,17 @@ export default async function RelatorioComprasParceladasPage() {
   const totalFalta = linhas.reduce((s, l) => s + l.faltaPagar, 0);
   const totalOriginal = compras.reduce((s, c) => s + Number(c.valor_total), 0);
 
-  // Projeção mês a mês do valor de parcelas ainda por pagar.
-  // Cada compra contribui com a parcela do respectivo mês (a partir do
-  // mês corrente); se aquele mês for a última parcela da compra, a
-  // barra ganha destaque de "encerra este mês".
+  // Projeção de "quitações": em cada mês futuro, quanto vale a soma
+  // das ÚLTIMAS parcelas das compras que se encerram ali. É esse o
+  // valor que fica livre da fatura a partir do mês seguinte.
   type Bucket = {
     chave: string;
     ano: number;
     mes: number;
     label: string;
-    valor: number;
-    encerramentos: number; // qtd de compras que terminam neste mês
-    valorEncerramentos: number; // soma das últimas parcelas neste mês
+    encerramentos: number;
+    valorUltimaParcela: number;
+    liberadoAcumulado: number; // preenchido depois
   };
   const buckets = new Map<string, Bucket>();
 
@@ -195,50 +194,46 @@ export default async function RelatorioComprasParceladasPage() {
       c.parcelas_ja_pagas ?? 0,
       Math.max(0, Math.min(c.parcelas, diffMeses)),
     );
+    if (pagasReal >= c.parcelas) continue; // quitada
 
-    // Índice da primeira parcela ainda por pagar (0-based)
-    const primeiraAberta = pagasReal;
-    if (primeiraAberta >= c.parcelas) continue; // quitada
+    // Mês da última parcela
+    const idxUltima = c.parcelas - 1;
+    const totalMeses = primeira.mes + idxUltima;
+    const ano = primeira.ano + Math.floor((totalMeses - 1) / 12);
+    const mesN = ((totalMeses - 1) % 12) + 1;
+    const chave = `${ano}-${String(mesN).padStart(2, "0")}`;
+    const label = labelMesAbrev(ano, mesN);
+    const valorParcela = valores[idxUltima];
 
-    for (let idx = primeiraAberta; idx < c.parcelas; idx++) {
-      // Mês desta parcela = primeira + idx
-      const totalMeses = primeira.mes + idx;
-      const ano = primeira.ano + Math.floor((totalMeses - 1) / 12);
-      const mesN = ((totalMeses - 1) % 12) + 1;
-      const chave = `${ano}-${String(mesN).padStart(2, "0")}`;
-      const label = labelMesAbrev(ano, mesN);
-      let b = buckets.get(chave);
-      if (!b) {
-        b = {
-          chave,
-          ano,
-          mes: mesN,
-          label,
-          valor: 0,
-          encerramentos: 0,
-          valorEncerramentos: 0,
-        };
-        buckets.set(chave, b);
-      }
-      const v = valores[idx];
-      b.valor += v;
-      if (idx === c.parcelas - 1) {
-        b.encerramentos += 1;
-        b.valorEncerramentos += v;
-      }
+    let b = buckets.get(chave);
+    if (!b) {
+      b = {
+        chave,
+        ano,
+        mes: mesN,
+        label,
+        encerramentos: 0,
+        valorUltimaParcela: 0,
+        liberadoAcumulado: 0,
+      };
+      buckets.set(chave, b);
     }
+    b.encerramentos += 1;
+    b.valorUltimaParcela += valorParcela;
   }
 
-  const projecao = Array.from(buckets.values())
-    .sort((a, b) => a.chave.localeCompare(b.chave))
-    .map((b) => ({
-      ...b,
-      valor: Number(b.valor.toFixed(2)),
-      valorEncerramentos: Number(b.valorEncerramentos.toFixed(2)),
-    }));
+  const projecao = Array.from(buckets.values()).sort((a, b) =>
+    a.chave.localeCompare(b.chave),
+  );
+  let acumulado = 0;
+  for (const b of projecao) {
+    b.valorUltimaParcela = Number(b.valorUltimaParcela.toFixed(2));
+    acumulado += b.valorUltimaParcela;
+    b.liberadoAcumulado = Number(acumulado.toFixed(2));
+  }
 
   const valorMaximoBarra = projecao.reduce(
-    (m, b) => Math.max(m, b.valor),
+    (m, b) => Math.max(m, b.valorUltimaParcela),
     0,
   );
 
@@ -469,9 +464,9 @@ type ProjecaoBucket = {
   ano: number;
   mes: number;
   label: string;
-  valor: number;
   encerramentos: number;
-  valorEncerramentos: number;
+  valorUltimaParcela: number;
+  liberadoAcumulado: number;
 };
 
 function ProjecaoChart({
@@ -481,74 +476,59 @@ function ProjecaoChart({
   projecao: ProjecaoBucket[];
   maximo: number;
 }) {
-  const totalPeriodo = projecao.reduce((s, b) => s + b.valor, 0);
   const totalEncerramentos = projecao.reduce(
     (s, b) => s + b.encerramentos,
     0,
   );
+  const totalLiberado =
+    projecao.length > 0
+      ? projecao[projecao.length - 1].liberadoAcumulado
+      : 0;
 
   return (
     <Card>
       <div className="flex flex-col gap-4 p-5 md:p-6">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <div>
-            <p className="text-[11px] uppercase tracking-widest text-primary">
-              Projeção mês a mês
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Quanto de parcela cai em cada fatura futura. Trechos mais
-              escuros marcam meses em que alguma compra é quitada.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-4 text-xs">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block size-2.5 rounded-sm bg-primary/45" />
-              <span className="text-muted-foreground">Parcelas do mês</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block size-2.5 rounded-sm bg-primary" />
-              <span className="text-muted-foreground">Última parcela</span>
-            </span>
-          </div>
+        <div>
+          <p className="text-[11px] uppercase tracking-widest text-primary">
+            Quitações mês a mês
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Cada barra mostra o valor das últimas parcelas que caem naquele
+            mês. A partir do mês seguinte, esse valor deixa de aparecer na
+            fatura.
+          </p>
         </div>
 
         <div className="-mx-1 overflow-x-auto pb-1">
           <div className="flex min-w-full items-end gap-2 px-1">
             {projecao.map((b) => {
-              const alturaPct = maximo > 0 ? (b.valor / maximo) * 100 : 0;
-              // Fatia da barra que representa a soma das últimas parcelas
-              const pctEncerramento =
-                b.valor > 0 ? (b.valorEncerramentos / b.valor) * 100 : 0;
+              const alturaPct =
+                maximo > 0 ? (b.valorUltimaParcela / maximo) * 100 : 0;
               return (
                 <div
                   key={b.chave}
-                  className="flex min-w-[52px] flex-1 flex-col items-center gap-1.5"
-                  title={`${b.label} — ${formatBRL(b.valor)}${
-                    b.encerramentos
-                      ? ` · ${b.encerramentos} ${b.encerramentos === 1 ? "quitação" : "quitações"} (${formatBRL(b.valorEncerramentos)})`
-                      : ""
-                  }`}
+                  className="flex min-w-[64px] flex-1 flex-col items-center gap-1.5"
+                  title={`${b.label} — encerra ${formatBRL(b.valorUltimaParcela)} em ${b.encerramentos} ${
+                    b.encerramentos === 1 ? "compra" : "compras"
+                  } · a partir do mês seguinte fica ${formatBRL(b.liberadoAcumulado)} livre`}
                 >
-                  <span className="text-[10px] tabular-nums text-muted-foreground">
-                    {formatBRL(b.valor).replace("R$ ", "")}
+                  <span className="text-[10px] tabular-nums font-medium">
+                    {formatBRL(b.valorUltimaParcela).replace("R$ ", "")}
                   </span>
                   <div className="relative flex h-32 w-full items-end overflow-hidden rounded-md bg-muted/60">
                     <div
-                      className="w-full rounded-md bg-primary/45"
+                      className="w-full rounded-md bg-primary"
                       style={{ height: `${Math.max(2, alturaPct)}%` }}
-                    >
-                      {pctEncerramento > 0 && (
-                        <div
-                          className="w-full bg-primary"
-                          style={{ height: `${pctEncerramento}%` }}
-                          aria-hidden
-                        />
-                      )}
-                    </div>
+                    />
                   </div>
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                    {b.label}
-                  </span>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      {b.label}
+                    </span>
+                    <span className="text-[10px] tabular-nums text-sage-700">
+                      +{formatBRL(b.liberadoAcumulado).replace("R$ ", "")}
+                    </span>
+                  </div>
                 </div>
               );
             })}
@@ -556,19 +536,21 @@ function ProjecaoChart({
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-          <span>
-            {projecao.length} {projecao.length === 1 ? "mês" : "meses"} até
-            a última quitação
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-sm bg-primary" />
+            valor da última parcela do mês
           </span>
-          <span>
-            Total a pagar no período:{" "}
-            <strong className="tabular-nums text-foreground">
-              {formatBRL(totalPeriodo)}
-            </strong>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-sm bg-sage-500" />
+            liberado acumulado (fica livre depois desse mês)
           </span>
           <span>
             {totalEncerramentos}{" "}
-            {totalEncerramentos === 1 ? "quitação" : "quitações"} previstas
+            {totalEncerramentos === 1 ? "quitação prevista" : "quitações previstas"}{" "}
+            · total{" "}
+            <strong className="tabular-nums text-sage-700">
+              {formatBRL(totalLiberado)}
+            </strong>
           </span>
         </div>
       </div>
