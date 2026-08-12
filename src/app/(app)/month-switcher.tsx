@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { mesAnterior, mesProximo, type MesRef } from "@/lib/mes";
@@ -8,6 +11,7 @@ type Props = {
 };
 
 export function MonthSwitcher({ mes }: Props) {
+  const pathname = usePathname();
   const prev = mesAnterior(mes);
   const next = mesProximo(mes);
 
@@ -18,7 +22,10 @@ export function MonthSwitcher({ mes }: Props) {
         size="sm"
         nativeButton={false}
         render={
-          <Link href={`/?mes=${prev.chave}`} aria-label="Mês anterior">
+          <Link
+            href={`${pathname}?mes=${prev.chave}`}
+            aria-label="Mês anterior"
+          >
             <ChevronLeftIcon className="size-4" />
           </Link>
         }
@@ -31,7 +38,10 @@ export function MonthSwitcher({ mes }: Props) {
         size="sm"
         nativeButton={false}
         render={
-          <Link href={`/?mes=${next.chave}`} aria-label="Próximo mês">
+          <Link
+            href={`${pathname}?mes=${next.chave}`}
+            aria-label="Próximo mês"
+          >
             <ChevronRightIcon className="size-4" />
           </Link>
         }
