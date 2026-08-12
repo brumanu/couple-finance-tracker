@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { mesAnterior, parseMesParam, type MesRef } from "@/lib/mes";
+import { mesProximo, parseMesParam, type MesRef } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import {
   faturaDoMes,
@@ -144,14 +144,15 @@ export default async function DashboardPage({
   const noMesAtual =
     hoje.slice(0, 7) === `${mes.ano}-${String(mes.mes).padStart(2, "0")}`;
 
-  // Range histórico: 5 meses anteriores + selecionado
+  // Range: mês selecionado + 5 próximos (projeção)
   const mesesHistorico: MesRef[] = [];
   let cursor = mes;
   for (let i = 0; i < HISTORICO_MESES; i += 1) {
-    mesesHistorico.unshift(cursor);
-    cursor = mesAnterior(cursor);
+    mesesHistorico.push(cursor);
+    cursor = mesProximo(cursor);
   }
-  const primeiroDiaHistorico = mesesHistorico[0].primeiroDia;
+  const primeiroDiaRange = mesesHistorico[0].primeiroDia;
+  const ultimoDiaRange = mesesHistorico[mesesHistorico.length - 1].ultimoDia;
 
   const [
     rendasRes,
@@ -174,14 +175,14 @@ export default async function DashboardPage({
         "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, inicio_vigencia, fim_vigencia",
       )
       .eq("ativa", true)
-      .or(`fim_vigencia.is.null,fim_vigencia.gte.${primeiroDiaHistorico}`),
+      .or(`fim_vigencia.is.null,fim_vigencia.gte.${primeiroDiaRange}`),
     supabase
       .from("lancamentos")
       .select(
         "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, conta_recorrente_id",
       )
-      .gte("data_referencia", primeiroDiaHistorico)
-      .lte("data_referencia", mes.ultimoDia)
+      .gte("data_referencia", primeiroDiaRange)
+      .lte("data_referencia", ultimoDiaRange)
       .order("data_pagamento", { ascending: false }),
     supabase
       .from("cartoes")
@@ -649,11 +650,11 @@ function SobraHistoricoChart({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-widest text-accent-700">
-            Sobra mês a mês
+            Projeção de sobra
           </p>
           <p className="mt-1 text-[13px] text-neutral-700">
-            Últimos {historico.length} meses. Barras acima do eixo indicam
-            sobra positiva.
+            Mês atual + próximos {historico.length - 1}. Barras acima do
+            eixo indicam sobra positiva.
           </p>
         </div>
       </div>
