@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOutIcon, TagIcon } from "lucide-react";
+import { LogOutIcon, TagIcon, BarChart3Icon } from "lucide-react";
 import { signOut } from "@/lib/auth-actions";
 import { ThemeToggle } from "./theme-toggle";
 
@@ -30,6 +30,13 @@ export function MobileHeader({ nomeCasal, nomeUsuario }: Props) {
         </div>
       </div>
       <div className="flex items-center gap-1">
+        <Link
+          href="/relatorios"
+          aria-label="Relatórios"
+          className="rounded-full p-2 text-muted-foreground hover:bg-neutral-200 hover:text-foreground"
+        >
+          <BarChart3Icon className="size-4" strokeWidth={2.75} />
+        </Link>
         <Link
           href="/categorias"
           aria-label="Categorias"

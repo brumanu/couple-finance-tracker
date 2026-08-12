@@ -6,6 +6,7 @@ import {
   CreditCardIcon,
   HandCoinsIcon,
   TagIcon,
+  BarChart3Icon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,4 +27,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/despesas", label: "Despesas", icon: ShoppingCartIcon },
   { href: "/dividas", label: "Dívidas", icon: HandCoinsIcon },
   { href: "/categorias", label: "Categorias", icon: TagIcon, desktopOnly: true },
+  { href: "/relatorios", label: "Relatórios", icon: BarChart3Icon, desktopOnly: true },
 ];
