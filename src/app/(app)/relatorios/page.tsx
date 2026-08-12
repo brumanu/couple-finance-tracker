@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CreditCardIcon, ChevronRightIcon } from "lucide-react";
+import { CreditCardIcon, ChevronRightIcon, RepeatIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 
@@ -17,6 +17,13 @@ const RELATORIOS: Relatorio[] = [
     descricao:
       "Todas as compras parceladas de todos os cartões — quanto falta pagar, em quantas parcelas.",
     Icon: CreditCardIcon,
+  },
+  {
+    href: "/relatorios/assinaturas",
+    titulo: "Assinaturas dos cartões",
+    descricao:
+      "Todas as assinaturas recorrentes de todos os cartões — quantas são e quanto pesam no mês.",
+    Icon: RepeatIcon,
   },
 ];
 
