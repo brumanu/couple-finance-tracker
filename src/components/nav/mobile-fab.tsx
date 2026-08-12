@@ -13,14 +13,14 @@ type Props = {
 
 export function MobileFab({ cartoes, categorias }: Props) {
   return (
-    <div className="fixed bottom-24 right-5 z-40 md:hidden">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+env(safe-area-inset-bottom))] z-40 flex justify-end px-5 md:hidden">
       <DespesaFormDialog
         cartoes={cartoes}
         categorias={categorias}
         trigger={
           <Button
             size="icon-lg"
-            className="size-14 shadow-[0_12px_32px_color-mix(in_srgb,var(--organic-neutral-900)_28%,transparent)]"
+            className="pointer-events-auto size-[60px] shadow-organic-md"
             aria-label="Lançar despesa"
           >
             <PlusIcon className="size-6" strokeWidth={2.75} />

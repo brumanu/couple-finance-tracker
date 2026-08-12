@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { WalletIcon } from "lucide-react";
+import { ShieldIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signIn } from "./actions";
@@ -24,23 +23,23 @@ export default async function LoginPage({
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <div className="flex flex-col gap-5 p-8">
-          <div className="mx-auto flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <WalletIcon className="size-6" strokeWidth={2.75} />
-          </div>
-          <div className="text-center">
-            <h1 className="font-heading text-2xl leading-tight">
+      <div className="w-full max-w-[430px]">
+        <div className="flex flex-col gap-6 rounded-[32px] bg-card px-8 py-9 shadow-organic-lg">
+          <div>
+            <div className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <ShieldIcon className="size-6" strokeWidth={2.75} />
+            </div>
+            <h1 className="mt-5 font-heading text-[30px] leading-tight">
               Nosso financeiro
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-2 text-[15px] text-neutral-700">
               Entre para ver quanto sobra nesta quinzena.
             </p>
           </div>
 
-          <form action={signIn} className="flex flex-col gap-4">
+          <form action={signIn} className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="email" className="text-xs text-muted-foreground">
+              <Label htmlFor="email" className="text-xs text-neutral-700">
                 Email
               </Label>
               <Input
@@ -52,10 +51,7 @@ export default async function LoginPage({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="password"
-                className="text-xs text-muted-foreground"
-              >
+              <Label htmlFor="password" className="text-xs text-neutral-700">
                 Senha
               </Label>
               <Input
@@ -71,12 +67,12 @@ export default async function LoginPage({
                 {error}
               </p>
             )}
-            <Button type="submit" className="w-full">
+            <Button type="submit" size="lg" className="w-full">
               Entrar
             </Button>
           </form>
         </div>
-      </Card>
+      </div>
     </main>
   );
 }

@@ -54,13 +54,13 @@ export default async function DividasPage() {
   const totalPagoAbertas = abertas.reduce((s, d) => s + d.pago, 0);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
             Dívidas
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
             Cadastre o que você deve e vai baixando conforme paga. Não entra
             no saldo da quinzena — é só pra não esquecer.
           </p>
@@ -80,50 +80,46 @@ export default async function DividasPage() {
       ) : (
         <>
           {abertas.length > 0 && (
-            <Card className="border-primary/40 bg-primary/5">
-              <div className="flex flex-col gap-3 p-6">
-                <p className="text-[11px] uppercase tracking-widest text-primary">
-                  Ainda em aberto
+            <div className="flex flex-wrap items-baseline gap-8 rounded-[28px] border border-accent-300/70 bg-accent-100 px-7 py-6">
+              <div>
+                <p className="text-[11px] uppercase tracking-widest text-accent-700">
+                  Falta pagar
                 </p>
-                <div className="flex flex-wrap items-baseline gap-6">
-                  <div>
-                    <p className="text-xs text-muted-foreground">Falta pagar</p>
-                    <p
-                      className="font-heading tabular-nums text-primary"
-                      style={{
-                        fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
-                        lineHeight: 1,
-                      }}
-                    >
-                      {formatBRL(totalDevido)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Já pago</p>
-                    <p className="font-medium tabular-nums text-sage-700">
-                      {formatBRL(totalPagoAbertas)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">
-                      {abertas.length === 1 ? "1 dívida" : `${abertas.length} dívidas`}
-                    </p>
-                    <p className="font-medium tabular-nums">em aberto</p>
-                  </div>
-                </div>
+                <p
+                  className="mt-1.5 font-heading tabular-nums text-primary"
+                  style={{
+                    fontSize: "clamp(2rem, 4vw, 2.5rem)",
+                    lineHeight: 1,
+                  }}
+                >
+                  {formatBRL(totalDevido)}
+                </p>
               </div>
-            </Card>
+              <div>
+                <p className="text-[11px] uppercase tracking-widest text-neutral-700">
+                  Já pago
+                </p>
+                <p className="mt-1.5 font-heading tabular-nums text-sage-700">
+                  {formatBRL(totalPagoAbertas)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-widest text-neutral-700">
+                  {abertas.length === 1
+                    ? "1 dívida"
+                    : `${abertas.length} dívidas`}
+                </p>
+                <p className="mt-1.5 font-heading">em aberto</p>
+              </div>
+            </div>
           )}
 
           {abertas.length > 0 && (
             <section className="flex flex-col gap-3">
-              <h3 className="px-1 font-heading text-lg">Em aberto</h3>
-              <div className="grid gap-3 md:grid-cols-2">
+              <h3 className="px-1 font-heading text-[20px]">Em aberto</h3>
+              <div className="grid gap-4 md:grid-cols-2">
                 {abertas.map((d) => (
-                  <DividaCard
-                    key={d.divida.id}
-                    detalhe={d}
-                  />
+                  <DividaCard key={d.divida.id} detalhe={d} />
                 ))}
               </div>
             </section>
@@ -131,10 +127,10 @@ export default async function DividasPage() {
 
           {quitadas.length > 0 && (
             <section className="flex flex-col gap-3">
-              <h3 className="px-1 font-heading text-lg text-muted-foreground">
+              <h3 className="px-1 font-heading text-[20px] text-neutral-700">
                 Quitadas
               </h3>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 {quitadas.map((d) => (
                   <DividaCard key={d.divida.id} detalhe={d} />
                 ))}
@@ -161,62 +157,64 @@ function DividaCard({
 }) {
   const { divida, pago, total, restante, quitada, progresso } = detalhe;
   return (
-    <Card className={quitada ? "opacity-70" : ""}>
-      <div className="flex flex-col gap-4 p-5">
-        <div className="flex items-start gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="font-heading text-lg leading-tight">
-                {divida.descricao}
-              </p>
-              {quitada && (
-                <Badge variant="secondary" className="text-[10px]">
-                  <CheckCircle2Icon className="size-3" strokeWidth={2.75} />
-                  quitada
-                </Badge>
-              )}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Total {formatBRL(total)} · Pago {formatBRL(pago)}
+    <div
+      className={`flex flex-col gap-4 rounded-[26px] bg-card px-6 py-5 ${
+        quitada ? "opacity-70" : ""
+      }`}
+    >
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="font-heading text-[19px] leading-tight">
+              {divida.descricao}
             </p>
+            {quitada && (
+              <Badge variant="secondary" className="text-[10px]">
+                <CheckCircle2Icon className="size-3" strokeWidth={2.75} />
+                quitada
+              </Badge>
+            )}
           </div>
-          <EditDividaTrigger divida={divida} />
-          <DividaActionsMenu id={divida.id} descricao={divida.descricao} />
+          <p className="mt-1 text-[13px] text-neutral-700">
+            Total {formatBRL(total)} · Pago {formatBRL(pago)}
+          </p>
         </div>
-
-        <div className="flex flex-col gap-2">
-          <div className="flex h-2 w-full overflow-hidden rounded-full bg-neutral-200">
-            <div
-              className={quitada ? "bg-sage-500" : "bg-primary"}
-              style={{ width: `${progresso}%` }}
-            />
-          </div>
-          <div className="flex items-baseline justify-between">
-            <p className="text-xs text-muted-foreground">
-              {quitada ? "Zerada!" : "Ainda falta"}
-            </p>
-            <p
-              className={`font-heading text-xl tabular-nums ${
-                quitada ? "text-sage-700" : "text-primary"
-              }`}
-            >
-              {formatBRL(restante)}
-            </p>
-          </div>
-        </div>
-
-        <Button
-          variant="outline"
-          size="sm"
-          nativeButton={false}
-          render={
-            <Link href={`/dividas/${divida.id}`}>
-              {quitada ? "Ver pagamentos" : "Registrar pagamento"}
-              <ChevronRightIcon className="size-4" strokeWidth={2.75} />
-            </Link>
-          }
-        />
+        <EditDividaTrigger divida={divida} />
+        <DividaActionsMenu id={divida.id} descricao={divida.descricao} />
       </div>
-    </Card>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex h-2 w-full overflow-hidden rounded-full bg-neutral-200">
+          <div
+            className={quitada ? "bg-sage-500" : "bg-primary"}
+            style={{ width: `${progresso}%` }}
+          />
+        </div>
+        <div className="flex items-baseline justify-between">
+          <p className="text-[13px] text-neutral-700">
+            {quitada ? "Zerada!" : "Ainda falta"}
+          </p>
+          <p
+            className={`font-heading text-[22px] tabular-nums ${
+              quitada ? "text-sage-700" : "text-primary"
+            }`}
+          >
+            {formatBRL(restante)}
+          </p>
+        </div>
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        nativeButton={false}
+        render={
+          <Link href={`/dividas/${divida.id}`}>
+            {quitada ? "Ver pagamentos" : "Registrar pagamento"}
+            <ChevronRightIcon className="size-4" strokeWidth={2.75} />
+          </Link>
+        }
+      />
+    </div>
   );
 }

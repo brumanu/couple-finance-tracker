@@ -92,14 +92,14 @@ export default async function DespesasPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
             Despesas
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Mercado, gasolina, aquele jantar de sexta.
+          <p className="mt-1.5 text-[15px] text-neutral-700">
+            Mercado, gasolina, farmácia — o gasto solto do mês.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -110,59 +110,42 @@ export default async function DespesasPage({
         </div>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <div className="flex flex-col gap-4 p-6">
-            <p className="text-[11px] uppercase tracking-widest text-primary">
-              Gasto em {mes.label}
-            </p>
-            <p
-              className="font-heading tabular-nums"
-              style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1 }}
-            >
-              {formatBRL(total)}
-            </p>
-            <div className="flex flex-col gap-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <span className="inline-block size-2 rounded-full bg-sage-500" />
-                  Dia 15
-                </span>
-                <span className="tabular-nums">{formatBRL(total15)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <span className="inline-block size-2 rounded-full bg-accent-500" />
-                  Dia 30
-                </span>
-                <span className="tabular-nums">{formatBRL(total30)}</span>
-              </div>
-            </div>
-          </div>
-        </Card>
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="flex flex-col gap-3 rounded-[28px] bg-card px-8 py-7">
+          <p className="text-[11px] uppercase tracking-widest text-accent-700">
+            Gasto em {mes.label}
+          </p>
+          <p
+            className="font-heading tabular-nums"
+            style={{ fontSize: "clamp(2.25rem, 5vw, 2.75rem)", lineHeight: 1 }}
+          >
+            {formatBRL(total)}
+          </p>
+          <p className="text-[14px] text-neutral-700">
+            {formatBRL(total15)} na quinzena 15 · {formatBRL(total30)} na 30
+          </p>
+        </div>
 
-        <Card>
-          <div className="flex flex-col gap-4 p-6">
-            <p className="text-[11px] uppercase tracking-widest text-primary">
-              Comparado a {anterior.label}
+        <div className="flex flex-col gap-4 rounded-[28px] bg-surface-soft px-8 py-7">
+          <p className="text-[11px] uppercase tracking-widest text-neutral-700">
+            Comparado a {anterior.label}
+          </p>
+          <div className="flex items-baseline gap-3">
+            <p
+              className={`font-heading tabular-nums ${
+                deltaPct <= 0 ? "text-sage-700" : "text-primary"
+              }`}
+              style={{ fontSize: "clamp(2rem, 5vw, 2.375rem)", lineHeight: 1 }}
+            >
+              {deltaPct === 0
+                ? "—"
+                : `${deltaPct > 0 ? "+" : "−"}${Math.abs(deltaPct).toFixed(0)}%`}
             </p>
-            <div className="flex items-baseline gap-3">
-              <p
-                className={`font-heading tabular-nums ${
-                  deltaPct <= 0 ? "text-sage-700" : "text-primary"
-                }`}
-                style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1 }}
-              >
-                {deltaPct === 0 ? "—" : `${deltaPct > 0 ? "+" : "−"}${Math.abs(deltaPct).toFixed(0)}%`}
-              </p>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {totalAnterior > 0
-                ? `Você gastou ${formatBRL(totalAnterior)} em ${anterior.label}.`
-                : `Nenhum gasto em ${anterior.label} — sem base de comparação.`}
-            </p>
+            <span className="text-[14px] text-neutral-700">
+              {anterior.label} fechou em {formatBRL(totalAnterior)}
+            </span>
           </div>
-        </Card>
+        </div>
       </div>
 
       {lista.length === 0 ? (
@@ -175,48 +158,40 @@ export default async function DespesasPage({
           </div>
         </Card>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-6">
           {Array.from(grupos.entries()).map(([data, itens]) => {
-            const totalDia = itens.reduce(
-              (s, d) => s + Number(d.valor),
-              0,
-            );
+            const totalDia = itens.reduce((s, d) => s + Number(d.valor), 0);
             return (
-              <section key={data} className="flex flex-col gap-2">
-                <div className="flex items-baseline justify-between px-1">
-                  <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              <section key={data} className="flex flex-col gap-3">
+                <div className="flex items-baseline justify-between px-1.5">
+                  <h3 className="font-heading text-[19px]">
                     {formatDataLonga(data)}
                   </h3>
-                  <p className="text-xs tabular-nums text-muted-foreground">
+                  <p className="tabular-nums text-[14px] text-neutral-700">
                     {formatBRL(totalDia)}
                   </p>
                 </div>
-                <Card>
+                <div className="rounded-[26px] bg-card px-6">
                   <ul className="flex flex-col divide-y divide-border/60">
                     {itens.map((d) => (
                       <li
                         key={d.id}
-                        className="flex items-center gap-3 px-5 py-3"
+                        className="flex items-center gap-4 py-4"
                       >
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-neutral-200 font-heading text-xs">
+                        <div className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-background font-heading text-sm text-neutral-800">
                           {d.descricao[0]?.toUpperCase() ?? "?"}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
+                          <p className="truncate text-[15px] font-semibold">
                             {d.descricao}
                           </p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="text-[13px] text-neutral-700">
                             {d.categoria ? `${d.categoria} · ` : ""}
                             quinzena {d.quinzena}
                           </p>
                         </div>
-                        {d.categoria && (
-                          <Badge variant="secondary" className="hidden md:inline-flex text-[10px]">
-                            {d.categoria}
-                          </Badge>
-                        )}
-                        <span className="whitespace-nowrap text-sm font-medium tabular-nums text-primary">
-                          −{formatBRL(d.valor)}
+                        <span className="whitespace-nowrap font-heading text-[17px] tabular-nums">
+                          {formatBRL(d.valor)}
                         </span>
                         <EditDespesaTrigger
                           despesa={d}
@@ -229,7 +204,7 @@ export default async function DespesasPage({
                       </li>
                     ))}
                   </ul>
-                </Card>
+                </div>
               </section>
             );
           })}

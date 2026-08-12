@@ -28,13 +28,13 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:bg-sidebar md:text-sidebar-foreground">
-      <div className="px-6 pt-8 pb-6">
-        <h1 className="font-heading text-2xl leading-none">Financeiro</h1>
-        <p className="mt-2 text-xs text-muted-foreground">{nomeCasal}</p>
+    <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:bg-sidebar md:px-[18px] md:py-7 md:text-sidebar-foreground">
+      <div className="px-2.5">
+        <h1 className="font-heading text-[21px] leading-none">Financeiro</h1>
+        <p className="mt-1 text-[13px] text-neutral-700">{nomeCasal}</p>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 px-3">
+      <nav className="flex flex-1 flex-col gap-1.5">
         {NAV_ITEMS.map((item) => {
           const active =
             item.href === "/"
@@ -44,10 +44,10 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
           return item.disabled ? (
             <span
               key={item.href}
-              className="flex items-center gap-3 rounded-full px-4 py-2.5 text-sm text-muted-foreground/50"
+              className="flex items-center gap-3 rounded-full px-4 py-2.5 text-[15px] text-muted-foreground/50"
               title="Em breve"
             >
-              <Icon className="size-4" strokeWidth={2.75} />
+              <Icon className="size-[18px]" strokeWidth={2.75} />
               {item.label}
               <span className="ml-auto text-[10px] uppercase tracking-wide">
                 em breve
@@ -58,13 +58,13 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm transition-colors",
+                "flex items-center gap-3 rounded-full px-4 py-2.5 text-[15px] transition-colors",
                 active
                   ? "bg-primary text-primary-foreground"
-                  : "text-foreground/80 hover:bg-sidebar-accent hover:text-foreground",
+                  : "text-neutral-800 hover:bg-sidebar-accent hover:text-foreground",
               )}
             >
-              <Icon className="size-4" strokeWidth={2.75} />
+              <Icon className="size-[18px]" strokeWidth={2.75} />
               {item.label}
               <LinkPendingDot className="ml-auto" />
             </Link>
@@ -72,22 +72,20 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
         })}
       </nav>
 
-      <div className="mx-3 mb-6 mt-4 flex items-center gap-3 rounded-full px-2 py-2">
+      <div className="flex items-center gap-2.5 px-2">
         <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage-300 font-heading text-sm text-sage-800">
           {iniciais(nomeUsuario) || "?"}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">{nomeUsuario}</p>
-          <p className="truncate text-xs text-muted-foreground">
-            {emailUsuario}
-          </p>
+          <p className="truncate text-[13px] font-semibold">{nomeUsuario}</p>
+          <p className="truncate text-xs text-neutral-700">{emailUsuario}</p>
         </div>
         <ThemeToggle />
         <form action={signOut}>
           <button
             type="submit"
             aria-label="Sair"
-            className="rounded-full p-2 text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            className="rounded-full p-2 text-neutral-700 hover:bg-sidebar-accent hover:text-foreground"
           >
             <LogOutIcon className="size-4" strokeWidth={2.75} />
           </button>

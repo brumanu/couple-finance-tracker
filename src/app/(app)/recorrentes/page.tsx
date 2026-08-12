@@ -49,13 +49,13 @@ export default async function RecorrentesPage() {
     .reduce((s, r) => s + Number(r.valor_previsto), 0);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
             Contas fixas
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
             As que voltam todo mês. Cada uma mora numa quinzena.
           </p>
         </div>
@@ -72,17 +72,15 @@ export default async function RecorrentesPage() {
           </div>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid items-start gap-6 md:grid-cols-2">
           <ColunaContas
             titulo="Quinzena do dia 15"
-            corDot="bg-sage-500"
             total={total15}
             itens={contas15}
             categorias={categorias}
           />
           <ColunaContas
             titulo="Quinzena do dia 30"
-            corDot="bg-accent-500"
             total={total30}
             itens={contas30}
             categorias={categorias}
@@ -95,84 +93,77 @@ export default async function RecorrentesPage() {
 
 function ColunaContas({
   titulo,
-  corDot,
   total,
   itens,
   categorias,
 }: {
   titulo: string;
-  corDot: string;
   total: number;
   itens: RecorrenteRow[];
   categorias: Awaited<ReturnType<typeof getCategorias>>;
 }) {
   return (
-    <Card>
-      <div className="flex flex-col gap-4 p-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className={`inline-block size-2 rounded-full ${corDot}`} />
-            <p className="font-heading text-lg leading-none">{titulo}</p>
-          </div>
-          <p className="text-sm font-medium tabular-nums">
-            {formatBRL(total)}
-          </p>
+    <section className="flex flex-col gap-3.5">
+      <div className="flex items-baseline justify-between px-1">
+        <h3 className="font-heading text-[20px]">{titulo}</h3>
+        <span className="tabular-nums text-[14px] text-neutral-700">
+          {formatBRL(total)}
+        </span>
+      </div>
+      {itens.length === 0 ? (
+        <div className="rounded-[26px] bg-card px-6 py-8 text-center text-sm text-muted-foreground">
+          Nenhuma conta nesta quinzena.
         </div>
-        {itens.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma conta nesta quinzena.
-          </p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border/60">
-            {itens.map((r) => (
-              <li
-                key={r.id}
-                className={`flex items-center gap-3 py-3 first:pt-0 last:pb-0 ${
-                  r.ativa ? "" : "opacity-60"
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="truncate text-sm font-medium">
-                      {r.descricao}
-                    </p>
-                    {r.categoria && (
-                      <Badge
-                        variant={categoriaVariant(r.categoria)}
-                        className="text-[10px]"
-                      >
-                        {r.categoria}
-                      </Badge>
-                    )}
-                    {!r.ativa && (
-                      <Badge variant="neutral" className="text-[10px]">
-                        pausada
-                      </Badge>
-                    )}
-                  </div>
-                  {r.dia_vencimento && (
-                    <p className="text-xs text-muted-foreground">
-                      Vence dia {r.dia_vencimento}
-                    </p>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {itens.map((r) => (
+            <div
+              key={r.id}
+              className={`flex items-center gap-3.5 rounded-[26px] px-5 py-4 ${
+                r.ativa ? "bg-card" : "bg-surface-soft opacity-70"
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="truncate text-[15px] font-semibold">
+                    {r.descricao}
+                  </p>
+                  {r.categoria && (
+                    <Badge
+                      variant={categoriaVariant(r.categoria)}
+                      className="text-[11px]"
+                    >
+                      {r.categoria}
+                    </Badge>
+                  )}
+                  {!r.ativa && (
+                    <Badge variant="neutral" className="text-[10px]">
+                      pausada
+                    </Badge>
                   )}
                 </div>
-                <span className="whitespace-nowrap text-sm font-medium tabular-nums">
-                  {formatBRL(r.valor_previsto)}
-                </span>
-                <EditRecorrenteTrigger
-                  recorrente={r}
-                  categorias={categorias}
-                />
-                <RecorrenteActionsMenu
-                  id={r.id}
-                  ativa={r.ativa}
-                  descricao={r.descricao}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </Card>
+                {r.dia_vencimento && (
+                  <p className="mt-0.5 text-[13px] text-neutral-700">
+                    Vence dia {r.dia_vencimento}
+                  </p>
+                )}
+              </div>
+              <span className="whitespace-nowrap font-heading text-[17px] tabular-nums">
+                {formatBRL(r.valor_previsto)}
+              </span>
+              <EditRecorrenteTrigger
+                recorrente={r}
+                categorias={categorias}
+              />
+              <RecorrenteActionsMenu
+                id={r.id}
+                ativa={r.ativa}
+                descricao={r.descricao}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

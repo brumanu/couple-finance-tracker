@@ -36,73 +36,66 @@ export default async function RendasPage() {
   const rendas30 = lista.filter((r) => r.dia_recebimento === 30);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
             Rendas
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            O que entra por mês, dividido entre o adiantamento (dia 15) e o
-            salário final (dia 30).
+          <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
+            O que entra todo mês: adiantamento no dia 15, salário no dia 30.
           </p>
         </div>
         <RendaFormDialog />
       </header>
 
-      <Card>
-        <div className="flex flex-col gap-5 p-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-[11px] uppercase tracking-widest text-primary">
-              Entra por mês
-            </p>
-            <p
-              className="font-heading tabular-nums"
-              style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1 }}
-            >
-              {formatBRL(totalMes)}
-            </p>
-          </div>
-          {totalMes > 0 && (
-            <div className="flex flex-col gap-2">
-              <div className="flex h-3 w-full overflow-hidden rounded-full bg-neutral-200">
-                {pct15 > 0 && (
-                  <div
-                    className="bg-sage-500"
-                    style={{ width: `${pct15}%` }}
-                  />
-                )}
-                {pct30 > 0 && (
-                  <div
-                    className="bg-accent-500"
-                    style={{ width: `${pct30}%` }}
-                  />
-                )}
-              </div>
-              <div className="flex flex-wrap gap-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <span className="inline-block size-2 rounded-full bg-sage-500" />
-                  <span className="text-foreground/80">
-                    Dia 15{" "}
-                    <span className="font-medium tabular-nums text-foreground">
-                      {formatBRL(total15)}
-                    </span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="inline-block size-2 rounded-full bg-accent-500" />
-                  <span className="text-foreground/80">
-                    Dia 30{" "}
-                    <span className="font-medium tabular-nums text-foreground">
-                      {formatBRL(total30)}
-                    </span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
+      <div className="flex flex-wrap items-center gap-8 rounded-[28px] bg-card p-7 md:gap-11 md:p-8">
+        <div className="min-w-[220px]">
+          <p className="text-[11px] uppercase tracking-widest text-accent-700">
+            Entra por mês
+          </p>
+          <p
+            className="mt-2 font-heading tabular-nums"
+            style={{ fontSize: "clamp(2.25rem, 5vw, 3rem)", lineHeight: 1 }}
+          >
+            {formatBRL(totalMes)}
+          </p>
         </div>
-      </Card>
+        {totalMes > 0 && (
+          <div className="flex flex-1 flex-col gap-2.5">
+            <div className="flex h-4 w-full overflow-hidden rounded-full bg-neutral-200">
+              {pct15 > 0 && (
+                <div
+                  className="bg-sage-500"
+                  style={{ width: `${pct15}%` }}
+                />
+              )}
+              {pct30 > 0 && (
+                <div
+                  className="bg-accent-400"
+                  style={{ width: `${pct30}%` }}
+                />
+              )}
+            </div>
+            <div className="flex flex-wrap justify-between gap-4 text-[13px] text-neutral-800">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block size-2.5 rounded-full bg-sage-500" />
+                Dia 15 —{" "}
+                <span className="font-medium tabular-nums">
+                  {formatBRL(total15)}
+                </span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block size-2.5 rounded-full bg-accent-400" />
+                Dia 30 —{" "}
+                <span className="font-medium tabular-nums">
+                  {formatBRL(total30)}
+                </span>
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {lista.length === 0 ? (
         <Card>
@@ -114,17 +107,13 @@ export default async function RendasPage() {
           </div>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2">
           <ColunaRendas
-            titulo="Dia 15"
-            subtitulo="Adiantamento"
-            corDot="bg-sage-500"
+            titulo="Dia 15 · adiantamento"
             itens={rendas15}
           />
           <ColunaRendas
-            titulo="Dia 30"
-            subtitulo="Salário final"
-            corDot="bg-accent-500"
+            titulo="Dia 30 · salário"
             itens={rendas30}
           />
         </div>
@@ -135,68 +124,56 @@ export default async function RendasPage() {
 
 function ColunaRendas({
   titulo,
-  subtitulo,
-  corDot,
   itens,
 }: {
   titulo: string;
-  subtitulo: string;
-  corDot: string;
   itens: RendaRow[];
 }) {
   return (
-    <Card>
-      <div className="flex flex-col gap-4 p-6">
-        <div className="flex items-center gap-3">
-          <span className={`inline-block size-2 rounded-full ${corDot}`} />
-          <div>
-            <p className="font-heading text-lg leading-none">{titulo}</p>
-            <p className="text-xs text-muted-foreground">{subtitulo}</p>
-          </div>
+    <section className="flex flex-col gap-3">
+      <h3 className="px-1 font-heading text-[20px]">{titulo}</h3>
+      {itens.length === 0 ? (
+        <div className="rounded-[26px] bg-card px-6 py-8 text-center text-sm text-muted-foreground">
+          Nenhuma renda nesta quinzena.
         </div>
-        {itens.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma renda nesta quinzena.
-          </p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border/60">
-            {itens.map((r) => (
-              <li
-                key={r.id}
-                className={`flex items-center gap-3 py-3 first:pt-0 last:pb-0 ${
-                  r.ativa ? "" : "opacity-60"
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-medium">
-                      {r.descricao}
-                    </p>
-                    {!r.ativa && (
-                      <Badge variant="neutral" className="text-[10px]">
-                        pausada
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Todo dia {r.dia_recebimento}
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {itens.map((r) => (
+            <div
+              key={r.id}
+              className={`flex items-center gap-4 rounded-[26px] bg-card px-5 py-4 ${
+                r.ativa ? "" : "opacity-60"
+              }`}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate text-[15px] font-semibold">
+                    {r.descricao}
                   </p>
+                  {!r.ativa && (
+                    <Badge variant="neutral" className="text-[10px]">
+                      pausada
+                    </Badge>
+                  )}
                 </div>
-                <span className="whitespace-nowrap text-sm font-medium tabular-nums">
-                  {formatBRL(r.valor_previsto)}
-                </span>
-                <EditRendaTrigger renda={r} />
-                <RendaActionsMenu
-                  id={r.id}
-                  ativa={r.ativa}
-                  descricao={r.descricao}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </Card>
+                <p className="text-[13px] text-neutral-700">
+                  Todo dia {r.dia_recebimento}
+                </p>
+              </div>
+              <span className="whitespace-nowrap font-heading text-[17px] tabular-nums">
+                {formatBRL(r.valor_previsto)}
+              </span>
+              <EditRendaTrigger renda={r} />
+              <RendaActionsMenu
+                id={r.id}
+                ativa={r.ativa}
+                descricao={r.descricao}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

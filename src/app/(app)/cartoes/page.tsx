@@ -71,14 +71,14 @@ export default async function CartoesPage({
   const bancoById = new Map(bancos.map((b) => [b.id, b]));
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
             Cartões
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Faturas de {mes.label}. Clique num cartão para ver as compras.
+          <p className="mt-1.5 max-w-[56ch] text-[15px] text-neutral-700">
+            Faturas de {mes.label}. Toque num cartão para abrir as compras.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -118,7 +118,7 @@ export default async function CartoesPage({
           </div>
         </Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2">
           {cartoes.map((c) => {
             const banco = bancoById.get(c.banco_id);
             const label = banco?.nome
@@ -133,69 +133,85 @@ export default async function CartoesPage({
               assinaturas,
             );
             return (
-              <Card key={c.id} className={c.ativo ? "" : "opacity-60"}>
-                <div className="flex flex-col gap-4 p-5">
-                  <div className="flex items-center gap-3">
-                    <BancoIcone
-                      icone={banco?.icone ?? null}
-                      corFallback={banco?.cor}
-                      nomeFallback={banco?.nome ?? label}
-                      size={44}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-heading text-lg leading-tight">
-                        {label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {c.bandeira ? BANDEIRA_LABEL[c.bandeira] : ""}
-                        {c.bandeira ? " · " : ""}
-                        Fecha dia {c.dia_fechamento} · Vence dia {c.dia_vencimento}
-                      </p>
-                    </div>
-                    {!c.ativo && (
-                      <Badge variant="neutral" className="text-[10px]">
-                        pausado
-                      </Badge>
-                    )}
-                    <EditCartaoTrigger cartao={c} bancos={bancos} />
-                    <CartaoActionsMenu
-                      id={c.id}
-                      ativo={c.ativo}
-                      label={label}
-                    />
+              <div
+                key={c.id}
+                className={`flex flex-col gap-5 rounded-[28px] bg-card px-6 py-5 ${
+                  c.ativo ? "" : "opacity-60"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <BancoIcone
+                    icone={banco?.icone ?? null}
+                    corFallback={banco?.cor}
+                    nomeFallback={banco?.nome ?? label}
+                    size={44}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-heading text-[19px] leading-tight">
+                      {label}
+                    </p>
+                    <p className="mt-0.5 text-[13px] text-neutral-700">
+                      {c.bandeira ? BANDEIRA_LABEL[c.bandeira] : ""}
+                      {c.bandeira ? " · " : ""}
+                      Fecha dia {c.dia_fechamento} · Vence dia{" "}
+                      {c.dia_vencimento}
+                    </p>
                   </div>
-
-                  <div className="flex items-end justify-between border-t border-border/60 pt-4">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                        Fatura de {mes.label}
-                      </p>
-                      <p className="mt-1 font-heading text-2xl tabular-nums">
-                        {formatBRL(fatura.total)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {fatura.parcelas.length === 0
-                          ? "Sem compras"
-                          : `${fatura.parcelas.length} ${fatura.parcelas.length === 1 ? "compra" : "compras"}`}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      nativeButton={false}
-                      render={
-                        <Link href={`/cartoes/${c.id}?mes=${mes.chave}`}>
-                          Detalhes
-                          <ChevronRightIcon
-                            className="size-4"
-                            strokeWidth={2.75}
-                          />
-                        </Link>
-                      }
-                    />
-                  </div>
+                  {!c.ativo && (
+                    <Badge variant="neutral" className="text-[10px]">
+                      pausado
+                    </Badge>
+                  )}
+                  <EditCartaoTrigger cartao={c} bancos={bancos} />
+                  <CartaoActionsMenu
+                    id={c.id}
+                    ativo={c.ativo}
+                    label={label}
+                  />
                 </div>
-              </Card>
+
+                <div className="flex items-end justify-between border-t border-border/60 pt-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-widest text-accent-700">
+                      Fatura de {mes.label}
+                    </p>
+                    <p
+                      className="mt-1.5 font-heading tabular-nums"
+                      style={{ fontSize: "clamp(1.75rem, 3.5vw, 2.125rem)", lineHeight: 1 }}
+                    >
+                      {formatBRL(fatura.total)}
+                    </p>
+                    <p className="mt-1 text-[13px] text-neutral-700">
+                      {fatura.parcelas.length === 0 && fatura.assinaturas.length === 0
+                        ? "Sem lançamentos"
+                        : [
+                            fatura.parcelas.length > 0
+                              ? `${fatura.parcelas.length} ${fatura.parcelas.length === 1 ? "compra" : "compras"}`
+                              : null,
+                            fatura.assinaturas.length > 0
+                              ? `${fatura.assinaturas.length} ${fatura.assinaturas.length === 1 ? "assinatura" : "assinaturas"}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    nativeButton={false}
+                    render={
+                      <Link href={`/cartoes/${c.id}?mes=${mes.chave}`}>
+                        Detalhes
+                        <ChevronRightIcon
+                          className="size-4"
+                          strokeWidth={2.75}
+                        />
+                      </Link>
+                    }
+                  />
+                </div>
+              </div>
             );
           })}
         </div>

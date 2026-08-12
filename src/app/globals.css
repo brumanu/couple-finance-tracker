@@ -152,7 +152,7 @@
   --chart-4: var(--organic-accent-700);
   --chart-5: var(--organic-neutral-500);
 
-  --radius: 1rem;
+  --radius: 1.125rem; /* 18px — Organic prefers over-rounded surfaces */
 
   --sidebar: color-mix(in srgb, var(--organic-surface) 55%, var(--organic-bg));
   --sidebar-foreground: var(--organic-text);
@@ -252,3 +252,26 @@
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Elevation tokens espelhando o design system Organic — sombras quentes e
+   pouco saturadas, calibradas ao fundo cream. */
+:root {
+  --shadow-organic-sm: 0 1px 2px color-mix(in srgb, var(--organic-neutral-900) 12%, transparent);
+  --shadow-organic-md: 0 6px 20px color-mix(in srgb, var(--organic-neutral-900) 14%, transparent);
+  --shadow-organic-lg: 0 20px 48px color-mix(in srgb, var(--organic-neutral-900) 20%, transparent);
+}
+.dark {
+  --shadow-organic-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-organic-md: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-organic-lg: 0 20px 48px rgba(0, 0, 0, 0.6);
+}
+.shadow-organic-sm { box-shadow: var(--shadow-organic-sm); }
+.shadow-organic-md { box-shadow: var(--shadow-organic-md); }
+.shadow-organic-lg { box-shadow: var(--shadow-organic-lg); }
+
+/* Superfície mais leve do que --card: usada em cards secundários que
+   pedem hierarquia visual dentro de outra superfície. */
+:root {
+  --surface-soft: color-mix(in srgb, var(--organic-surface) 45%, var(--organic-bg));
+}
+.bg-surface-soft { background: var(--surface-soft); }

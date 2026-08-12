@@ -30,13 +30,13 @@ export default async function BancosPage() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
             Bancos
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1.5 max-w-[46ch] text-[15px] text-neutral-700">
             Onde vivem os cartões. O ícone identifica cada um de bate-pronto.
           </p>
         </div>
@@ -63,26 +63,25 @@ export default async function BancosPage() {
                   ? "1 cartão"
                   : `${n} cartões`;
             return (
-              <Card key={b.id}>
-                <div className="flex items-center gap-4 p-4">
-                  <BancoIcone
-                    icone={b.icone}
-                    corFallback={b.cor}
-                    nomeFallback={b.nome}
-                    size={44}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="font-heading text-lg leading-tight">
-                      {b.nome}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {subtitulo}
-                    </p>
-                  </div>
-                  <EditBancoTrigger banco={b} />
-                  <BancoActionsMenu id={b.id} nome={b.nome} />
+              <div
+                key={b.id}
+                className="flex items-center gap-4 rounded-[24px] bg-card px-5 py-4"
+              >
+                <BancoIcone
+                  icone={b.icone}
+                  corFallback={b.cor}
+                  nomeFallback={b.nome}
+                  size={44}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-semibold">{b.nome}</p>
+                  <p className="mt-0.5 text-[13px] text-neutral-700">
+                    {subtitulo}
+                  </p>
                 </div>
-              </Card>
+                <EditBancoTrigger banco={b} />
+                <BancoActionsMenu id={b.id} nome={b.nome} />
+              </div>
             );
           })}
         </div>

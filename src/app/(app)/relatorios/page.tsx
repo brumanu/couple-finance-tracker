@@ -24,12 +24,12 @@ export default async function RelatoriosPage() {
   await requireSession();
 
   return (
-    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header>
-        <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+        <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
           Relatórios
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
           Visões consolidadas dos seus dados. Vamos adicionando aos poucos.
         </p>
       </header>
@@ -39,29 +39,27 @@ export default async function RelatoriosPage() {
           <Link
             key={r.href}
             href={r.href}
-            className="group focus:outline-none"
+            className="group rounded-[26px] transition-shadow hover:shadow-organic-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
           >
-            <Card className="h-full transition-shadow group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-primary/30">
-              <div className="flex items-start gap-4 p-6">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <r.Icon className="size-5" strokeWidth={2.5} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-heading text-lg leading-tight">
-                      {r.titulo}
-                    </p>
-                    <ChevronRightIcon
-                      className="ml-auto size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-                      strokeWidth={2.5}
-                    />
-                  </div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {r.descricao}
-                  </p>
-                </div>
+            <div className="flex items-start gap-4 rounded-[26px] bg-card px-6 py-5">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-200 text-accent-800">
+                <r.Icon className="size-5" strokeWidth={2.5} />
               </div>
-            </Card>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="font-heading text-[19px] leading-tight">
+                    {r.titulo}
+                  </p>
+                  <ChevronRightIcon
+                    className="ml-auto size-4 text-neutral-700 transition-transform group-hover:translate-x-0.5"
+                    strokeWidth={2.5}
+                  />
+                </div>
+                <p className="mt-1 text-[13px] text-neutral-700">
+                  {r.descricao}
+                </p>
+              </div>
+            </div>
           </Link>
         ))}
       </div>

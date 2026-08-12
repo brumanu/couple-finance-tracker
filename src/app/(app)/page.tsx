@@ -17,6 +17,7 @@ import {
 import { BancoIcone } from "@/lib/bancos-icones";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { getCategorias } from "@/lib/categorias-server";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "./month-switcher";
@@ -289,18 +290,17 @@ export default async function DashboardPage({
     : [];
 
   const primeiroNome = session.nome.split(/\s+/)[0];
+  const contextoHoje = noMesAtual ? saudacaoContexto(hojeDia) : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-8 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
             Oi, {primeiroNome}
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {noMesAtual
-              ? `Isto é o que sobra nesta quinzena e na próxima em ${mes.label}.`
-              : `Estimativa para ${mes.label}.`}
+          <p className="mt-1.5 text-[15px] text-neutral-700">
+            {contextoHoje ?? `Estimativa para ${mes.label}.`}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -346,18 +346,20 @@ export default async function DashboardPage({
           </div>
 
           {contasEmAtraso.length > 0 && (
-            <div className="flex items-start gap-3 rounded-2xl border border-accent-300 bg-accent-100 p-4">
-              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <AlertTriangleIcon className="size-4" strokeWidth={2.75} />
+            <div className="flex items-center gap-4 rounded-[26px] border border-accent-300 bg-accent-100 px-5 py-4">
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                <AlertTriangleIcon className="size-5" strokeWidth={2.75} />
               </div>
-              <div className="flex-1">
-                <p className="font-heading text-lg text-accent-800">
+              <div className="min-w-0 flex-1">
+                <p className="font-heading text-[17px] text-accent-800">
                   {contasEmAtraso.length === 1
-                    ? "1 conta em atraso"
+                    ? `A ${contasEmAtraso[0].descricao.toLowerCase()} venceu`
                     : `${contasEmAtraso.length} contas em atraso`}
                 </p>
-                <p className="text-sm text-accent-800/80">
-                  {contasEmAtraso.map((c) => c.descricao).join(", ")}
+                <p className="text-sm text-accent-800/85">
+                  {contasEmAtraso.length === 1
+                    ? `${formatBRL(pagamentos.get(contasEmAtraso[0].id)?.valor ?? contasEmAtraso[0].valor_previsto)} · vencimento dia ${contasEmAtraso[0].dia_vencimento}`
+                    : contasEmAtraso.map((c) => c.descricao).join(", ")}
                 </p>
               </div>
             </div>
@@ -508,72 +510,79 @@ function QuinzenaHeroCard({
   const pctLivre = Math.max(0, 100 - pctContas - pctDespesas);
 
   return (
-    <Card className="relative overflow-hidden">
+    <div className="relative flex flex-col gap-5 overflow-hidden rounded-[28px] bg-card p-7 md:gap-6 md:p-8">
       <div
-        className={`pointer-events-none absolute -right-16 -top-16 size-56 rounded-full ${meta.blob}`}
+        className="pointer-events-none absolute -right-16 -top-16 size-60 rounded-full bg-accent-200/70"
         aria-hidden
       />
-      <div className="relative flex flex-col gap-5 p-6">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-primary">
-            {titulo}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Quinzena {meta.label} · {meta.subtitle}
-          </p>
-        </div>
-
+      <div className="relative flex flex-col gap-1.5">
+        <p className="text-[11px] uppercase tracking-widest text-accent-700">
+          {titulo} · {meta.label}
+        </p>
         <p
           className={`font-heading tabular-nums ${dados.saldo >= 0 ? "text-foreground" : "text-primary"}`}
-          style={{ fontSize: "clamp(2.5rem, 6vw, 4rem)", lineHeight: 1 }}
+          style={{ fontSize: "clamp(2.75rem, 6vw, 4.125rem)", lineHeight: 1, letterSpacing: "-0.02em" }}
         >
           {formatBRL(dados.saldo)}
         </p>
+        <p className="mt-1 max-w-[44ch] text-[15px] text-neutral-800">
+          {meta.subtitle}. {dados.saldo >= 0
+            ? "Ainda dá até o fim da quinzena, se as contas vierem como previsto."
+            : "Já passou do que entrou — atenção aos próximos gastos."}
+        </p>
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex h-3 w-full overflow-hidden rounded-full bg-neutral-200">
-            {pctContas > 0 && (
-              <div
-                className={meta.barra}
-                style={{ width: `${pctContas}%` }}
-                title={`Contas ${formatBRL(dados.totalContas)}`}
-              />
-            )}
-            {pctDespesas > 0 && (
-              <div
-                className={meta.barraSecundaria}
-                style={{ width: `${pctDespesas}%` }}
-                title={`Despesas ${formatBRL(dados.totalDespesas)}`}
-              />
-            )}
-            {pctLivre > 0 && (
-              <div
-                className="bg-neutral-300"
-                style={{ width: `${pctLivre}%` }}
-              />
-            )}
-          </div>
-          <div className="flex flex-wrap gap-4 text-xs">
-            <LegendaDot
+      <div className="relative flex flex-col gap-3">
+        <div className="flex h-4 w-full overflow-hidden rounded-full bg-neutral-200">
+          {pctContas > 0 && (
+            <div
               className={meta.barra}
-              label="Contas"
-              valor={dados.totalContas}
+              style={{ width: `${pctContas}%` }}
+              title={`Contas ${formatBRL(dados.totalContas)}`}
             />
-            <LegendaDot
+          )}
+          {pctDespesas > 0 && (
+            <div
               className={meta.barraSecundaria}
-              label="Despesas"
-              valor={dados.totalDespesas}
+              style={{ width: `${pctDespesas}%` }}
+              title={`Despesas ${formatBRL(dados.totalDespesas)}`}
             />
-            <LegendaDot
-              className="bg-neutral-300"
-              label="Renda"
-              valor={dados.totalRenda}
-              muted
+          )}
+          {pctLivre > 0 && (
+            <div
+              className="bg-neutral-200"
+              style={{ width: `${pctLivre}%` }}
             />
-          </div>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-4 text-[13px] text-neutral-800">
+          <LegendaDot
+            className={meta.barra}
+            label="Contas"
+            valor={dados.totalContas}
+          />
+          <LegendaDot
+            className={meta.barraSecundaria}
+            label="Despesas"
+            valor={dados.totalDespesas}
+          />
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-full bg-neutral-300" />
+            <span className="text-muted-foreground">
+              Livre {Math.round(pctLivre)}%
+            </span>
+          </span>
         </div>
       </div>
-    </Card>
+
+      <div className="relative flex flex-wrap gap-2">
+        {dados.totalRenda > 0 && (
+          <Badge variant="neutral" className="text-[12px]">
+            Entrou {formatBRL(dados.totalRenda)} no dia {quinzena}
+          </Badge>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -586,35 +595,54 @@ function QuinzenaResumoCard({
 }) {
   const meta = QUINZENA_META[quinzena];
   return (
-    <Card>
-      <div className="flex flex-col gap-4 p-6">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-primary">
-            Próxima quinzena · {meta.label}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">{meta.subtitle}</p>
-        </div>
+    <div className="flex flex-col gap-5 rounded-[28px] bg-surface-soft p-7 md:p-8">
+      <div>
+        <p className="text-[11px] uppercase tracking-widest text-neutral-700">
+          Próxima quinzena · {meta.label}
+        </p>
         <p
-          className="font-heading tabular-nums"
-          style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", lineHeight: 1 }}
+          className="mt-2 font-heading tabular-nums"
+          style={{ fontSize: "clamp(1.875rem, 4vw, 2.375rem)", lineHeight: 1 }}
         >
           {formatBRL(dados.saldo)}
         </p>
-        <div className="flex flex-col gap-2 text-sm">
-          <ResumoLinha label="Renda" valor={dados.totalRenda} />
-          <ResumoLinha
-            label="Contas"
-            valor={-dados.totalContas}
-            variant="danger"
-          />
-          <ResumoLinha
-            label="Despesas"
-            valor={-dados.totalDespesas}
-            variant="danger"
-          />
+        <p className="mt-2 text-sm text-neutral-700">
+          {meta.subtitle}, nada pago ainda.
+        </p>
+      </div>
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-neutral-200">
+        <div
+          className={meta.barra}
+          style={{
+            width: `${Math.min(
+              100,
+              ((dados.totalContas + dados.totalDespesas) /
+                (dados.totalRenda || 1)) *
+                100,
+            )}%`,
+          }}
+        />
+      </div>
+      <div className="flex flex-col gap-3 text-sm">
+        <ResumoLinha label="Renda" valor={dados.totalRenda} />
+        <ResumoLinha
+          label="Contas"
+          valor={-dados.totalContas}
+          variant="danger"
+        />
+        <ResumoLinha
+          label="Despesas"
+          valor={-dados.totalDespesas}
+          variant="danger"
+        />
+        <div className="mt-1 flex items-center justify-between border-t border-border/60 pt-3">
+          <span className="font-heading text-base">Sobra do mês</span>
+          <span className="font-heading text-lg tabular-nums text-sage-700">
+            {formatBRL(dados.saldo)}
+          </span>
         </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -681,183 +709,239 @@ function ContasQuinzenaCard({
   hojeDia: number;
   noMesAtual: boolean;
 }) {
-  const semItens = contas.length === 0 && faturas.length === 0;
+  const total = contas.length + faturas.length;
+  const pagas = contas.filter((c) => pagamentos.has(c.id)).length;
+  const semItens = total === 0;
+
   return (
-    <Card>
-      <div className="flex flex-col gap-4 p-6">
-        <div className="flex items-baseline justify-between">
-          <p className="font-heading text-lg">Contas desta quinzena</p>
-          <p className="text-xs text-muted-foreground">{mes.label}</p>
-        </div>
-        {semItens ? (
-          <p className="text-sm text-muted-foreground">
-            Nada cadastrado para o dia {quinzena}.
-          </p>
-        ) : (
-          <ul className="flex flex-col divide-y divide-border/60">
-            {faturas.map((f) => (
-              <li
-                key={f.cartaoId}
-                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-              >
-                <BancoIcone
-                  icone={f.bancoIcone}
-                  corFallback={f.bancoCor}
-                  nomeFallback={f.bancoNome}
-                  size={36}
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">Fatura {f.label}</p>
-                  <p className="text-xs text-muted-foreground">Cartão</p>
-                </div>
-                <span className="tabular-nums text-sm font-medium">
-                  {formatBRL(f.total)}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  nativeButton={false}
-                  aria-label="Ver fatura"
-                  render={
-                    <Link href={`/cartoes/${f.cartaoId}?mes=${mes.chave}`}>
-                      <ChevronRightIcon
-                        className="size-4"
-                        strokeWidth={2.75}
-                      />
-                    </Link>
-                  }
-                />
-              </li>
-            ))}
-            {contas.map((c) => {
-              const pago = pagamentos.get(c.id);
-              const atrasada =
-                noMesAtual &&
-                !pago &&
-                c.dia_vencimento != null &&
-                hojeDia > c.dia_vencimento;
-              return (
-                <li
-                  key={c.id}
-                  className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
-                >
-                  <div
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                      pago
-                        ? "bg-sage-300 text-sage-800"
-                        : atrasada
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-neutral-200 text-foreground"
-                    }`}
-                  >
-                    {pago ? (
-                      <CheckIcon className="size-4" strokeWidth={2.75} />
-                    ) : atrasada ? (
-                      <AlertTriangleIcon
-                        className="size-4"
-                        strokeWidth={2.75}
-                      />
-                    ) : (
-                      <span className="font-heading text-xs">
-                        {c.descricao[0]?.toUpperCase() ?? "?"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={`truncate text-sm ${pago ? "text-muted-foreground line-through" : ""}`}
-                    >
-                      {c.descricao}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {pago
-                        ? `Paga${pago.data_pagamento ? " em " + formatDataCurta(pago.data_pagamento) : ""}`
-                        : c.dia_vencimento
-                          ? atrasada
-                            ? `Venceu dia ${c.dia_vencimento}`
-                            : `Vence dia ${c.dia_vencimento}`
-                          : ""}
-                    </p>
-                  </div>
-                  <span
-                    className={`tabular-nums text-sm font-medium ${pago ? "text-muted-foreground line-through" : ""}`}
-                  >
-                    {formatBRL(pago ? pago.valor : c.valor_previsto)}
-                  </span>
-                  {pago ? (
-                    <DesmarcarButton
-                      lancamentoId={pago.id}
-                      descricao={c.descricao}
-                    />
-                  ) : (
-                    <PagarDialog
-                      contaRecorrenteId={c.id}
-                      descricao={c.descricao}
-                      valorPrevisto={c.valor_previsto}
-                      dataReferencia={mes.primeiroDia}
-                      quinzena={c.quinzena as 15 | 30}
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+    <section className="flex flex-col gap-3.5">
+      <div className="flex items-baseline justify-between px-1">
+        <h3 className="font-heading text-[22px]">Contas da quinzena</h3>
+        {!semItens && (
+          <span className="text-[13px] text-neutral-700">
+            {pagas} de {total}{" "}
+            {total === 1 ? "paga" : contas.length + faturas.length > pagas + 1 ? "pagas" : "paga"}
+          </span>
         )}
       </div>
-    </Card>
+      {semItens ? (
+        <div className="rounded-[26px] bg-card px-6 py-8 text-center text-sm text-muted-foreground">
+          Nada cadastrado para o dia {quinzena}.
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {faturas.map((f) => (
+            <div
+              key={f.cartaoId}
+              className="flex items-center gap-4 rounded-[26px] bg-card px-5 py-4"
+            >
+              <BancoIcone
+                icone={f.bancoIcone}
+                corFallback={f.bancoCor}
+                nomeFallback={f.bancoNome}
+                size={38}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold">
+                  Fatura {f.label}
+                </p>
+                <p className="text-[13px] text-neutral-700">Cartão</p>
+              </div>
+              <span className="tabular-nums text-[15px] font-medium">
+                {formatBRL(f.total)}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                nativeButton={false}
+                aria-label="Ver fatura"
+                render={
+                  <Link href={`/cartoes/${f.cartaoId}?mes=${mes.chave}`}>
+                    <ChevronRightIcon
+                      className="size-4"
+                      strokeWidth={2.75}
+                    />
+                  </Link>
+                }
+              />
+            </div>
+          ))}
+          {contas.map((c) => {
+            const pago = pagamentos.get(c.id);
+            const atrasada =
+              noMesAtual &&
+              !pago &&
+              c.dia_vencimento != null &&
+              hojeDia > c.dia_vencimento;
+            return (
+              <div
+                key={c.id}
+                className={`flex items-center gap-4 rounded-[26px] px-5 py-4 ${
+                  atrasada
+                    ? "border border-accent-300 bg-accent-100"
+                    : "bg-card"
+                }`}
+              >
+                <div
+                  className={`flex size-[38px] shrink-0 items-center justify-center rounded-full ${
+                    pago
+                      ? "bg-sage-300 text-sage-800"
+                      : atrasada
+                        ? "bg-accent-200 text-accent-800"
+                        : "bg-neutral-200 text-foreground"
+                  }`}
+                >
+                  {pago ? (
+                    <CheckIcon className="size-[18px]" strokeWidth={2.75} />
+                  ) : atrasada ? (
+                    <AlertTriangleIcon
+                      className="size-[18px]"
+                      strokeWidth={2.75}
+                    />
+                  ) : (
+                    <span className="font-heading text-sm">
+                      {c.descricao[0]?.toUpperCase() ?? "?"}
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`truncate text-[15px] font-semibold ${
+                      pago ? "text-neutral-700" : ""
+                    }`}
+                  >
+                    {c.descricao}
+                  </p>
+                  <p
+                    className={`text-[13px] ${atrasada ? "text-accent-800" : "text-neutral-700"}`}
+                  >
+                    {pago
+                      ? `Paga${pago.data_pagamento ? " em " + formatDataCurta(pago.data_pagamento) : ""}${c.categoria ? " · " + c.categoria : ""}`
+                      : c.dia_vencimento
+                        ? atrasada
+                          ? `Venceu dia ${c.dia_vencimento}${c.categoria ? " · " + c.categoria : ""}`
+                          : `Vence dia ${c.dia_vencimento}${c.categoria ? " · " + c.categoria : ""}`
+                        : c.categoria ?? ""}
+                  </p>
+                </div>
+                <span
+                  className={`tabular-nums text-[15px] font-medium ${
+                    pago ? "text-neutral-700 line-through" : ""
+                  }`}
+                >
+                  {formatBRL(pago ? pago.valor : c.valor_previsto)}
+                </span>
+                {pago ? (
+                  <DesmarcarButton
+                    lancamentoId={pago.id}
+                    descricao={c.descricao}
+                  />
+                ) : (
+                  <PagarDialog
+                    contaRecorrenteId={c.id}
+                    descricao={c.descricao}
+                    valorPrevisto={c.valor_previsto}
+                    dataReferencia={mes.primeiroDia}
+                    quinzena={c.quinzena as 15 | 30}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 
 function UltimasDespesasCard({ despesas }: { despesas: LancamentoRow[] }) {
   return (
-    <Card>
-      <div className="flex flex-col gap-4 p-6">
-        <div className="flex items-baseline justify-between">
-          <p className="font-heading text-lg">Últimas despesas</p>
-          <Link
-            href="/despesas"
-            className="text-xs text-primary hover:underline"
-          >
-            Ver todas
-          </Link>
+    <section className="flex flex-col gap-3.5">
+      <div className="flex items-baseline justify-between px-1">
+        <h3 className="font-heading text-[22px]">Últimas despesas</h3>
+        <Link
+          href="/despesas"
+          className="text-[13px] text-primary hover:underline"
+        >
+          ver todas
+        </Link>
+      </div>
+      {despesas.length === 0 ? (
+        <div className="rounded-[26px] bg-surface-soft px-6 py-8 text-center text-sm text-muted-foreground">
+          Nenhuma despesa lançada neste mês.
         </div>
-        {despesas.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma despesa lançada neste mês.
-          </p>
-        ) : (
+      ) : (
+        <div className="rounded-[26px] bg-surface-soft px-6">
           <ul className="flex flex-col divide-y divide-border/60">
             {despesas.map((d) => (
               <li
                 key={d.id}
-                className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+                className="flex items-center gap-3.5 py-3.5"
               >
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-neutral-200 font-heading text-xs text-foreground">
+                <div className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-card font-heading text-xs text-neutral-800">
                   {d.descricao[0]?.toUpperCase() ?? "?"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm">{d.descricao}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="truncate text-[15px] font-semibold">
+                    {d.descricao}
+                  </p>
+                  <p className="text-[13px] text-neutral-700">
                     {d.data_pagamento
                       ? formatDataCurta(d.data_pagamento)
                       : ""}
                     {d.categoria ? ` · ${d.categoria}` : ""}
-                    {d.quinzena ? ` · quinzena ${d.quinzena}` : ""}
                   </p>
                 </div>
-                <span className="tabular-nums text-sm font-medium text-primary">
-                  −{formatBRL(d.valor)}
+                <span className="tabular-nums text-[15px] font-medium">
+                  {formatBRL(d.valor)}
                 </span>
               </li>
             ))}
           </ul>
-        )}
-      </div>
-    </Card>
+        </div>
+      )}
+    </section>
   );
 }
 
 function formatDataCurta(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d}/${m}`;
+}
+
+const DIAS_PT = [
+  "Domingo",
+  "Segunda",
+  "Terça",
+  "Quarta",
+  "Quinta",
+  "Sexta",
+  "Sábado",
+];
+const MESES_PT = [
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
+];
+
+function saudacaoContexto(hojeDia: number): string {
+  const agora = new Date();
+  const dia = DIAS_PT[agora.getDay()];
+  const mes = MESES_PT[agora.getMonth()];
+  const nDia = agora.getDate();
+  let momento: string;
+  if (hojeDia <= 5) momento = "começo da quinzena do adiantamento";
+  else if (hojeDia <= 15) momento = "meio da quinzena do adiantamento";
+  else if (hojeDia <= 20) momento = "começo da quinzena do salário";
+  else momento = "reta final da quinzena do salário";
+  return `${dia}, ${nDia} de ${mes} — ${momento}.`;
 }
