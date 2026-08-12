@@ -59,6 +59,11 @@ export const BANCO_ICONES = {
     cor: "#242424",
     glifo: "C6",
   },
+  inter: {
+    nome: "Inter",
+    cor: "#FF7A00",
+    glifo: "in",
+  },
 } as const;
 
 export type BancoIconeId = keyof typeof BANCO_ICONES;
