@@ -106,6 +106,18 @@ export default async function CartaoDetailPage({
   const compras = (comprasRes.data ?? []) as CompraRow[];
   const assinaturas = (assinRes.data ?? []) as AssinaturaRow[];
 
+  // Compras que efetivamente têm parcela na fatura do mês selecionado
+  const comprasDoMes = compras
+    .map((c) => {
+      const info = parcelaNoMes(
+        c as CompraCartaoInfo,
+        cartao.dia_fechamento,
+        mes,
+      );
+      return info ? { compra: c, info } : null;
+    })
+    .filter((x): x is { compra: CompraRow; info: NonNullable<ReturnType<typeof parcelaNoMes>> } => x !== null);
+
   const label = banco?.nome
     ? cartao.apelido
       ? `${banco.nome} · ${cartao.apelido}`
@@ -204,10 +216,11 @@ export default async function CartaoDetailPage({
 
       <section className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between px-1">
-          <h3 className="font-heading text-lg">Compras</h3>
+          <h3 className="font-heading text-lg">Compras da fatura</h3>
           <p className="text-xs text-muted-foreground">
-            {compras.length}{" "}
-            {compras.length === 1 ? "registrada" : "registradas"}
+            {comprasDoMes.length}{" "}
+            {comprasDoMes.length === 1 ? "na fatura" : "na fatura"} ·{" "}
+            {compras.length} no cartão
           </p>
         </div>
         {compras.length === 0 ? (
@@ -223,15 +236,18 @@ export default async function CartaoDetailPage({
               />
             </div>
           </Card>
+        ) : comprasDoMes.length === 0 ? (
+          <Card>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Nenhuma compra cai na fatura de {mes.label}.
+              </p>
+            </div>
+          </Card>
         ) : (
           <Card>
             <ul className="flex flex-col divide-y divide-border/60">
-              {compras.map((c) => {
-                const info = parcelaNoMes(
-                  c as CompraCartaoInfo,
-                  cartao.dia_fechamento,
-                  mes,
-                );
+              {comprasDoMes.map(({ compra: c, info }) => {
                 const primeira = mesPrimeiraParcela(
                   c.data_compra,
                   cartao.dia_fechamento,
@@ -240,29 +256,17 @@ export default async function CartaoDetailPage({
                   Number(c.valor_total),
                   c.parcelas,
                 );
-                const valorParcela = valores[0];
 
-                // Última parcela (mesmo se não estiver ativa nesse mês)
                 const totalMesesUltima = primeira.mes + c.parcelas - 1;
                 const anoUltima =
                   primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
                 const mesUltimaNum = ((totalMesesUltima - 1) % 12) + 1;
                 const ultimaLabel = `${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][mesUltimaNum-1]}/${String(anoUltima).slice(2)}`;
 
-                const restantes = info
-                  ? c.parcelas - info.numero
-                  : primeira.ano * 12 + primeira.mes >
-                      mes.ano * 12 + mes.mes
-                    ? c.parcelas // ainda não começou
-                    : 0; // já terminou
-                const valorRestante = info
-                  ? Number(
-                      valores.slice(info.numero).reduce((s, v) => s + v, 0),
-                    )
-                  : primeira.ano * 12 + primeira.mes >
-                      mes.ano * 12 + mes.mes
-                    ? Number(c.valor_total)
-                    : 0;
+                const restantes = c.parcelas - info.numero;
+                const valorRestante = Number(
+                  valores.slice(info.numero).reduce((s, v) => s + v, 0),
+                );
 
                 return (
                   <li
@@ -302,7 +306,7 @@ export default async function CartaoDetailPage({
                             Parcela
                           </p>
                           <p className="font-medium tabular-nums">
-                            {info ? info.numero : primeira.ano * 12 + primeira.mes > mes.ano * 12 + mes.mes ? "0" : c.parcelas}/{c.parcelas}
+                            {info.numero}/{c.parcelas}
                           </p>
                         </div>
                         <div>
@@ -310,7 +314,7 @@ export default async function CartaoDetailPage({
                             Valor da parcela
                           </p>
                           <p className="font-medium tabular-nums">
-                            {formatBRL(valorParcela)}
+                            {formatBRL(info.valor)}
                           </p>
                         </div>
                         <div>
