@@ -2,17 +2,19 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
+import { getCategorias } from "@/lib/categorias-server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { BancoIcone } from "@/lib/bancos-icones";
-import { formatBRL } from "@/lib/format";
 import { mesAtual, buildMes } from "@/lib/mes";
 import {
   mesPrimeiraParcela,
   valoresParcelas,
-  type CompraCartaoInfo,
 } from "@/lib/cartao-calc";
+import {
+  RelatorioComprasParceladasClient,
+  type LinhaRelatorio,
+  type CartaoOpcaoRel,
+} from "./relatorio-client";
 
 type CompraRow = {
   id: string;
@@ -23,6 +25,7 @@ type CompraRow = {
   parcelas: number;
   parcelas_ja_pagas: number | null;
   categoria: string | null;
+  categoria_id: string | null;
 };
 
 type CartaoRow = {
@@ -38,11 +41,6 @@ type BancoRow = {
   cor: string;
   icone: string | null;
 };
-
-function formatDataBR(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y.slice(2)}`;
-}
 
 const MESES_ABREV = [
   "Jan",
@@ -63,23 +61,26 @@ function labelMesAbrev(ano: number, mes: number): string {
   return `${MESES_ABREV[mes - 1]}/${String(ano).slice(2)}`;
 }
 
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
 export default async function RelatorioComprasParceladasPage() {
   await requireSession();
   const supabase = await createClient();
   const hoje = mesAtual();
 
-  const [comprasRes, cartoesRes, bancosRes] = await Promise.all([
+  const [comprasRes, cartoesRes, bancosRes, categorias] = await Promise.all([
     supabase
       .from("compras_cartao")
       .select(
-        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria",
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id",
       )
       .gt("parcelas", 1)
       .order("data_compra", { ascending: false }),
-    supabase
-      .from("cartoes")
-      .select("id, banco_id, apelido, dia_fechamento"),
+    supabase.from("cartoes").select("id, banco_id, apelido, dia_fechamento"),
     supabase.from("bancos").select("id, nome, cor, icone"),
+    getCategorias(),
   ]);
 
   const compras = (comprasRes.data ?? []) as CompraRow[];
@@ -87,21 +88,6 @@ export default async function RelatorioComprasParceladasPage() {
   const bancos = (bancosRes.data ?? []) as BancoRow[];
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
   const bancoById = new Map(bancos.map((b) => [b.id, b] as const));
-
-  type LinhaRelatorio = {
-    compra: CompraRow;
-    cartaoLabel: string;
-    bancoIcone: string | null;
-    bancoCor: string;
-    bancoNome: string;
-    parcelaAtual: number; // 0 se ainda não começou; >parcelas se acabou
-    valorParcela: number;
-    faltaPagar: number;
-    parcelasRestantes: number;
-    primeiraLabel: string;
-    ultimaLabel: string;
-    status: "aguardando" | "ativa" | "quitada";
-  };
 
   const linhas: LinhaRelatorio[] = compras.map((c) => {
     const cartao = cartaoById.get(c.cartao_id);
@@ -116,15 +102,10 @@ export default async function RelatorioComprasParceladasPage() {
     const primeira = mesPrimeiraParcela(c.data_compra, diaFech);
     const valores = valoresParcelas(Number(c.valor_total), c.parcelas);
 
-    // Quantos meses se passaram desde a primeira parcela até hoje (inclusivo)
     const diffMeses =
       (hoje.ano - primeira.ano) * 12 + (hoje.mes - primeira.mes);
-    // Índice 0-based da parcela atual; ex: se diffMeses=0, é parcela 1
     const parcelaAtual =
       diffMeses < 0 ? 0 : Math.min(c.parcelas, diffMeses + 1);
-
-    // Parcelas efetivamente pagas: max(já pagas cadastradas, parcelaAtual - 1)
-    // — pra compras normais, parcelas_ja_pagas fica 0 e o cálculo é temporal.
     const pagasReal = Math.max(
       c.parcelas_ja_pagas ?? 0,
       Math.max(0, parcelaAtual - 1),
@@ -134,7 +115,6 @@ export default async function RelatorioComprasParceladasPage() {
       .slice(pagasReal)
       .reduce((s, v) => s + v, 0);
 
-    // Última parcela
     const totalMesesUltima = primeira.mes + c.parcelas - 1;
     const anoUltima = primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
     const mesUltima = ((totalMesesUltima - 1) % 12) + 1;
@@ -144,97 +124,67 @@ export default async function RelatorioComprasParceladasPage() {
       parcelaAtual >= 1 && parcelaAtual <= c.parcelas
         ? valores[parcelaAtual - 1]
         : valores[0];
+    const valorUltimaParcela = valores[c.parcelas - 1];
 
     let status: LinhaRelatorio["status"] = "ativa";
     if (parcelaAtual === 0) status = "aguardando";
     else if (pagasReal >= c.parcelas) status = "quitada";
 
     return {
-      compra: c,
+      id: c.id,
+      descricao: c.descricao,
+      categoria: c.categoria,
+      categoriaId: c.categoria_id,
+      cartaoId: c.cartao_id,
       cartaoLabel,
       bancoIcone: banco?.icone ?? null,
       bancoCor: banco?.cor ?? "#c67139",
       bancoNome: banco?.nome ?? cartaoLabel,
+      dataCompra: c.data_compra,
+      valorTotal: Number(c.valor_total),
+      parcelas: c.parcelas,
       parcelaAtual: Math.max(1, parcelaAtual),
       valorParcela,
+      valorUltimaParcela,
       faltaPagar: Number(faltaPagar.toFixed(2)),
       parcelasRestantes,
+      primeiraChave: `${primeira.ano}-${pad2(primeira.mes)}`,
       primeiraLabel: labelMesAbrev(primeira.ano, primeira.mes),
+      ultimaChave: `${ultima.ano}-${pad2(ultima.mes)}`,
       ultimaLabel: labelMesAbrev(ultima.ano, ultima.mes),
+      ultimaAno: ultima.ano,
+      ultimaMes: ultima.mes,
       status,
     };
   });
 
-  const totalCompras = linhas.length;
-  const totalFalta = linhas.reduce((s, l) => s + l.faltaPagar, 0);
-  const totalOriginal = compras.reduce((s, c) => s + Number(c.valor_total), 0);
-
-  // Projeção de "quitações": em cada mês futuro, quanto vale a soma
-  // das ÚLTIMAS parcelas das compras que se encerram ali. É esse o
-  // valor que fica livre da fatura a partir do mês seguinte.
-  type Bucket = {
-    chave: string;
-    ano: number;
-    mes: number;
-    label: string;
-    encerramentos: number;
-    valorUltimaParcela: number;
-    liberadoAcumulado: number; // preenchido depois
-  };
-  const buckets = new Map<string, Bucket>();
-
-  for (const c of compras) {
-    const cartao = cartaoById.get(c.cartao_id);
-    const diaFech = cartao?.dia_fechamento ?? 1;
-    const primeira = mesPrimeiraParcela(c.data_compra, diaFech);
-    const valores = valoresParcelas(Number(c.valor_total), c.parcelas);
-    const diffMeses =
-      (hoje.ano - primeira.ano) * 12 + (hoje.mes - primeira.mes);
-    const pagasReal = Math.max(
-      c.parcelas_ja_pagas ?? 0,
-      Math.max(0, Math.min(c.parcelas, diffMeses)),
-    );
-    if (pagasReal >= c.parcelas) continue; // quitada
-
-    // Mês da última parcela
-    const idxUltima = c.parcelas - 1;
-    const totalMeses = primeira.mes + idxUltima;
-    const ano = primeira.ano + Math.floor((totalMeses - 1) / 12);
-    const mesN = ((totalMeses - 1) % 12) + 1;
-    const chave = `${ano}-${String(mesN).padStart(2, "0")}`;
-    const label = labelMesAbrev(ano, mesN);
-    const valorParcela = valores[idxUltima];
-
-    let b = buckets.get(chave);
-    if (!b) {
-      b = {
-        chave,
-        ano,
-        mes: mesN,
+  // Opções pros dropdowns de filtro — só cartões que aparecem no relatório
+  const cartaoIdsPresentes = new Set(linhas.map((l) => l.cartaoId));
+  const cartaoOptions: CartaoOpcaoRel[] = cartoes
+    .filter((c) => cartaoIdsPresentes.has(c.id))
+    .map((c) => {
+      const banco = bancoById.get(c.banco_id);
+      const label = banco?.nome
+        ? c.apelido
+          ? `${banco.nome} · ${c.apelido}`
+          : banco.nome
+        : (c.apelido ?? "Cartão");
+      return {
+        id: c.id,
         label,
-        encerramentos: 0,
-        valorUltimaParcela: 0,
-        liberadoAcumulado: 0,
+        bancoIcone: banco?.icone ?? null,
+        bancoCor: banco?.cor ?? "#c67139",
+        bancoNome: banco?.nome ?? label,
       };
-      buckets.set(chave, b);
-    }
-    b.encerramentos += 1;
-    b.valorUltimaParcela += valorParcela;
-  }
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 
-  const projecao = Array.from(buckets.values()).sort((a, b) =>
-    a.chave.localeCompare(b.chave),
+  // Só categorias efetivamente usadas por alguma compra parcelada
+  const categoriaIdsPresentes = new Set(
+    linhas.map((l) => l.categoriaId).filter((x): x is string => Boolean(x)),
   );
-  let acumulado = 0;
-  for (const b of projecao) {
-    b.valorUltimaParcela = Number(b.valorUltimaParcela.toFixed(2));
-    acumulado += b.valorUltimaParcela;
-    b.liberadoAcumulado = Number(acumulado.toFixed(2));
-  }
-
-  const valorMaximoBarra = projecao.reduce(
-    (m, b) => Math.max(m, b.valorUltimaParcela),
-    0,
+  const categoriaOptions = categorias.filter((c) =>
+    categoriaIdsPresentes.has(c.id),
   );
 
   return (
@@ -265,30 +215,6 @@ export default async function RelatorioComprasParceladasPage() {
         </div>
       </header>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        <ResumoCard
-          label="Total de compras"
-          valor={String(totalCompras)}
-          hint={totalCompras === 1 ? "compra" : "compras"}
-        />
-        <ResumoCard
-          label="Valor total original"
-          valor={formatBRL(totalOriginal)}
-        />
-        <ResumoCard
-          label="Falta pagar"
-          valor={formatBRL(totalFalta)}
-          destaque
-        />
-      </div>
-
-      {projecao.length > 0 && (
-        <ProjecaoChart
-          projecao={projecao}
-          maximo={valorMaximoBarra}
-        />
-      )}
-
       {linhas.length === 0 ? (
         <Card>
           <div className="flex flex-col items-center gap-3 p-8 text-center">
@@ -298,295 +224,12 @@ export default async function RelatorioComprasParceladasPage() {
           </div>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
-          {/* Desktop: tabela; Mobile: cards */}
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Compra</th>
-                  <th className="px-4 py-3 text-left font-medium">Cartão</th>
-                  <th className="px-4 py-3 text-left font-medium">Data</th>
-                  <th className="px-4 py-3 text-right font-medium">Total</th>
-                  <th className="px-4 py-3 text-center font-medium">
-                    Parcela
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium">
-                    Valor parc.
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium">
-                    Falta pagar
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium">
-                    Última em
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {linhas.map((l) => (
-                  <tr key={l.compra.id} className="hover:bg-muted/30">
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col">
-                        <span className="font-medium">
-                          {l.compra.descricao}
-                        </span>
-                        {l.compra.categoria && (
-                          <span className="mt-0.5 text-xs text-muted-foreground">
-                            {l.compra.categoria}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <BancoIcone
-                          icone={l.bancoIcone}
-                          corFallback={l.bancoCor}
-                          nomeFallback={l.bancoNome}
-                          size={24}
-                        />
-                        <span className="truncate">{l.cartaoLabel}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 tabular-nums text-muted-foreground">
-                      {formatDataBR(l.compra.data_compra)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {formatBRL(l.compra.valor_total)}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {l.status === "aguardando" ? (
-                        <Badge variant="neutral" className="text-[10px]">
-                          começa {l.primeiraLabel}
-                        </Badge>
-                      ) : l.status === "quitada" ? (
-                        <Badge variant="secondary" className="text-[10px]">
-                          quitada
-                        </Badge>
-                      ) : (
-                        <span className="tabular-nums">
-                          {l.parcelaAtual}/{l.compra.parcelas}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {formatBRL(l.valorParcela)}
-                    </td>
-                    <td
-                      className={`px-4 py-3 text-right tabular-nums ${
-                        l.faltaPagar > 0
-                          ? "font-medium text-primary"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {formatBRL(l.faltaPagar)}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {l.ultimaLabel}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <ul className="flex flex-col divide-y divide-border/60 md:hidden">
-            {linhas.map((l) => (
-              <li key={l.compra.id} className="flex flex-col gap-2 p-4">
-                <div className="flex items-start gap-3">
-                  <BancoIcone
-                    icone={l.bancoIcone}
-                    corFallback={l.bancoCor}
-                    nomeFallback={l.bancoNome}
-                    size={32}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">
-                      {l.compra.descricao}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {l.cartaoLabel} · {formatDataBR(l.compra.data_compra)}
-                    </p>
-                  </div>
-                  {l.status === "aguardando" ? (
-                    <Badge variant="neutral" className="text-[10px]">
-                      {l.primeiraLabel}
-                    </Badge>
-                  ) : l.status === "quitada" ? (
-                    <Badge variant="secondary" className="text-[10px]">
-                      quitada
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-[10px]">
-                      {l.parcelaAtual}/{l.compra.parcelas}
-                    </Badge>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2 pt-1 text-xs">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Parcela
-                    </p>
-                    <p className="tabular-nums font-medium">
-                      {formatBRL(l.valorParcela)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Falta
-                    </p>
-                    <p
-                      className={`tabular-nums font-medium ${
-                        l.faltaPagar > 0 ? "text-primary" : ""
-                      }`}
-                    >
-                      {formatBRL(l.faltaPagar)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      Última
-                    </p>
-                    <p className="font-medium">{l.ultimaLabel}</p>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
+        <RelatorioComprasParceladasClient
+          linhas={linhas}
+          cartaoOptions={cartaoOptions}
+          categoriaOptions={categoriaOptions}
+        />
       )}
     </div>
-  );
-}
-
-type ProjecaoBucket = {
-  chave: string;
-  ano: number;
-  mes: number;
-  label: string;
-  encerramentos: number;
-  valorUltimaParcela: number;
-  liberadoAcumulado: number;
-};
-
-function ProjecaoChart({
-  projecao,
-  maximo,
-}: {
-  projecao: ProjecaoBucket[];
-  maximo: number;
-}) {
-  const totalEncerramentos = projecao.reduce(
-    (s, b) => s + b.encerramentos,
-    0,
-  );
-  const totalLiberado =
-    projecao.length > 0
-      ? projecao[projecao.length - 1].liberadoAcumulado
-      : 0;
-
-  return (
-    <Card>
-      <div className="flex flex-col gap-4 p-5 md:p-6">
-        <div>
-          <p className="text-[11px] uppercase tracking-widest text-primary">
-            Quitações mês a mês
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cada barra mostra o valor das últimas parcelas que caem naquele
-            mês. A partir do mês seguinte, esse valor deixa de aparecer na
-            fatura.
-          </p>
-        </div>
-
-        <div className="-mx-1 overflow-x-auto pb-1">
-          <div className="flex min-w-full items-end gap-2 px-1">
-            {projecao.map((b) => {
-              const alturaPct =
-                maximo > 0 ? (b.valorUltimaParcela / maximo) * 100 : 0;
-              return (
-                <div
-                  key={b.chave}
-                  className="flex min-w-[64px] flex-1 flex-col items-center gap-1.5"
-                  title={`${b.label} — encerra ${formatBRL(b.valorUltimaParcela)} em ${b.encerramentos} ${
-                    b.encerramentos === 1 ? "compra" : "compras"
-                  } · a partir do mês seguinte fica ${formatBRL(b.liberadoAcumulado)} livre`}
-                >
-                  <span className="text-[10px] tabular-nums font-medium">
-                    {formatBRL(b.valorUltimaParcela).replace("R$ ", "")}
-                  </span>
-                  <div className="relative flex h-32 w-full items-end overflow-hidden rounded-md bg-muted/60">
-                    <div
-                      className="w-full rounded-md bg-primary"
-                      style={{ height: `${Math.max(2, alturaPct)}%` }}
-                    />
-                  </div>
-                  <div className="flex flex-col items-center gap-0.5">
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                      {b.label}
-                    </span>
-                    <span className="text-[10px] tabular-nums text-sage-700">
-                      +{formatBRL(b.liberadoAcumulado).replace("R$ ", "")}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm bg-primary" />
-            valor da última parcela do mês
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="inline-block size-2.5 rounded-sm bg-sage-500" />
-            liberado acumulado (fica livre depois desse mês)
-          </span>
-          <span>
-            {totalEncerramentos}{" "}
-            {totalEncerramentos === 1 ? "quitação prevista" : "quitações previstas"}{" "}
-            · total{" "}
-            <strong className="tabular-nums text-sage-700">
-              {formatBRL(totalLiberado)}
-            </strong>
-          </span>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function ResumoCard({
-  label,
-  valor,
-  hint,
-  destaque,
-}: {
-  label: string;
-  valor: string;
-  hint?: string;
-  destaque?: boolean;
-}) {
-  return (
-    <Card>
-      <div className="flex flex-col gap-2 p-5">
-        <p className="text-[11px] uppercase tracking-widest text-primary">
-          {label}
-        </p>
-        <p
-          className={`font-heading tabular-nums ${
-            destaque ? "text-primary" : ""
-          }`}
-          style={{ fontSize: "clamp(1.5rem, 3.5vw, 2rem)", lineHeight: 1 }}
-        >
-          {valor}
-        </p>
-        {hint && (
-          <p className="text-xs text-muted-foreground">{hint}</p>
-        )}
-      </div>
-    </Card>
   );
 }
