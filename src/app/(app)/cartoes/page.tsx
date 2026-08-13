@@ -78,7 +78,7 @@ export default async function CartoesPage({
             Cartões
           </h2>
           <p className="mt-1.5 max-w-[56ch] text-[15px] text-neutral-700">
-            Faturas de {mes.label}. Toque num cartão para abrir as compras.
+            Faturas de {mes.label}. Toque em &ldquo;Detalhes&rdquo; pra abrir as compras.
           </p>
         </div>
         <div className="flex items-center gap-2">

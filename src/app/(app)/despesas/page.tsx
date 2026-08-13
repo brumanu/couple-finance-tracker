@@ -78,11 +78,7 @@ export default async function DespesasPage({
     0,
   );
   const deltaPct =
-    totalAnterior > 0
-      ? ((total - totalAnterior) / totalAnterior) * 100
-      : total > 0
-        ? 100
-        : 0;
+    totalAnterior > 0 ? ((total - totalAnterior) / totalAnterior) * 100 : null;
 
   const grupos = new Map<string, DespesaRow[]>();
   for (const d of lista) {
@@ -133,13 +129,19 @@ export default async function DespesasPage({
           <div className="flex items-baseline gap-3">
             <p
               className={`font-heading tabular-nums ${
-                deltaPct <= 0 ? "text-sage-700" : "text-primary"
+                deltaPct === null || deltaPct <= 0
+                  ? "text-sage-700"
+                  : "text-primary"
               }`}
               style={{ fontSize: "clamp(2rem, 5vw, 2.375rem)", lineHeight: 1 }}
             >
-              {deltaPct === 0
-                ? "—"
-                : `${deltaPct > 0 ? "+" : "−"}${Math.abs(deltaPct).toFixed(0)}%`}
+              {deltaPct === null
+                ? total > 0
+                  ? "novo"
+                  : "—"
+                : deltaPct === 0
+                  ? "—"
+                  : `${deltaPct > 0 ? "+" : "−"}${Math.abs(deltaPct).toFixed(0)}%`}
             </p>
             <span className="text-[14px] text-neutral-700">
               {anterior.label} fechou em {formatBRL(totalAnterior)}

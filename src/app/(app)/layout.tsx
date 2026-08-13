@@ -22,12 +22,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         nomeCasal={session.casalNome}
       />
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <MobileHeader
           nomeCasal={session.casalNome}
           nomeUsuario={session.nome}
         />
-        <main className="flex-1 pb-44 md:pb-6">{children}</main>
+        <main className="min-w-0 flex-1 pb-44 md:pb-6">{children}</main>
       </div>
 
       <BottomNav />

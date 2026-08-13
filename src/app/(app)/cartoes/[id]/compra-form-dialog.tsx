@@ -156,6 +156,12 @@ export function CompraFormDialog({
     if (state.ok) setOpen(false);
   }, [state]);
 
+  const valorInvalido = useMemo(() => {
+    if (!valorRaw.trim()) return false;
+    const n = parseBRLInput(valorRaw);
+    return n === null || n <= 0;
+  }, [valorRaw]);
+
   const preview = useMemo(() => {
     const total = parseBRLInput(valorRaw);
     const parcelas = Number(parcelasRaw);
@@ -266,10 +272,16 @@ export function CompraFormDialog({
                 name="valor_total"
                 required
                 inputMode="decimal"
+                aria-invalid={valorInvalido}
                 value={valorRaw}
                 onChange={(e) => setValorRaw(e.target.value)}
                 placeholder="Ex: 1200,00"
               />
+              {valorInvalido && (
+                <p className="text-xs text-destructive">
+                  Digite um valor válido, ex: 1200,00.
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-2">
               <Label

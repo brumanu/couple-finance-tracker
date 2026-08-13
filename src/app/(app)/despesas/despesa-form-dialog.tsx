@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { hojeISO } from "@/lib/mes";
+import { parseBRLInput } from "@/lib/format";
 import { BancoIcone } from "@/lib/bancos-icones";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
@@ -101,6 +102,18 @@ export function DespesaFormDialog({
   const [parcelada, setParcelada] = useState(false);
   const [parcelasRaw, setParcelasRaw] = useState("2");
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
+  const [dataValue, setDataValue] = useState(defaults.data);
+  const [quinzena, setQuinzena] = useState(defaults.quinzena);
+  const [quinzenaTouched, setQuinzenaTouched] = useState(false);
+  const [valorRaw, setValorRaw] = useState(defaults.valor);
+
+  useEffect(() => setValorRaw(defaults.valor), [defaults.valor]);
+
+  const valorInvalido = useMemo(() => {
+    if (!valorRaw.trim()) return false;
+    const n = parseBRLInput(valorRaw);
+    return n === null || n <= 0;
+  }, [valorRaw]);
 
   useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
 
@@ -111,6 +124,19 @@ export function DespesaFormDialog({
       setParcelasRaw("2");
     }
   }, [isEdit, open]);
+
+  useEffect(() => {
+    setDataValue(defaults.data);
+    setQuinzena(defaults.quinzena);
+    setQuinzenaTouched(false);
+  }, [open, defaults.data, defaults.quinzena]);
+
+  function handleDataChange(novaData: string) {
+    setDataValue(novaData);
+    if (!quinzenaTouched && novaData) {
+      setQuinzena(inferQuinzena(novaData));
+    }
+  }
 
   useEffect(() => {
     if (cartaoId === NENHUM) {
@@ -177,9 +203,16 @@ export function DespesaFormDialog({
                 name="valor"
                 required
                 inputMode="decimal"
-                defaultValue={defaults.valor}
+                aria-invalid={valorInvalido}
+                value={valorRaw}
+                onChange={(e) => setValorRaw(e.target.value)}
                 placeholder="Ex: 250,00"
               />
+              {valorInvalido && (
+                <p className="text-xs text-destructive">
+                  Digite um valor válido, ex: 250,00.
+                </p>
+              )}
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="data" className="text-xs text-muted-foreground">
@@ -190,7 +223,8 @@ export function DespesaFormDialog({
                 name="data"
                 type="date"
                 required
-                defaultValue={defaults.data}
+                value={dataValue}
+                onChange={(e) => handleDataChange(e.target.value)}
               />
             </div>
           </div>
@@ -301,7 +335,15 @@ export function DespesaFormDialog({
                 >
                   Quinzena
                 </Label>
-                <Select name="quinzena" defaultValue={defaults.quinzena}>
+                <input type="hidden" name="quinzena" value={quinzena} />
+                <Select
+                  value={quinzena}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    setQuinzenaTouched(true);
+                    setQuinzena(v);
+                  }}
+                >
                   <SelectTrigger id="quinzena">
                     <SelectValue />
                   </SelectTrigger>

@@ -13,7 +13,7 @@ type Props = {
 
 export function MobileFab({ cartoes, categorias }: Props) {
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+env(safe-area-inset-bottom))] z-40 flex justify-end px-5 md:hidden">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+env(safe-area-inset-bottom))] z-40 flex justify-center md:hidden">
       <DespesaFormDialog
         cartoes={cartoes}
         categorias={categorias}
