@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/nav/sidebar";
 import { BottomNav } from "@/components/nav/bottom-nav";
 import { MobileHeader } from "@/components/nav/mobile-header";
 import { MobileFab } from "@/components/nav/mobile-fab";
+import { Toaster } from "@/components/ui/sonner";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const session = await requireSession();
@@ -31,6 +32,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
 
       <BottomNav />
       <MobileFab cartoes={cartoes} categorias={categorias} />
+      <Toaster />
     </div>
   );
 }

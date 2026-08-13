@@ -34,7 +34,7 @@ function parseFormData(formData: FormData): Parsed | string {
   if (!cartao_id) return "Cartão inválido.";
   if (!descricao) return "Descrição é obrigatória.";
   const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor < 0) return "Valor inválido.";
+  if (valor === null || valor <= 0) return "Valor deve ser maior que zero.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data_compra)) return "Data inválida.";
   if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > 60)
     return "Parcelas inválidas (1 a 60).";
@@ -140,7 +140,7 @@ export async function deleteCompra(id: string, cartaoId: string) {
     .from("compras_cartao")
     .delete()
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
   revalidatePath("/");

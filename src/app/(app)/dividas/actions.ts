@@ -72,7 +72,7 @@ export async function updateDivida(
 export async function deleteDivida(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("dividas").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/dividas");
   revalidatePath("/");
 }

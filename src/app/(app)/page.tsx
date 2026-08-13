@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { mesProximo, parseMesParam, type MesRef } from "@/lib/mes";
+import { hojeISO, mesProximo, parseMesParam, type MesRef } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import {
   faturaDoMes,
@@ -139,7 +139,7 @@ export default async function DashboardPage({
   const mesParam = typeof params.mes === "string" ? params.mes : undefined;
   const mes = parseMesParam(mesParam);
 
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeISO();
   const hojeDia = Number(hoje.slice(8, 10));
   const noMesAtual =
     hoje.slice(0, 7) === `${mes.ano}-${String(mes.mes).padStart(2, "0")}`;
@@ -153,6 +153,15 @@ export default async function DashboardPage({
   }
   const primeiroDiaRange = mesesHistorico[0].primeiroDia;
   const ultimoDiaRange = mesesHistorico[mesesHistorico.length - 1].ultimoDia;
+
+  // Cutoff for compras_cartao: a purchase from more than 60 months before the
+  // earliest displayed month can't have active installments (max parcelas = 60).
+  const cutoffDate = new Date(
+    mesesHistorico[0].ano,
+    mesesHistorico[0].mes - 1 - 60,
+    1,
+  );
+  const comprasCutoff = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, "0")}-01`;
 
   const [
     rendasRes,
@@ -192,7 +201,8 @@ export default async function DashboardPage({
       .from("compras_cartao")
       .select(
         "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria",
-      ),
+      )
+      .gte("data_compra", comprasCutoff),
     supabase.from("bancos").select("id, nome, cor, icone"),
     supabase.from("dividas").select("id, descricao, valor_total"),
     supabase.from("pagamentos_divida").select("divida_id, valor"),
@@ -486,7 +496,7 @@ export default async function DashboardPage({
                 </p>
                 <p className="text-sm text-accent-800/85">
                   {contasEmAtraso.length === 1
-                    ? `${formatBRL(pagamentosMes.get(contasEmAtraso[0].id)?.valor ?? contasEmAtraso[0].valor_previsto)} · vencimento dia ${contasEmAtraso[0].dia_vencimento}`
+                    ? `${formatBRL(contasEmAtraso[0].valor_previsto)} · vencimento dia ${contasEmAtraso[0].dia_vencimento}`
                     : contasEmAtraso.map((c) => c.descricao).join(", ")}
                 </p>
               </div>
@@ -1174,7 +1184,7 @@ const MESES_PT = [
 ];
 
 function saudacaoContexto(hojeDia: number): string {
-  const agora = new Date();
+  const agora = new Date(hojeISO() + "T12:00:00"); // noon to avoid DST edge cases
   const dia = DIAS_PT[agora.getDay()];
   const mes = MESES_PT[agora.getMonth()];
   const nDia = agora.getDate();

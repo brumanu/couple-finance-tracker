@@ -8,7 +8,9 @@ import { Card } from "@/components/ui/card";
 import { mesAtual, buildMes } from "@/lib/mes";
 import {
   mesPrimeiraParcela,
+  parcelaNoMes,
   valoresParcelas,
+  type CompraCartaoInfo,
 } from "@/lib/cartao-calc";
 import {
   RelatorioComprasParceladasClient,
@@ -101,34 +103,60 @@ export default async function RelatorioComprasParceladasPage() {
     const diaFech = cartao?.dia_fechamento ?? 1;
     const primeira = mesPrimeiraParcela(c.data_compra, diaFech);
     const valores = valoresParcelas(Number(c.valor_total), c.parcelas);
+    const valorUltimaParcela = valores[c.parcelas - 1];
 
-    const diffMeses =
-      (hoje.ano - primeira.ano) * 12 + (hoje.mes - primeira.mes);
-    const parcelaAtual =
-      diffMeses < 0 ? 0 : Math.min(c.parcelas, diffMeses + 1);
-    const pagasReal = Math.max(
-      c.parcelas_ja_pagas ?? 0,
-      Math.max(0, parcelaAtual - 1),
-    );
-    const parcelasRestantes = Math.max(0, c.parcelas - pagasReal);
-    const faltaPagar = valores
-      .slice(pagasReal)
-      .reduce((s, v) => s + v, 0);
+    // Use parcelaNoMes for consistent calculation with the dashboard
+    const compraInfo: CompraCartaoInfo = {
+      id: c.id,
+      cartao_id: c.cartao_id,
+      descricao: c.descricao,
+      valor_total: c.valor_total,
+      data_compra: c.data_compra,
+      parcelas: c.parcelas,
+      parcelas_ja_pagas: c.parcelas_ja_pagas ?? undefined,
+      categoria: c.categoria,
+    };
+    const infoHoje = parcelaNoMes(compraInfo, diaFech, hoje);
 
+    // Compute última parcela month
     const totalMesesUltima = primeira.mes + c.parcelas - 1;
     const anoUltima = primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
     const mesUltima = ((totalMesesUltima - 1) % 12) + 1;
     const ultima = buildMes(anoUltima, mesUltima);
 
-    const valorParcela =
-      parcelaAtual >= 1 && parcelaAtual <= c.parcelas
-        ? valores[parcelaAtual - 1]
-        : valores[0];
-    const valorUltimaParcela = valores[c.parcelas - 1];
+    let parcelaAtual: number;
+    let valorParcela: number;
+    let faltaPagar: number;
+    let parcelasRestantes: number;
+    let status: LinhaRelatorio["status"];
 
-    let status: LinhaRelatorio["status"] = "ativa";
-    if (parcelaAtual === 0) status = "aguardando";
-    else if (pagasReal >= c.parcelas) status = "quitada";
+    if (infoHoje) {
+      // Active installment this month
+      parcelaAtual = infoHoje.numero;
+      valorParcela = infoHoje.valor;
+      faltaPagar = Number((infoHoje.valor + infoHoje.restanteAposEste).toFixed(2));
+      parcelasRestantes = c.parcelas - infoHoje.numero + 1;
+      status = "ativa";
+    } else {
+      // No active installment: either hasn't started or already finished
+      const diffMeses =
+        (hoje.ano - primeira.ano) * 12 + (hoje.mes - primeira.mes);
+      if (diffMeses < 0) {
+        // Purchase hasn't started billing yet
+        status = "aguardando";
+        parcelaAtual = 1;
+        valorParcela = valores[0];
+        faltaPagar = Number(Number(c.valor_total).toFixed(2));
+        parcelasRestantes = c.parcelas;
+      } else {
+        // All installments done
+        status = "quitada";
+        parcelaAtual = c.parcelas;
+        valorParcela = valorUltimaParcela;
+        faltaPagar = 0;
+        parcelasRestantes = 0;
+      }
+    }
 
     return {
       id: c.id,
@@ -143,10 +171,10 @@ export default async function RelatorioComprasParceladasPage() {
       dataCompra: c.data_compra,
       valorTotal: Number(c.valor_total),
       parcelas: c.parcelas,
-      parcelaAtual: Math.max(1, parcelaAtual),
+      parcelaAtual,
       valorParcela,
       valorUltimaParcela,
-      faltaPagar: Number(faltaPagar.toFixed(2)),
+      faltaPagar,
       parcelasRestantes,
       primeiraChave: `${primeira.ano}-${pad2(primeira.mes)}`,
       primeiraLabel: labelMesAbrev(primeira.ano, primeira.mes),

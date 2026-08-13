@@ -50,7 +50,7 @@ export default async function DespesasPage({
     supabase
       .from("lancamentos")
       .select(
-        "id, descricao, valor, data_pagamento, quinzena, categoria, categoria_id",
+        "id, descricao, valor, data_pagamento, data_referencia, quinzena, categoria, categoria_id",
       )
       .eq("tipo", "despesa_avulsa")
       .gte("data_referencia", mes.primeiroDia)
@@ -86,7 +86,7 @@ export default async function DespesasPage({
 
   const grupos = new Map<string, DespesaRow[]>();
   for (const d of lista) {
-    const key = d.data_pagamento;
+    const key = d.data_pagamento ?? d.data_referencia ?? "sem-data";
     if (!grupos.has(key)) grupos.set(key, []);
     grupos.get(key)!.push(d);
   }
@@ -165,7 +165,7 @@ export default async function DespesasPage({
               <section key={data} className="flex flex-col gap-3">
                 <div className="flex items-baseline justify-between px-1.5">
                   <h3 className="font-heading text-[19px]">
-                    {formatDataLonga(data)}
+                    {/^\d{4}-\d{2}-\d{2}$/.test(data) ? formatDataLonga(data) : "Sem data"}
                   </h3>
                   <p className="tabular-nums text-[14px] text-neutral-700">
                     {formatBRL(totalDia)}

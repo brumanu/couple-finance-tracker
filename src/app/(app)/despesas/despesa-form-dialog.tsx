@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { hojeISO } from "@/lib/mes";
 import { BancoIcone } from "@/lib/bancos-icones";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
@@ -35,7 +36,8 @@ export type DespesaRow = {
   id: string;
   descricao: string;
   valor: number | string;
-  data_pagamento: string;
+  data_pagamento: string | null;
+  data_referencia: string | null;
   quinzena: number | null;
   categoria: string | null;
   categoria_id: string | null;
@@ -52,9 +54,7 @@ const INITIAL_STATE: DespesaFormState = {};
 
 const NENHUM = "__nenhum__";
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+const todayISO = hojeISO;
 
 function inferQuinzena(dateISO: string): "15" | "30" {
   const day = Number(dateISO.slice(8, 10));
@@ -153,7 +153,7 @@ export function DespesaFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="flex flex-col gap-4">
+        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="descricao" className="text-xs text-muted-foreground">
               Descrição

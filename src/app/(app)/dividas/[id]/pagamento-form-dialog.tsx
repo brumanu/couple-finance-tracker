@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatBRL } from "@/lib/format";
+import { hojeISO } from "@/lib/mes";
 import {
   createPagamento,
   type PagamentoDividaFormState,
@@ -27,9 +28,7 @@ type Props = {
 
 const INITIAL_STATE: PagamentoDividaFormState = {};
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+const todayISO = hojeISO;
 
 export function PagamentoFormDialog({ dividaId, restante }: Props) {
   const [open, setOpen] = useState(false);
@@ -72,7 +71,7 @@ export function PagamentoFormDialog({ dividaId, restante }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="flex flex-col gap-4">
+        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="divida_id" value={dividaId} />
 
           <div className="grid grid-cols-2 gap-3">

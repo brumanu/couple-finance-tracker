@@ -110,7 +110,7 @@ export function BancoFormDialog({ banco, trigger }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="flex flex-col gap-4">
+        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="icone" value={icone} />
 
           <div className="flex flex-col gap-2">

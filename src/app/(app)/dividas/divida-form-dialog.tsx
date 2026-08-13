@@ -75,7 +75,7 @@ export function DividaFormDialog({ divida, trigger }: Props) {
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="flex flex-col gap-4">
+        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="descricao" className="text-xs text-muted-foreground">
               Descrição

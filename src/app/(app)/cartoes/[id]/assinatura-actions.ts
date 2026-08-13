@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
 import { resolverCategoria } from "@/lib/categorias-server";
+import { hojeISO } from "@/lib/mes";
 
 export type AssinaturaFormState = { error?: string; ok?: boolean };
 
@@ -24,7 +25,7 @@ function parseFormData(formData: FormData): Parsed | string {
   const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
   const inicio_vigencia =
     String(formData.get("inicio_vigencia") ?? "").trim() ||
-    new Date().toISOString().slice(0, 10);
+    hojeISO();
   const fimRaw = String(formData.get("fim_vigencia") ?? "").trim();
   const fim_vigencia = fimRaw || null;
   const ativa =
@@ -33,7 +34,7 @@ function parseFormData(formData: FormData): Parsed | string {
   if (!cartao_id) return "Cartão inválido.";
   if (!descricao) return "Descrição é obrigatória.";
   const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor < 0) return "Valor mensal inválido.";
+  if (valor === null || valor <= 0) return "Valor mensal deve ser maior que zero.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio_vigencia))
     return "Data de início inválida.";
   if (fim_vigencia && !/^\d{4}-\d{2}-\d{2}$/.test(fim_vigencia))
@@ -133,7 +134,7 @@ export async function deleteAssinatura(id: string, cartaoId: string) {
     .from("assinaturas_cartao")
     .delete()
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
   revalidatePath("/");
@@ -149,7 +150,7 @@ export async function toggleAssinaturaAtiva(
     .from("assinaturas_cartao")
     .update({ ativa })
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
   revalidatePath("/");
@@ -158,12 +159,12 @@ export async function toggleAssinaturaAtiva(
 /** Encerra a assinatura setando fim_vigencia como hoje. */
 export async function cancelarAssinatura(id: string, cartaoId: string) {
   const supabase = await createClient();
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeISO();
   const { error } = await supabase
     .from("assinaturas_cartao")
     .update({ fim_vigencia: hoje })
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
   revalidatePath("/");

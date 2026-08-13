@@ -22,7 +22,7 @@ function parseFormData(formData: FormData): {
 
   if (!descricao) return "Descrição é obrigatória.";
   const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor < 0) return "Valor inválido.";
+  if (valor === null || valor <= 0) return "Valor deve ser maior que zero.";
   if (dia !== 15 && dia !== 30) return "Dia de recebimento inválido.";
 
   return {
@@ -86,7 +86,7 @@ export async function updateRenda(
 export async function deleteRenda(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("rendas").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/rendas");
   revalidatePath("/");
 }
@@ -94,7 +94,7 @@ export async function deleteRenda(id: string) {
 export async function toggleRendaAtiva(id: string, ativa: boolean) {
   const supabase = await createClient();
   const { error } = await supabase.from("rendas").update({ ativa }).eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/rendas");
   revalidatePath("/");
 }

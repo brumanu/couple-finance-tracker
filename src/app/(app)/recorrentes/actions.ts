@@ -30,7 +30,7 @@ function parseFormData(formData: FormData): Parsed | string {
 
   if (!descricao) return "Descrição é obrigatória.";
   const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor < 0) return "Valor inválido.";
+  if (valor === null || valor <= 0) return "Valor deve ser maior que zero.";
   if (quinzena !== 15 && quinzena !== 30) return "Quinzena inválida.";
 
   let dia_vencimento: number | null = null;
@@ -130,7 +130,7 @@ export async function deleteRecorrente(id: string) {
     .from("contas_recorrentes")
     .delete()
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/recorrentes");
   revalidatePath("/");
 }
@@ -141,7 +141,7 @@ export async function toggleRecorrenteAtiva(id: string, ativa: boolean) {
     .from("contas_recorrentes")
     .update({ ativa })
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/recorrentes");
   revalidatePath("/");
 }

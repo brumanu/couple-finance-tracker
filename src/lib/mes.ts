@@ -30,9 +30,16 @@ function ultimoDiaMes(ano: number, mes: number): number {
   return new Date(ano, mes, 0).getDate();
 }
 
+/** Returns today's date as YYYY-MM-DD using America/Sao_Paulo timezone. */
+export function hojeISO(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+}
+
 export function mesAtual(): MesRef {
-  const now = new Date();
-  return buildMes(now.getFullYear(), now.getMonth() + 1);
+  const hoje = hojeISO(); // "YYYY-MM-DD"
+  const ano = Number(hoje.slice(0, 4));
+  const mes = Number(hoje.slice(5, 7));
+  return buildMes(ano, mes);
 }
 
 export function buildMes(ano: number, mes: number): MesRef {

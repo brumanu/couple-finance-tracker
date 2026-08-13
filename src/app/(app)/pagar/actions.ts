@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
+import { hojeISO } from "@/lib/mes";
 
 export type PagarFormState = { error?: string; ok?: boolean };
 
@@ -16,11 +17,11 @@ export async function pagarContaRecorrente(
   const valorRaw = String(formData.get("valor") ?? "").trim();
   const dataPagamento =
     String(formData.get("data_pagamento") ?? "").trim() ||
-    new Date().toISOString().slice(0, 10);
+    hojeISO();
   const descricao = String(formData.get("descricao") ?? "").trim();
 
   const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor < 0) return { error: "Valor inválido." };
+  if (valor === null || valor <= 0) return { error: "Valor deve ser maior que zero." };
   if (!descricao) return { error: "Descrição obrigatória." };
 
   const supabase = await createClient();
@@ -60,6 +61,6 @@ export async function desmarcarPagamento(lancamentoId: string) {
     .from("lancamentos")
     .delete()
     .eq("id", lancamentoId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/");
 }

@@ -104,7 +104,7 @@ export async function updateCartao(
 export async function deleteCartao(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("cartoes").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/cartoes");
   revalidatePath("/");
 }
@@ -115,7 +115,7 @@ export async function toggleCartaoAtivo(id: string, ativo: boolean) {
     .from("cartoes")
     .update({ ativo })
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/cartoes");
   revalidatePath("/");
 }

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { hojeISO } from "@/lib/mes";
 import { pagarContaRecorrente, type PagarFormState } from "./actions";
 
 type Props = {
@@ -45,7 +46,7 @@ export function PagarDialog({
   const defaults = useMemo(
     () => ({
       valor: Number(valorPrevisto).toFixed(2).replace(".", ","),
-      dataHoje: new Date().toISOString().slice(0, 10),
+      dataHoje: hojeISO(),
       descricao,
     }),
     [valorPrevisto, descricao],
@@ -74,7 +75,7 @@ export function PagarDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="flex flex-col gap-4">
+        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <Label htmlFor="descricao">Descrição</Label>
             <Input

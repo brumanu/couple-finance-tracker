@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatBRL, parseBRLInput } from "@/lib/format";
 import { mesPrimeiraParcela, valoresParcelas } from "@/lib/cartao-calc";
-import { buildMes } from "@/lib/mes";
+import { buildMes, hojeISO } from "@/lib/mes";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import {
@@ -62,9 +62,7 @@ const MESES_PT_ABREV = [
   "Dez",
 ];
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+const todayISO = hojeISO;
 
 // Se o usuário marcar "compra em andamento" com parcela atual X, a
 // primeira parcela ativa (X) deve cair no mês corrente. Backfilla a
@@ -239,7 +237,7 @@ export function CompraFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="flex flex-col gap-4">
+        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="cartao_id" value={cartaoId} />
 
           <div className="flex flex-col gap-2">

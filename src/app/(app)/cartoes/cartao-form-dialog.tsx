@@ -124,7 +124,7 @@ export function CartaoFormDialog({ cartao, bancos, trigger }: Props) {
             Você precisa cadastrar um banco antes de criar um cartão.
           </p>
         ) : (
-          <form action={formAction} className="flex flex-col gap-4">
+          <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
             <input type="hidden" name="banco_id" value={bancoId} />
             <div className="flex flex-col gap-2">
               <Label htmlFor="banco_id" className="text-xs text-muted-foreground">

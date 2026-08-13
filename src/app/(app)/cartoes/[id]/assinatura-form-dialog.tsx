@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { hojeISO } from "@/lib/mes";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import {
@@ -43,9 +44,7 @@ type Props = {
 
 const INITIAL_STATE: AssinaturaFormState = {};
 
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+const todayISO = hojeISO;
 
 export function AssinaturaFormDialog({
   cartaoId,
@@ -115,7 +114,7 @@ export function AssinaturaFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form action={formAction} className="flex flex-col gap-4">
+        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="cartao_id" value={cartaoId} />
 
           <div className="flex flex-col gap-2">

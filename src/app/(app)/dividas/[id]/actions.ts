@@ -68,7 +68,7 @@ export async function deletePagamento(id: string, dividaId: string) {
     .from("pagamentos_divida")
     .delete()
     .eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/dividas/${dividaId}`);
   revalidatePath("/dividas");
   revalidatePath("/");

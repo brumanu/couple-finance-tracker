@@ -78,7 +78,7 @@ export function valoresParcelas(
   const base = Math.floor((valorTotal * 100) / parcelas) / 100;
   const cents = Math.round(valorTotal * 100);
   const somaBase = Math.round(base * 100) * (parcelas - 1);
-  const ultima = (cents - somaBase) / 100;
+  const ultima = Math.max(0, (cents - somaBase) / 100);
   const arr = Array(parcelas - 1).fill(base);
   arr.push(Number(ultima.toFixed(2)));
   return arr;

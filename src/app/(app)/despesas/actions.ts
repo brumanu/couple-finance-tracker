@@ -36,7 +36,7 @@ function parseFormData(formData: FormData): ParsedInput | string {
 
   if (!descricao) return "Descrição é obrigatória.";
   const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor < 0) return "Valor inválido.";
+  if (valor === null || valor <= 0) return "Valor deve ser maior que zero.";
   if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return "Data inválida.";
 
   // Vinculado a cartão → compra à vista (parcelas=1) OU parcelada
@@ -178,7 +178,7 @@ export async function updateDespesa(
 export async function deleteDespesa(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("lancamentos").delete().eq("id", id);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath("/despesas");
   revalidatePath("/");
 }

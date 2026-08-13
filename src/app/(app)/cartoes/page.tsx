@@ -195,6 +195,11 @@ export default async function CartoesPage({
                             .filter(Boolean)
                             .join(" · ")}
                     </p>
+                    {!c.ativo && fatura.total > 0 && (
+                      <p className="mt-1 text-[11px] text-primary/80">
+                        (n\u00e3o contabilizado no dashboard)
+                      </p>
+                    )}
                   </div>
                   <Button
                     variant="ghost"
