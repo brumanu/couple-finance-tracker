@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { CreditCardIcon, ChevronRightIcon, RepeatIcon } from "lucide-react";
+import {
+  CreditCardIcon,
+  ChevronRightIcon,
+  RepeatIcon,
+  PieChartIcon,
+} from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 
@@ -11,6 +16,13 @@ type Relatorio = {
 };
 
 const RELATORIOS: Relatorio[] = [
+  {
+    href: "/relatorios/gastos-por-categoria",
+    titulo: "Gastos por categoria",
+    descricao:
+      "Despesas avulsas, contas fixas, compras no cartão e assinaturas do mês, agrupados por categoria.",
+    Icon: PieChartIcon,
+  },
   {
     href: "/relatorios/compras-parceladas",
     titulo: "Compras parceladas",

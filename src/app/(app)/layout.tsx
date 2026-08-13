@@ -27,7 +27,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           nomeCasal={session.casalNome}
           nomeUsuario={session.nome}
         />
-        <main className="flex-1 pb-28 md:pb-6">{children}</main>
+        <main className="flex-1 pb-44 md:pb-6">{children}</main>
       </div>
 
       <BottomNav />

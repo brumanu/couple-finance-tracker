@@ -87,7 +87,7 @@ export default async function DividaDetailPage({
             Total {formatBRL(total)}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           <EditDividaTrigger divida={divida} />
           <DividaActionsMenu id={divida.id} descricao={divida.descricao} />
         </div>
@@ -95,29 +95,29 @@ export default async function DividaDetailPage({
 
       <Card className={quitada ? "" : "border-primary/40 bg-primary/5"}>
         <div className="flex flex-col gap-4 p-6">
-          <div className="grid grid-cols-3 gap-4">
-            <div>
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
+            <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 Total
               </p>
-              <p className="font-heading text-xl tabular-nums">
+              <p className="font-heading text-lg tabular-nums md:text-xl">
                 {formatBRL(total)}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 Pago
               </p>
-              <p className="font-heading text-xl tabular-nums text-sage-700">
+              <p className="font-heading text-lg tabular-nums text-sage-700 md:text-xl">
                 {formatBRL(pago)}
               </p>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 Falta
               </p>
               <p
-                className={`font-heading text-xl tabular-nums ${
+                className={`font-heading text-lg tabular-nums md:text-xl ${
                   quitada ? "text-sage-700" : "text-primary"
                 }`}
               >

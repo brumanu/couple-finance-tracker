@@ -26,27 +26,27 @@ export function MobileHeader({ nomeCasal, nomeUsuario }: Props) {
           {nomeCasal}
         </p>
       </div>
-      <div className="flex items-center gap-1">
+      <div className="flex items-center">
         <Link
           href="/relatorios"
           aria-label="Relatórios"
-          className="rounded-full p-2 text-neutral-700 hover:bg-neutral-200 hover:text-foreground"
+          className="flex size-11 items-center justify-center rounded-full text-neutral-700 hover:bg-neutral-200 hover:text-foreground"
         >
           <BarChart3Icon className="size-[18px]" strokeWidth={2.75} />
         </Link>
         <Link
           href="/categorias"
           aria-label="Categorias"
-          className="rounded-full p-2 text-neutral-700 hover:bg-neutral-200 hover:text-foreground"
+          className="flex size-11 items-center justify-center rounded-full text-neutral-700 hover:bg-neutral-200 hover:text-foreground"
         >
           <TagIcon className="size-[18px]" strokeWidth={2.75} />
         </Link>
-        <ThemeToggle />
+        <ThemeToggle className="size-11 justify-center p-0" />
         <form action={signOut}>
           <button
             type="submit"
             aria-label="Sair"
-            className="rounded-full p-2 text-neutral-700 hover:bg-neutral-200 hover:text-foreground"
+            className="flex size-11 items-center justify-center rounded-full text-neutral-700 hover:bg-neutral-200 hover:text-foreground"
           >
             <LogOutIcon className="size-[18px]" strokeWidth={2.75} />
           </button>

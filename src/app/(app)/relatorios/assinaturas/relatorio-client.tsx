@@ -144,7 +144,7 @@ export function RelatorioAssinaturasClient({
                 <SelectTrigger id="f-cartao" className="w-full">
                   <SelectValue>
                     {cartaoSelecionado ? (
-                      <span className="inline-flex items-center gap-2">
+                      <span className="inline-flex min-w-0 items-center gap-2">
                         <BancoIcone
                           icone={cartaoSelecionado.bancoIcone}
                           corFallback={cartaoSelecionado.bancoCor}
