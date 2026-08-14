@@ -101,6 +101,7 @@ const HISTORICO_MESES = 6;
 
 type CalcMes = {
   totalRenda: number;
+  totalRendaExtra: number;
   totalContasRec: number;
   totalCartoes: number;
   totalDespesas: number;
@@ -113,6 +114,7 @@ type CalcQuinzena = CalcMes & {
   contas: RecorrenteRow[];
   despesas: LancamentoRow[];
   faturas: FaturaResumo[];
+  rendasExtra: LancamentoRow[];
 };
 
 type FaturaResumo = {
@@ -319,7 +321,7 @@ export default async function DashboardPage({
         pagosMes.set(l.conta_recorrente_id, l);
       }
     }
-    const totalRenda = rendas.reduce(
+    const totalRendaFixa = rendas.reduce(
       (s, r) => s + Number(r.valor_previsto),
       0,
     );
@@ -331,8 +333,13 @@ export default async function DashboardPage({
     const totalDespesas = lancsMes
       .filter((l) => l.tipo === "despesa_avulsa")
       .reduce((s, l) => s + Number(l.valor), 0);
+    const totalRendaExtra = lancsMes
+      .filter((l) => l.tipo === "renda_extra")
+      .reduce((s, l) => s + Number(l.valor), 0);
+    const totalRenda = totalRendaFixa + totalRendaExtra;
     return {
       totalRenda,
+      totalRendaExtra,
       totalContasRec,
       totalCartoes,
       totalDespesas,
@@ -356,8 +363,11 @@ export default async function DashboardPage({
     const despesasQ = lancsMes.filter(
       (l) => l.tipo === "despesa_avulsa" && l.quinzena === q,
     );
+    const rendasExtraQ = lancsMes.filter(
+      (l) => l.tipo === "renda_extra" && l.quinzena === q,
+    );
     const faturasQ = faturas.filter((f) => f.quinzena === q);
-    const totalRenda = rendasQ.reduce(
+    const totalRendaFixa = rendasQ.reduce(
       (s, r) => s + Number(r.valor_previsto),
       0,
     );
@@ -367,13 +377,20 @@ export default async function DashboardPage({
     }, 0);
     const totalCartoes = faturasQ.reduce((s, f) => s + f.total, 0);
     const totalDespesas = despesasQ.reduce((s, l) => s + Number(l.valor), 0);
+    const totalRendaExtra = rendasExtraQ.reduce(
+      (s, l) => s + Number(l.valor),
+      0,
+    );
+    const totalRenda = totalRendaFixa + totalRendaExtra;
     return {
       quinzena: q,
       rendas: rendasQ,
       contas: contasQ,
       despesas: despesasQ,
       faturas: faturasQ,
+      rendasExtra: rendasExtraQ,
       totalRenda,
+      totalRendaExtra,
       totalContasRec,
       totalCartoes,
       totalDespesas,
@@ -399,6 +416,11 @@ export default async function DashboardPage({
   }
   const despesasAvulsasMes = lancsMesAtual
     .filter((l) => l.tipo === "despesa_avulsa")
+    .sort((a, b) =>
+      (b.data_pagamento ?? "").localeCompare(a.data_pagamento ?? ""),
+    );
+  const rendaExtraMes = lancsMesAtual
+    .filter((l) => l.tipo === "renda_extra")
     .sort((a, b) =>
       (b.data_pagamento ?? "").localeCompare(a.data_pagamento ?? ""),
     );
@@ -519,6 +541,10 @@ export default async function DashboardPage({
             <UltimasDespesasCard despesas={despesasAvulsasMes.slice(0, 6)} />
           </div>
 
+          {dadosMes.totalRendaExtra > 0 && (
+            <RendaExtraMesCard itens={rendaExtraMes} />
+          )}
+
           {dividasAbertas.length > 0 && (
             <DividasCard
               total={totalDividas}
@@ -573,6 +599,9 @@ function SobraMesHeroCard({
           {dados.saldo >= 0
             ? "É o que sobra depois de contas, cartões e despesas do mês."
             : "O previsto já supera as entradas do mês — atenção aos próximos gastos."}
+          {dados.totalRendaExtra > 0
+            ? ` Inclui ${formatBRL(dados.totalRendaExtra)} de renda extra.`
+            : ""}
         </p>
       </div>
 
@@ -1153,6 +1182,43 @@ function UltimasDespesasCard({ despesas }: { despesas: LancamentoRow[] }) {
           </ul>
         </div>
       )}
+    </section>
+  );
+}
+
+function RendaExtraMesCard({ itens }: { itens: LancamentoRow[] }) {
+  const total = itens.reduce((s, r) => s + Number(r.valor), 0);
+  return (
+    <section className="flex flex-col gap-3.5">
+      <div className="flex items-baseline justify-between px-1">
+        <h3 className="font-heading text-[22px]">Renda extra no mês</h3>
+        <span className="tabular-nums text-[13px] font-medium text-sage-700">
+          + {formatBRL(total)}
+        </span>
+      </div>
+      <div className="rounded-[26px] border border-sage-300 bg-sage-100 px-6">
+        <ul className="flex flex-col divide-y divide-sage-300/60">
+          {itens.map((r) => (
+            <li key={r.id} className="flex items-center gap-3.5 py-3.5">
+              <div className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-sage-300 font-heading text-xs text-sage-800">
+                {r.descricao[0]?.toUpperCase() ?? "?"}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[15px] font-semibold">
+                  {r.descricao}
+                </p>
+                <p className="text-[13px] text-sage-800/80">
+                  {r.data_pagamento ? formatDataCurta(r.data_pagamento) : ""}
+                  {r.categoria ? ` · ${r.categoria}` : ""}
+                </p>
+              </div>
+              <span className="tabular-nums text-[15px] font-medium text-sage-700">
+                + {formatBRL(r.valor)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
     </section>
   );
 }

@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOutIcon } from "lucide-react";
+import { LogOutIcon, SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
 import { signOut } from "@/lib/auth-actions";
 import { LinkPendingDot } from "./link-pending-dot";
 import { ThemeToggle } from "./theme-toggle";
+import { useSearch } from "@/components/search/search-provider";
+import { PushToggleButton } from "@/components/push/push-toggle-button";
 
 type Props = {
   nomeUsuario: string;
@@ -26,6 +28,7 @@ function iniciais(nome: string): string {
 
 export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
   const pathname = usePathname();
+  const { setOpen: setSearchOpen } = useSearch();
 
   return (
     <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:bg-sidebar md:px-[18px] md:py-7 md:text-sidebar-foreground">
@@ -33,6 +36,18 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
         <h1 className="font-heading text-[21px] leading-none">Financeiro</h1>
         <p className="mt-1 text-[13px] text-neutral-700">{nomeCasal}</p>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setSearchOpen(true)}
+        className="flex w-full items-center gap-2.5 rounded-full bg-sidebar-accent/50 px-4 py-2.5 text-[14px] text-neutral-700 transition-colors hover:bg-sidebar-accent hover:text-foreground"
+      >
+        <SearchIcon className="size-[16px] shrink-0" strokeWidth={2.75} />
+        <span className="flex-1 text-left">Buscar</span>
+        <span className="shrink-0 rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] tracking-wide text-muted-foreground">
+          ⌘K
+        </span>
+      </button>
 
       <nav className="flex flex-1 flex-col gap-1.5">
         {NAV_ITEMS.map((item) => {
@@ -80,6 +95,7 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
           <p className="truncate text-[13px] font-semibold">{nomeUsuario}</p>
           <p className="truncate text-xs text-neutral-700">{emailUsuario}</p>
         </div>
+        <PushToggleButton />
         <ThemeToggle />
         <form action={signOut}>
           <button

@@ -1,7 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import { LogOutIcon, TagIcon, BarChart3Icon } from "lucide-react";
+import { LogOutIcon, TagIcon, BarChart3Icon, SearchIcon } from "lucide-react";
 import { signOut } from "@/lib/auth-actions";
 import { ThemeToggle } from "./theme-toggle";
+import { useSearch } from "@/components/search/search-provider";
+import { PushToggleButton } from "@/components/push/push-toggle-button";
 
 type Props = {
   nomeCasal: string;
@@ -18,6 +22,8 @@ function iniciais(nome: string): string {
 }
 
 export function MobileHeader({ nomeCasal, nomeUsuario }: Props) {
+  const { setOpen: setSearchOpen } = useSearch();
+
   return (
     <header className="flex items-center justify-between px-5 pt-6 pb-2 md:hidden">
       <div className="min-w-0">
@@ -27,6 +33,14 @@ export function MobileHeader({ nomeCasal, nomeUsuario }: Props) {
         </p>
       </div>
       <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label="Buscar"
+          className="flex size-11 items-center justify-center rounded-full text-neutral-700 hover:bg-neutral-200 hover:text-foreground"
+        >
+          <SearchIcon className="size-[18px]" strokeWidth={2.75} />
+        </button>
         <Link
           href="/relatorios"
           aria-label="Relatórios"
@@ -41,6 +55,7 @@ export function MobileHeader({ nomeCasal, nomeUsuario }: Props) {
         >
           <TagIcon className="size-[18px]" strokeWidth={2.75} />
         </Link>
+        <PushToggleButton className="size-11 justify-center p-0" />
         <ThemeToggle className="size-11 justify-center p-0" />
         <form action={signOut}>
           <button
