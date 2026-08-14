@@ -39,6 +39,8 @@ type ContaRow = {
   descricao: string;
   valor_previsto: number | string;
   ativa: boolean;
+  inicio_vigencia: string;
+  fim_vigencia: string | null;
 };
 
 type CartaoRow = {
@@ -129,7 +131,9 @@ export default async function RelatorioComprometimentoFuturoPage({
         .eq("ativa", true),
       supabase
         .from("contas_recorrentes")
-        .select("id, descricao, valor_previsto, ativa")
+        .select(
+          "id, descricao, valor_previsto, ativa, inicio_vigencia, fim_vigencia",
+        )
         .eq("ativa", true),
       supabase.from("cartoes").select("id, dia_fechamento"),
       supabase
@@ -147,12 +151,6 @@ export default async function RelatorioComprometimentoFuturoPage({
   const pagamentos = (pagRes.data ?? []) as PagamentoRow[];
 
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
-
-  // Contas fixas: mesmo valor todo mês, enquanto ativa=true (sem vigência).
-  const contasTotal = contas.reduce(
-    (s, c) => s + Number(c.valor_previsto),
-    0,
-  );
 
   let mesMaisDistanteChave: string | null = null;
   let mesMaisDistanteLabel: string | null = null;
@@ -206,6 +204,18 @@ export default async function RelatorioComprometimentoFuturoPage({
       if (assinaturaAtivaNoMes(assinaturaInfo, mes)) {
         assinaturasTotal += Number(a.valor_mensal);
       }
+    }
+
+    // Contas fixas: mesmo valor todo mês, mas só enquanto vigente nesse mês
+    // (contas_recorrentes tem inicio_vigencia/fim_vigencia, igual às
+    // assinaturas — não é só "ativa=true pra sempre").
+    let contasTotal = 0;
+    for (const c of contas) {
+      const vigente =
+        c.inicio_vigencia <= mes.ultimoDia &&
+        (c.fim_vigencia === null || c.fim_vigencia >= mes.primeiroDia);
+      if (!vigente) continue;
+      contasTotal += Number(c.valor_previsto);
     }
 
     const total = comprasTotal + assinaturasTotal + contasTotal;
