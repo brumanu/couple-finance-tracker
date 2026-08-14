@@ -5,13 +5,14 @@ import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { mesAtual, buildMes } from "@/lib/mes";
+import { parseMesParam } from "@/lib/mes";
 import {
   mesPrimeiraParcela,
   parcelaNoMes,
   valoresParcelas,
   type CompraCartaoInfo,
 } from "@/lib/cartao-calc";
+import { MonthSwitcher } from "../../month-switcher";
 import {
   RelatorioComprasParceladasClient,
   type LinhaRelatorio,
@@ -67,9 +68,19 @@ function pad2(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-export default async function RelatorioComprasParceladasPage() {
+export default async function RelatorioComprasParceladasPage({
+  searchParams,
+}: PageProps<"/relatorios/compras-parceladas">) {
   const supabase = await createClient();
-  const hoje = mesAtual();
+
+  const sp = await searchParams;
+  const mesParam = typeof sp.mes === "string" ? sp.mes : undefined;
+  const mes = parseMesParam(mesParam);
+
+  // Cutoff: uma compra feita há mais de 60 meses (máximo de parcelas) antes
+  // do mês alvo não pode ter parcela ativa nesse mês.
+  const cutoffDate = new Date(mes.ano, mes.mes - 1 - 60, 1);
+  const comprasCutoff = `${cutoffDate.getFullYear()}-${pad2(cutoffDate.getMonth() + 1)}-01`;
 
   const [, comprasRes, cartoesRes, bancosRes, categorias] = await Promise.all([
     requireSession(),
@@ -79,6 +90,8 @@ export default async function RelatorioComprasParceladasPage() {
         "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id",
       )
       .gt("parcelas", 1)
+      .gte("data_compra", comprasCutoff)
+      .lte("data_compra", mes.ultimoDia)
       .order("data_compra", { ascending: false }),
     supabase.from("cartoes").select("id, banco_id, apelido, dia_fechamento"),
     supabase.from("bancos").select("id, nome, cor, icone"),
@@ -91,21 +104,12 @@ export default async function RelatorioComprasParceladasPage() {
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
   const bancoById = new Map(bancos.map((b) => [b.id, b] as const));
 
-  const linhas: LinhaRelatorio[] = compras.map((c) => {
+  const linhas: LinhaRelatorio[] = [];
+
+  for (const c of compras) {
     const cartao = cartaoById.get(c.cartao_id);
-    const banco = cartao ? bancoById.get(cartao.banco_id) : undefined;
-    const cartaoLabel = banco?.nome
-      ? cartao?.apelido
-        ? `${banco.nome} · ${cartao.apelido}`
-        : banco.nome
-      : (cartao?.apelido ?? "Cartão");
-
     const diaFech = cartao?.dia_fechamento ?? 1;
-    const primeira = mesPrimeiraParcela(c.data_compra, diaFech);
-    const valores = valoresParcelas(Number(c.valor_total), c.parcelas);
-    const valorUltimaParcela = valores[c.parcelas - 1];
 
-    // Use parcelaNoMes for consistent calculation with the dashboard
     const compraInfo: CompraCartaoInfo = {
       id: c.id,
       cartao_id: c.cartao_id,
@@ -116,49 +120,28 @@ export default async function RelatorioComprasParceladasPage() {
       parcelas_ja_pagas: c.parcelas_ja_pagas ?? undefined,
       categoria: c.categoria,
     };
-    const infoHoje = parcelaNoMes(compraInfo, diaFech, hoje);
+    const info = parcelaNoMes(compraInfo, diaFech, mes);
+    if (!info) continue; // sem parcela ativa no mês selecionado
 
-    // Compute última parcela month
+    const banco = cartao ? bancoById.get(cartao.banco_id) : undefined;
+    const cartaoLabel = banco?.nome
+      ? cartao?.apelido
+        ? `${banco.nome} · ${cartao.apelido}`
+        : banco.nome
+      : (cartao?.apelido ?? "Cartão");
+
+    const primeira = mesPrimeiraParcela(c.data_compra, diaFech);
+    const valores = valoresParcelas(Number(c.valor_total), c.parcelas);
+    const valorUltimaParcela = valores[c.parcelas - 1];
+
     const totalMesesUltima = primeira.mes + c.parcelas - 1;
     const anoUltima = primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
     const mesUltima = ((totalMesesUltima - 1) % 12) + 1;
-    const ultima = buildMes(anoUltima, mesUltima);
 
-    let parcelaAtual: number;
-    let valorParcela: number;
-    let faltaPagar: number;
-    let parcelasRestantes: number;
-    let status: LinhaRelatorio["status"];
+    const faltaPagar = Number((info.valor + info.restanteAposEste).toFixed(2));
+    const parcelasRestantes = c.parcelas - info.numero + 1;
 
-    if (infoHoje) {
-      // Active installment this month
-      parcelaAtual = infoHoje.numero;
-      valorParcela = infoHoje.valor;
-      faltaPagar = Number((infoHoje.valor + infoHoje.restanteAposEste).toFixed(2));
-      parcelasRestantes = c.parcelas - infoHoje.numero + 1;
-      status = "ativa";
-    } else {
-      // No active installment: either hasn't started or already finished
-      const diffMeses =
-        (hoje.ano - primeira.ano) * 12 + (hoje.mes - primeira.mes);
-      if (diffMeses < 0) {
-        // Purchase hasn't started billing yet
-        status = "aguardando";
-        parcelaAtual = 1;
-        valorParcela = valores[0];
-        faltaPagar = Number(Number(c.valor_total).toFixed(2));
-        parcelasRestantes = c.parcelas;
-      } else {
-        // All installments done
-        status = "quitada";
-        parcelaAtual = c.parcelas;
-        valorParcela = valorUltimaParcela;
-        faltaPagar = 0;
-        parcelasRestantes = 0;
-      }
-    }
-
-    return {
+    linhas.push({
       id: c.id,
       descricao: c.descricao,
       categoria: c.categoria,
@@ -171,20 +154,19 @@ export default async function RelatorioComprasParceladasPage() {
       dataCompra: c.data_compra,
       valorTotal: Number(c.valor_total),
       parcelas: c.parcelas,
-      parcelaAtual,
-      valorParcela,
+      parcelaAtual: info.numero,
+      valorParcela: info.valor,
       valorUltimaParcela,
       faltaPagar,
       parcelasRestantes,
       primeiraChave: `${primeira.ano}-${pad2(primeira.mes)}`,
       primeiraLabel: labelMesAbrev(primeira.ano, primeira.mes),
-      ultimaChave: `${ultima.ano}-${pad2(ultima.mes)}`,
-      ultimaLabel: labelMesAbrev(ultima.ano, ultima.mes),
-      ultimaAno: ultima.ano,
-      ultimaMes: ultima.mes,
-      status,
-    };
-  });
+      ultimaChave: `${anoUltima}-${pad2(mesUltima)}`,
+      ultimaLabel: labelMesAbrev(anoUltima, mesUltima),
+      ultimaAno: anoUltima,
+      ultimaMes: mesUltima,
+    });
+  }
 
   // Opções pros dropdowns de filtro — só cartões que aparecem no relatório
   const cartaoIdsPresentes = new Set(linhas.map((l) => l.cartaoId));
@@ -237,17 +219,18 @@ export default async function RelatorioComprasParceladasPage() {
             Compras parceladas
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Todas as compras parceladas de todos os cartões — status
-            calculado com base em {hoje.label}.
+            Compras parceladas de todos os cartões com parcela ativa em{" "}
+            {mes.label}.
           </p>
         </div>
+        <MonthSwitcher mes={mes} />
       </header>
 
       {linhas.length === 0 ? (
         <Card>
           <div className="flex flex-col items-center gap-3 p-8 text-center">
             <p className="text-sm text-muted-foreground">
-              Nenhuma compra parcelada registrada em nenhum cartão.
+              Nenhuma compra parcelada ativa em {mes.label}.
             </p>
           </div>
         </Card>
