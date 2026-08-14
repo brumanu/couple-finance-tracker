@@ -5,6 +5,12 @@ import {
   RepeatIcon,
   PieChartIcon,
   ListChecksIcon,
+  TrendingUpIcon,
+  ScaleIcon,
+  UsersIcon,
+  CalendarClockIcon,
+  TrophyIcon,
+  Grid3x3Icon,
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
@@ -44,6 +50,46 @@ const RELATORIOS: Relatorio[] = [
     descricao:
       "Todas as assinaturas recorrentes de todos os cartões — quantas são e quanto pesam no mês.",
     Icon: RepeatIcon,
+  },
+  {
+    href: "/relatorios/fluxo-mensal",
+    titulo: "Fluxo mensal",
+    descricao:
+      "Evolução do gasto total nos últimos 12 meses — pra ver se está subindo ou descendo.",
+    Icon: TrendingUpIcon,
+  },
+  {
+    href: "/relatorios/renda-x-despesa",
+    titulo: "Renda x despesa",
+    descricao: "Quanto entrou, quanto saiu, e o saldo do mês.",
+    Icon: ScaleIcon,
+  },
+  {
+    href: "/relatorios/gastos-por-pessoa",
+    titulo: "Gastos por pessoa",
+    descricao: "Quanto cada um do casal gastou no mês.",
+    Icon: UsersIcon,
+  },
+  {
+    href: "/relatorios/comprometimento-futuro",
+    titulo: "Comprometimento futuro",
+    descricao:
+      "Quanto dos próximos 12 meses já está preso em parcelas, assinaturas e contas fixas.",
+    Icon: CalendarClockIcon,
+  },
+  {
+    href: "/relatorios/maiores-gastos",
+    titulo: "Maiores gastos",
+    descricao:
+      "Ranking dos lançamentos individuais que mais pesaram no mês.",
+    Icon: TrophyIcon,
+  },
+  {
+    href: "/relatorios/categoria-por-mes",
+    titulo: "Categoria mês a mês",
+    descricao:
+      "Como cada categoria evoluiu nos últimos 6 meses, lado a lado.",
+    Icon: Grid3x3Icon,
   },
 ];
 
