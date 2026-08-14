@@ -23,10 +23,10 @@ function categoriaVariant(
 }
 
 export default async function RecorrentesPage() {
-  await requireSession();
   const supabase = await createClient();
 
-  const [{ data }, categorias] = await Promise.all([
+  const [, { data }, categorias] = await Promise.all([
+    requireSession(),
     supabase
       .from("contas_recorrentes")
       .select(

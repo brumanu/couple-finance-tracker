@@ -14,10 +14,10 @@ import {
 import { DividaActionsMenu } from "./divida-actions-menu";
 
 export default async function DividasPage() {
-  await requireSession();
   const supabase = await createClient();
 
-  const [dividasRes, pagRes] = await Promise.all([
+  const [, dividasRes, pagRes] = await Promise.all([
+    requireSession(),
     supabase
       .from("dividas")
       .select("id, descricao, valor_total")

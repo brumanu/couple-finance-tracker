@@ -60,7 +60,6 @@ export default async function CartaoDetailPage({
   params,
   searchParams,
 }: PageProps<"/cartoes/[id]">) {
-  await requireSession();
   const supabase = await createClient();
 
   const { id } = await params;
@@ -68,13 +67,16 @@ export default async function CartaoDetailPage({
   const mesParam = typeof sp.mes === "string" ? sp.mes : undefined;
   const mes = parseMesParam(mesParam);
 
-  const cartaoRes = await supabase
-    .from("cartoes")
-    .select(
-      "id, banco_id, apelido, bandeira, dia_fechamento, dia_vencimento, ativo",
-    )
-    .eq("id", id)
-    .maybeSingle();
+  const [, cartaoRes] = await Promise.all([
+    requireSession(),
+    supabase
+      .from("cartoes")
+      .select(
+        "id, banco_id, apelido, bandeira, dia_fechamento, dia_vencimento, ativo",
+      )
+      .eq("id", id)
+      .maybeSingle(),
+  ]);
   const cartao = cartaoRes.data;
   if (!cartao) notFound();
 

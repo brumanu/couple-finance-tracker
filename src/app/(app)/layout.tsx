@@ -8,8 +8,10 @@ import { MobileFab } from "@/components/nav/mobile-fab";
 import { Toaster } from "@/components/ui/sonner";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
-  const session = await requireSession();
-  const [cartoes, categorias] = await Promise.all([
+  // As três não dependem uma da outra (RLS escopa por cookie de sessão),
+  // então rodam em paralelo em vez de esperar a sessão resolver primeiro.
+  const [session, cartoes, categorias] = await Promise.all([
+    requireSession(),
     getCartoesParaSelecao(),
     getCategorias(),
   ]);

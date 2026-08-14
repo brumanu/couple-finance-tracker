@@ -9,28 +9,30 @@ import {
 import { CategoriaActionsMenu } from "./categoria-actions-menu";
 
 export default async function CategoriasPage() {
-  await requireSession();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("categorias")
-    .select("id, nome, cor, emoji")
-    .order("nome", { ascending: true });
-
-  const lista = (data ?? []) as CategoriaRow[];
-
-  // Contagem de uso — pra dar contexto na hora de excluir
+  // Nenhuma dessas depende das outras — inclusive a contagem de uso, que só
+  // dá contexto na hora de excluir — então tudo dispara junto.
   const [
+    ,
+    { data },
     { data: contasRec },
     { data: lancs },
     { data: compras },
     { data: assins },
   ] = await Promise.all([
+    requireSession(),
+    supabase
+      .from("categorias")
+      .select("id, nome, cor, emoji")
+      .order("nome", { ascending: true }),
     supabase.from("contas_recorrentes").select("categoria_id"),
     supabase.from("lancamentos").select("categoria_id"),
     supabase.from("compras_cartao").select("categoria_id"),
     supabase.from("assinaturas_cartao").select("categoria_id"),
   ]);
+
+  const lista = (data ?? []) as CategoriaRow[];
 
   const uso = new Map<string, number>();
   const somaUso = (rows: { categoria_id: string | null }[] | null) => {

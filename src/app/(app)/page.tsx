@@ -128,13 +128,7 @@ type FaturaResumo = {
 export default async function DashboardPage({
   searchParams,
 }: PageProps<"/">) {
-  const session = await requireSession();
   const supabase = await createClient();
-  const [cartoesSel, categorias] = await Promise.all([
-    getCartoesParaSelecao(),
-    getCategorias(),
-  ]);
-
   const params = await searchParams;
   const mesParam = typeof params.mes === "string" ? params.mes : undefined;
   const mes = parseMesParam(mesParam);
@@ -163,7 +157,13 @@ export default async function DashboardPage({
   );
   const comprasCutoff = `${cutoffDate.getFullYear()}-${String(cutoffDate.getMonth() + 1).padStart(2, "0")}-01`;
 
+  // Nenhuma dessas depende das outras (RLS escopa por cookie de sessão),
+  // então tudo roda em paralelo em vez de esperar sessão/cartões/categorias
+  // resolverem antes de disparar as queries do dashboard.
   const [
+    session,
+    cartoesSel,
+    categorias,
     rendasRes,
     contasRes,
     lancRes,
@@ -174,6 +174,9 @@ export default async function DashboardPage({
     pagDividasRes,
     assinRes,
   ] = await Promise.all([
+    requireSession(),
+    getCartoesParaSelecao(),
+    getCategorias(),
     supabase
       .from("rendas")
       .select("descricao, valor_previsto, dia_recebimento")

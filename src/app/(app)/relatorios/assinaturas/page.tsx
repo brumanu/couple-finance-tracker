@@ -42,11 +42,11 @@ type BancoRow = {
 };
 
 export default async function RelatorioAssinaturasPage() {
-  await requireSession();
   const supabase = await createClient();
   const hoje = mesAtual();
 
-  const [assinRes, cartoesRes, bancosRes, categorias] = await Promise.all([
+  const [, assinRes, cartoesRes, bancosRes, categorias] = await Promise.all([
+    requireSession(),
     supabase
       .from("assinaturas_cartao")
       .select(

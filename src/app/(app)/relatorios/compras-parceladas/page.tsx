@@ -68,11 +68,11 @@ function pad2(n: number): string {
 }
 
 export default async function RelatorioComprasParceladasPage() {
-  await requireSession();
   const supabase = await createClient();
   const hoje = mesAtual();
 
-  const [comprasRes, cartoesRes, bancosRes, categorias] = await Promise.all([
+  const [, comprasRes, cartoesRes, bancosRes, categorias] = await Promise.all([
+    requireSession(),
     supabase
       .from("compras_cartao")
       .select(

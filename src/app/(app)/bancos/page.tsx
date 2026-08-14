@@ -10,10 +10,10 @@ import {
 import { BancoActionsMenu } from "./banco-actions-menu";
 
 export default async function BancosPage() {
-  await requireSession();
   const supabase = await createClient();
 
-  const [bancosRes, cartoesRes] = await Promise.all([
+  const [, bancosRes, cartoesRes] = await Promise.all([
+    requireSession(),
     supabase
       .from("bancos")
       .select("id, nome, cor, icone")

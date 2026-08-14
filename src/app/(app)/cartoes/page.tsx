@@ -33,14 +33,14 @@ const BANDEIRA_LABEL: Record<string, string> = {
 export default async function CartoesPage({
   searchParams,
 }: PageProps<"/cartoes">) {
-  await requireSession();
   const supabase = await createClient();
 
   const params = await searchParams;
   const mesParam = typeof params.mes === "string" ? params.mes : undefined;
   const mes = parseMesParam(mesParam);
 
-  const [bancosRes, cartoesRes, comprasRes, assinRes] = await Promise.all([
+  const [, bancosRes, cartoesRes, comprasRes, assinRes] = await Promise.all([
+    requireSession(),
     supabase
       .from("bancos")
       .select("id, nome, cor, icone")

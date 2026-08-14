@@ -11,14 +11,16 @@ import {
 import { RendaActionsMenu } from "./renda-actions-menu";
 
 export default async function RendasPage() {
-  await requireSession();
   const supabase = await createClient();
 
-  const { data: rendas } = await supabase
-    .from("rendas")
-    .select("id, descricao, valor_previsto, dia_recebimento, ativa")
-    .order("dia_recebimento", { ascending: true })
-    .order("descricao", { ascending: true });
+  const [, { data: rendas }] = await Promise.all([
+    requireSession(),
+    supabase
+      .from("rendas")
+      .select("id, descricao, valor_previsto, dia_recebimento, ativa")
+      .order("dia_recebimento", { ascending: true })
+      .order("descricao", { ascending: true }),
+  ]);
 
   const lista = (rendas ?? []) as RendaRow[];
   const total15 = lista

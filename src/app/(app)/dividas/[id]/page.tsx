@@ -27,25 +27,26 @@ function formatDataBR(iso: string): string {
 export default async function DividaDetailPage({
   params,
 }: PageProps<"/dividas/[id]">) {
-  await requireSession();
   const supabase = await createClient();
 
   const { id } = await params;
 
-  const dividaRes = await supabase
-    .from("dividas")
-    .select("id, descricao, valor_total")
-    .eq("id", id)
-    .maybeSingle();
+  const [, dividaRes, { data: pagamentosData }] = await Promise.all([
+    requireSession(),
+    supabase
+      .from("dividas")
+      .select("id, descricao, valor_total")
+      .eq("id", id)
+      .maybeSingle(),
+    supabase
+      .from("pagamentos_divida")
+      .select("id, valor, data_pagamento, observacao")
+      .eq("divida_id", id)
+      .order("data_pagamento", { ascending: false })
+      .order("created_at", { ascending: false }),
+  ]);
   const divida = dividaRes.data;
   if (!divida) notFound();
-
-  const { data: pagamentosData } = await supabase
-    .from("pagamentos_divida")
-    .select("id, valor, data_pagamento, observacao")
-    .eq("divida_id", id)
-    .order("data_pagamento", { ascending: false })
-    .order("created_at", { ascending: false });
 
   const pagamentos = (pagamentosData ?? []) as PagamentoRow[];
   const total = Number(divida.valor_total);

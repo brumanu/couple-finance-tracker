@@ -69,7 +69,6 @@ function pad2(n: number): string {
 export default async function RelatorioGastosPorCategoriaPage({
   searchParams,
 }: PageProps<"/relatorios/gastos-por-categoria">) {
-  await requireSession();
   const supabase = await createClient();
 
   const sp = await searchParams;
@@ -81,8 +80,9 @@ export default async function RelatorioGastosPorCategoriaPage({
   const cutoffDate = new Date(mes.ano, mes.mes - 1 - 60, 1);
   const comprasCutoff = `${cutoffDate.getFullYear()}-${pad2(cutoffDate.getMonth() + 1)}-01`;
 
-  const [lancRes, contasRes, comprasRes, assinRes, cartoesRes, categorias] =
+  const [, lancRes, contasRes, comprasRes, assinRes, cartoesRes, categorias] =
     await Promise.all([
+      requireSession(),
       supabase
         .from("lancamentos")
         .select(
