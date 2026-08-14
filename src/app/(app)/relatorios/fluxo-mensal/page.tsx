@@ -19,6 +19,8 @@ type LancamentoRow = {
 type RecorrenteRow = {
   id: string;
   valor_previsto: number | string;
+  inicio_vigencia: string;
+  fim_vigencia: string | null;
 };
 
 type CompraRow = {
@@ -92,7 +94,7 @@ export default async function RelatorioFluxoMensalPage({
         .lte("data_referencia", maisRecente.ultimoDia),
       supabase
         .from("contas_recorrentes")
-        .select("id, valor_previsto")
+        .select("id, valor_previsto, inicio_vigencia, fim_vigencia")
         .eq("ativa", true),
       supabase
         .from("compras_cartao")
@@ -142,6 +144,13 @@ export default async function RelatorioFluxoMensalPage({
     let total = despesaAvulsaPorChave.get(mes.chave) ?? 0;
 
     for (const c of contas) {
+      // Só entra se a conta estava vigente nesse mês (mesma regra usada
+      // pela query de gastos-por-categoria, aqui replicada em memória
+      // porque `contas` cobre a janela inteira de 12 meses de uma vez).
+      const vigente =
+        c.inicio_vigencia <= mes.ultimoDia &&
+        (c.fim_vigencia === null || c.fim_vigencia >= mes.primeiroDia);
+      if (!vigente) continue;
       const pago = pagoPorContaMes.get(`${mes.chave}|${c.id}`);
       total += pago ? Number(pago.valor) : Number(c.valor_previsto);
     }
