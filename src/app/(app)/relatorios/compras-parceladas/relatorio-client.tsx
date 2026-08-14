@@ -55,6 +55,38 @@ export type CartaoOpcaoRel = {
 const TODOS = "__todos__";
 const SEM_CATEGORIA = "__sem_cat__";
 
+const MESES_ABREV = [
+  "Jan",
+  "Fev",
+  "Mar",
+  "Abr",
+  "Mai",
+  "Jun",
+  "Jul",
+  "Ago",
+  "Set",
+  "Out",
+  "Nov",
+  "Dez",
+];
+
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function labelMesAbrev(ano: number, mes: number): string {
+  return `${MESES_ABREV[mes - 1]}/${String(ano).slice(2)}`;
+}
+
+function parseChave(chave: string): { ano: number; mes: number } {
+  const [ano, mes] = chave.split("-").map(Number);
+  return { ano, mes };
+}
+
+function proximoMes(ano: number, mes: number): { ano: number; mes: number } {
+  return mes === 12 ? { ano: ano + 1, mes: 1 } : { ano, mes: mes + 1 };
+}
+
 type SortKey =
   | "data_desc"
   | "data_asc"
@@ -89,7 +121,27 @@ export function RelatorioComprasParceladasClient({
   const [cartaoId, setCartaoId] = useState<string>(TODOS);
   const [categoriaId, setCategoriaId] = useState<string>(TODOS);
   const [status, setStatus] = useState<string>(TODOS);
+  const [mes, setMes] = useState<string>(TODOS);
   const [sort, setSort] = useState<SortKey>("data_desc");
+
+  const mesOptions = useMemo(() => {
+    const chaves = new Set<string>();
+    for (const l of linhas) {
+      let { ano, mes: m } = parseChave(l.primeiraChave);
+      let chave = `${ano}-${pad2(m)}`;
+      while (chave <= l.ultimaChave) {
+        chaves.add(chave);
+        ({ ano, mes: m } = proximoMes(ano, m));
+        chave = `${ano}-${pad2(m)}`;
+      }
+    }
+    return Array.from(chaves)
+      .sort()
+      .map((chave) => {
+        const { ano, mes: m } = parseChave(chave);
+        return { chave, label: labelMesAbrev(ano, m) };
+      });
+  }, [linhas]);
 
   const filtradas = useMemo(() => {
     let arr = linhas;
@@ -100,6 +152,8 @@ export function RelatorioComprasParceladasClient({
       else arr = arr.filter((l) => l.categoriaId === categoriaId);
     }
     if (status !== TODOS) arr = arr.filter((l) => l.status === status);
+    if (mes !== TODOS)
+      arr = arr.filter((l) => l.primeiraChave <= mes && mes <= l.ultimaChave);
 
     const sorted = [...arr];
     switch (sort) {
@@ -121,7 +175,7 @@ export function RelatorioComprasParceladasClient({
         break;
     }
     return sorted;
-  }, [linhas, cartaoId, categoriaId, status, sort]);
+  }, [linhas, cartaoId, categoriaId, status, mes, sort]);
 
   const totalCompras = filtradas.length;
   const totalFalta = filtradas.reduce((s, l) => s + l.faltaPagar, 0);
@@ -175,12 +229,16 @@ export function RelatorioComprasParceladasClient({
   );
 
   const algumFiltroAtivo =
-    cartaoId !== TODOS || categoriaId !== TODOS || status !== TODOS;
+    cartaoId !== TODOS ||
+    categoriaId !== TODOS ||
+    status !== TODOS ||
+    mes !== TODOS;
 
   const limparFiltros = () => {
     setCartaoId(TODOS);
     setCategoriaId(TODOS);
     setStatus(TODOS);
+    setMes(TODOS);
   };
 
   const cartaoSelecionado = cartaoOptions.find((c) => c.id === cartaoId);
@@ -299,6 +357,33 @@ export function RelatorioComprasParceladasClient({
                         </span>
                         <span>{c.nome}</span>
                       </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex min-w-[140px] flex-col gap-1.5">
+              <Label
+                htmlFor="f-mes"
+                className="text-[10px] uppercase tracking-widest text-muted-foreground"
+              >
+                Mês
+              </Label>
+              <Select value={mes} onValueChange={(v) => v && setMes(v)}>
+                <SelectTrigger id="f-mes" className="w-full">
+                  <SelectValue>
+                    {mes === TODOS
+                      ? "Todos os meses"
+                      : (mesOptions.find((m) => m.chave === mes)?.label ??
+                        mes)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS}>Todos os meses</SelectItem>
+                  {mesOptions.map((m) => (
+                    <SelectItem key={m.chave} value={m.chave}>
+                      {m.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
