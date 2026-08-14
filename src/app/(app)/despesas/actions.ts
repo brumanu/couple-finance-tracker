@@ -121,6 +121,7 @@ export async function createDespesa(
     revalidatePath("/despesas");
     revalidatePath("/cartoes");
     revalidatePath(`/cartoes/${parsed.dados.cartao_id}`);
+    revalidatePath("/relatorios/compras-do-mes");
     revalidatePath("/");
     return { ok: true };
   }
@@ -135,6 +136,7 @@ export async function createDespesa(
   if (error) return { error: error.message };
 
   revalidatePath("/despesas");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -171,6 +173,7 @@ export async function updateDespesa(
   if (error) return { error: error.message };
 
   revalidatePath("/despesas");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -180,5 +183,6 @@ export async function deleteDespesa(id: string) {
   const { error } = await supabase.from("lancamentos").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/despesas");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
 }

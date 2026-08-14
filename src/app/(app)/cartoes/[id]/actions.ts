@@ -99,6 +99,7 @@ export async function createCompra(
 
   revalidatePath(`/cartoes/${parsed.cartao_id}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -130,6 +131,7 @@ export async function updateCompra(
 
   revalidatePath(`/cartoes/${parsed.cartao_id}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -143,5 +145,6 @@ export async function deleteCompra(id: string, cartaoId: string) {
   if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
 }

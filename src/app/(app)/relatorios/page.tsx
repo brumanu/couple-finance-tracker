@@ -4,6 +4,7 @@ import {
   ChevronRightIcon,
   RepeatIcon,
   PieChartIcon,
+  ListChecksIcon,
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
@@ -16,6 +17,13 @@ type Relatorio = {
 };
 
 const RELATORIOS: Relatorio[] = [
+  {
+    href: "/relatorios/compras-do-mes",
+    titulo: "Todas as compras do mês",
+    descricao:
+      "Despesas avulsas, contas fixas, compras no cartão e assinaturas do mês, com editar e excluir — bom pra corrigir categoria errada.",
+    Icon: ListChecksIcon,
+  },
   {
     href: "/relatorios/gastos-por-categoria",
     titulo: "Gastos por categoria",

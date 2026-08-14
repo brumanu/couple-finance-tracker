@@ -90,6 +90,7 @@ export async function createRecorrente(
   if (error) return { error: error.message };
 
   revalidatePath("/recorrentes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -120,6 +121,7 @@ export async function updateRecorrente(
   if (error) return { error: error.message };
 
   revalidatePath("/recorrentes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -132,6 +134,7 @@ export async function deleteRecorrente(id: string) {
     .eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/recorrentes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
 }
 
@@ -143,5 +146,6 @@ export async function toggleRecorrenteAtiva(id: string, ativa: boolean) {
     .eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/recorrentes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
 }

@@ -93,6 +93,7 @@ export async function createAssinatura(
 
   revalidatePath(`/cartoes/${parsed.cartao_id}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -124,6 +125,7 @@ export async function updateAssinatura(
 
   revalidatePath(`/cartoes/${parsed.cartao_id}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
   return { ok: true };
 }
@@ -137,6 +139,7 @@ export async function deleteAssinatura(id: string, cartaoId: string) {
   if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
 }
 
@@ -153,6 +156,7 @@ export async function toggleAssinaturaAtiva(
   if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
 }
 
@@ -167,5 +171,6 @@ export async function cancelarAssinatura(id: string, cartaoId: string) {
   if (error) return { error: error.message };
   revalidatePath(`/cartoes/${cartaoId}`);
   revalidatePath("/cartoes");
+  revalidatePath("/relatorios/compras-do-mes");
   revalidatePath("/");
 }
