@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -153,8 +154,11 @@ export function CompraFormDialog({
   }, [emAndamento]);
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state]);
+    if (state.ok) {
+      setOpen(false);
+      toast.success(isEdit ? "Compra atualizada." : "Compra cadastrada.");
+    }
+  }, [state, isEdit]);
 
   const valorInvalido = useMemo(() => {
     if (!valorRaw.trim()) return false;

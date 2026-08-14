@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -89,8 +90,11 @@ export function CartaoFormDialog({ cartao, bancos, trigger }: Props) {
   useEffect(() => setBancoId(defaults.banco_id), [defaults.banco_id]);
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state]);
+    if (state.ok) {
+      setOpen(false);
+      toast.success(isEdit ? "Cartão atualizado." : "Cartão cadastrado.");
+    }
+  }, [state, isEdit]);
 
   const semBanco = bancos.length === 0;
   const bancoSelecionado = bancos.find((b) => b.id === bancoId);

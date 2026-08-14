@@ -1,7 +1,8 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState } from "react";
 import { MoreVerticalIcon, TrashIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,55 +10,52 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { deleteBanco } from "./actions";
 
 type Props = { id: string; nome: string };
 
 export function BancoActionsMenu({ id, nome }: Props) {
-  const [pending, startTransition] = useTransition();
-
-  const onDelete = () => {
-    if (
-      !confirm(
-        `Excluir o banco "${nome}"? Isso vai falhar se ainda houver cartões vinculados.`,
-      )
-    )
-      return;
-    startTransition(async () => {
-      try {
-        await deleteBanco(id);
-      } catch (e) {
-        alert(
-          "Não foi possível excluir. Se existem cartões vinculados a este banco, remova-os primeiro.",
-        );
-        console.error(e);
-      }
-    });
-  };
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="Mais opções"
-            disabled={pending}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Mais opções"
+            >
+              <MoreVerticalIcon className="size-4" strokeWidth={2.75} />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onClick={() => setConfirmOpen(true)}
+            className="text-primary focus:text-primary"
           >
-            <MoreVerticalIcon className="size-4" strokeWidth={2.75} />
-          </Button>
-        }
+            <TrashIcon className="size-4" />
+            Excluir
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Excluir banco"
+        description={`Excluir o banco "${nome}"? Isso vai falhar se ainda houver cartões vinculados.`}
+        onConfirm={async () => {
+          const result = await deleteBanco(id);
+          if (result?.error) {
+            toast.error(result.error);
+            return;
+          }
+          toast.success("Banco excluído.");
+        }}
       />
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={onDelete}
-          className="text-primary focus:text-primary"
-        >
-          <TrashIcon className="size-4" />
-          Excluir
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    </>
   );
 }

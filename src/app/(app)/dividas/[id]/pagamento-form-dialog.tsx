@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -49,7 +50,10 @@ export function PagamentoFormDialog({ dividaId, restante }: Props) {
   );
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
+    if (state.ok) {
+      setOpen(false);
+      toast.success("Pagamento registrado.");
+    }
   }, [state]);
 
   return (

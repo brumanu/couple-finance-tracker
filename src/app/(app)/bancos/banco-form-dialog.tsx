@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -73,8 +74,11 @@ export function BancoFormDialog({ banco, trigger }: Props) {
   }, [defaults.icone, defaults.nome]);
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state]);
+    if (state.ok) {
+      setOpen(false);
+      toast.success(isEdit ? "Banco atualizado." : "Banco cadastrado.");
+    }
+  }, [state, isEdit]);
 
   function onIconeChange(novo: string | null) {
     if (!novo || !isBancoIconeId(novo)) return;

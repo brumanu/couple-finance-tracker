@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -92,8 +93,11 @@ export function RecorrenteFormDialog({
   useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state]);
+    if (state.ok) {
+      setOpen(false);
+      toast.success(isEdit ? "Conta atualizada." : "Conta cadastrada.");
+    }
+  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

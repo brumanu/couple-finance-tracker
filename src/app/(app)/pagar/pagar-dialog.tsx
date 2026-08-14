@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { CheckIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -53,7 +54,10 @@ export function PagarDialog({
   );
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
+    if (state.ok) {
+      setOpen(false);
+      toast.success("Pagamento confirmado.");
+    }
   }, [state]);
 
   return (

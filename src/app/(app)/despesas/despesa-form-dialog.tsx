@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -148,8 +149,11 @@ export function DespesaFormDialog({
   const cartaoSelecionado = cartoes.find((c) => c.id === cartaoId);
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state]);
+    if (state.ok) {
+      setOpen(false);
+      toast.success(isEdit ? "Despesa atualizada." : "Despesa cadastrada.");
+    }
+  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

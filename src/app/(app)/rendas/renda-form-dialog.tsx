@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -68,8 +69,9 @@ export function RendaFormDialog({ renda, trigger }: Props) {
   useEffect(() => {
     if (state.ok) {
       setOpen(false);
+      toast.success(isEdit ? "Renda atualizada." : "Renda cadastrada.");
     }
-  }, [state]);
+  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { RepeatIcon, PencilIcon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -86,8 +87,11 @@ export function AssinaturaFormDialog({
   useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
 
   useEffect(() => {
-    if (state.ok) setOpen(false);
-  }, [state]);
+    if (state.ok) {
+      setOpen(false);
+      toast.success(isEdit ? "Assinatura atualizada." : "Assinatura cadastrada.");
+    }
+  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
