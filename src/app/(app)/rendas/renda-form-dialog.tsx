@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
+import { playCoinSound } from "@/lib/sound";
 import {
   Dialog,
   DialogContent,
@@ -70,6 +71,7 @@ export function RendaFormDialog({ renda, trigger }: Props) {
     if (state.ok) {
       setOpen(false);
       toast.success(isEdit ? "Renda atualizada." : "Renda cadastrada.");
+      if (!isEdit) playCoinSound();
     }
   }, [state, isEdit]);
 

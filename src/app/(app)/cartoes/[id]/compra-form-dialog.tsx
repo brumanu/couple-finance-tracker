@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
+import { playCoinSound } from "@/lib/sound";
 import {
   Dialog,
   DialogContent,
@@ -157,6 +158,7 @@ export function CompraFormDialog({
     if (state.ok) {
       setOpen(false);
       toast.success(isEdit ? "Compra atualizada." : "Compra cadastrada.");
+      if (!isEdit) playCoinSound();
     }
   }, [state, isEdit]);
 
