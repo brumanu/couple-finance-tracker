@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { XIcon } from "lucide-react";
+import { XIcon, UserIcon, UsersIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { formatBRL } from "@/lib/format";
 import type { CategoriaOpcao } from "@/lib/categorias";
+import { QUEM_CASAL, type MembroOpcao } from "@/lib/membros";
 import {
   EditDespesaTrigger,
   type DespesaRow,
@@ -130,12 +131,53 @@ function CategoriaChip({
   );
 }
 
+function quemGastouDe(linha: LinhaCompra): string | null {
+  switch (linha.tipo) {
+    case "despesa":
+      return linha.despesa.quem_gastou;
+    case "conta_fixa":
+      return linha.recorrente.quem_gastou;
+    case "compra_cartao":
+      return linha.compra.quem_gastou;
+    case "assinatura":
+      return linha.assinatura.quem_gastou;
+  }
+}
+
+function QuemChip({
+  quemGastou,
+  membroById,
+}: {
+  quemGastou: string | null;
+  membroById: Map<string, MembroOpcao>;
+}) {
+  if (!quemGastou) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  if (quemGastou === QUEM_CASAL) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+        <UsersIcon className="size-3.5" />
+        Casal
+      </span>
+    );
+  }
+  const membro = membroById.get(quemGastou);
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <UserIcon className="size-3.5" />
+      {membro?.nome ?? "—"}
+    </span>
+  );
+}
+
 type Props = {
   linhas: LinhaCompra[];
   categoriaOptions: CategoriaOpcao[];
   todasCategorias: CategoriaOpcao[];
   temSemCategoria: boolean;
   mesLabel: string;
+  membros: MembroOpcao[];
 };
 
 export function RelatorioComprasDoMesClient({
@@ -144,6 +186,7 @@ export function RelatorioComprasDoMesClient({
   todasCategorias,
   temSemCategoria,
   mesLabel,
+  membros,
 }: Props) {
   const [categoriaId, setCategoriaId] = useState<string>(TODOS);
   const [sort, setSort] = useState<SortKey>("data_desc");
@@ -151,6 +194,10 @@ export function RelatorioComprasDoMesClient({
   const categoriaById = useMemo(
     () => new Map(todasCategorias.map((c) => [c.id, c] as const)),
     [todasCategorias],
+  );
+  const membroById = useMemo(
+    () => new Map(membros.map((m) => [m.id, m] as const)),
+    [membros],
   );
 
   const filtradas = useMemo(() => {
@@ -346,6 +393,7 @@ export function RelatorioComprasDoMesClient({
                   <th className="px-4 py-3 text-left font-medium">
                     Categoria
                   </th>
+                  <th className="px-4 py-3 text-left font-medium">Quem</th>
                   <th className="px-4 py-3 text-left font-medium">Origem</th>
                   <th className="px-4 py-3 text-left font-medium">Data</th>
                   <th className="px-4 py-3 text-right font-medium">Valor</th>
@@ -369,6 +417,12 @@ export function RelatorioComprasDoMesClient({
                       />
                     </td>
                     <td className="px-4 py-3">
+                      <QuemChip
+                        quemGastou={quemGastouDe(l)}
+                        membroById={membroById}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
                       <Badge variant="neutral" className="text-[10px]">
                         {l.origem}
                       </Badge>
@@ -381,7 +435,11 @@ export function RelatorioComprasDoMesClient({
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
-                        <LinhaAcoes linha={l} categorias={todasCategorias} />
+                        <LinhaAcoes
+                          linha={l}
+                          categorias={todasCategorias}
+                          membros={membros}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -410,6 +468,10 @@ export function RelatorioComprasDoMesClient({
                       <span className="text-xs text-muted-foreground">
                         · {formatDataBR(l.data)}
                       </span>
+                      <QuemChip
+                        quemGastou={quemGastouDe(l)}
+                        membroById={membroById}
+                      />
                     </div>
                   </div>
                   <span className="whitespace-nowrap tabular-nums text-sm font-medium text-primary">
@@ -421,7 +483,11 @@ export function RelatorioComprasDoMesClient({
                     {l.origem}
                   </Badge>
                   <div className="flex items-center gap-1">
-                    <LinhaAcoes linha={l} categorias={todasCategorias} />
+                    <LinhaAcoes
+                      linha={l}
+                      categorias={todasCategorias}
+                      membros={membros}
+                    />
                   </div>
                 </div>
               </li>
@@ -436,15 +502,21 @@ export function RelatorioComprasDoMesClient({
 function LinhaAcoes({
   linha,
   categorias,
+  membros,
 }: {
   linha: LinhaCompra;
   categorias: CategoriaOpcao[];
+  membros: MembroOpcao[];
 }) {
   switch (linha.tipo) {
     case "despesa":
       return (
         <>
-          <EditDespesaTrigger despesa={linha.despesa} categorias={categorias} />
+          <EditDespesaTrigger
+            despesa={linha.despesa}
+            categorias={categorias}
+            membros={membros}
+          />
           <DespesaActionsMenu
             id={linha.despesa.id}
             descricao={linha.despesa.descricao}
@@ -457,6 +529,7 @@ function LinhaAcoes({
           <EditRecorrenteTrigger
             recorrente={linha.recorrente}
             categorias={categorias}
+            membros={membros}
           />
           <RecorrenteActionsMenu
             id={linha.recorrente.id}
@@ -472,6 +545,7 @@ function LinhaAcoes({
             compra={linha.compra}
             diaFechamento={linha.diaFechamento}
             categorias={categorias}
+            membros={membros}
           />
           <CompraActionsMenu
             id={linha.compra.id}
@@ -487,6 +561,7 @@ function LinhaAcoes({
             assinatura={linha.assinatura}
             cartaoId={linha.assinatura.cartao_id}
             categorias={categorias}
+            membros={membros}
           />
           <AssinaturaActionsMenu
             id={linha.assinatura.id}

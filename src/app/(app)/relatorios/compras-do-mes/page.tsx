@@ -3,6 +3,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
+import { getMembrosCasal } from "@/lib/membros-server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { parseMesParam } from "@/lib/mes";
@@ -28,6 +29,7 @@ type LancamentoRow = {
   categoria: string | null;
   categoria_id: string | null;
   conta_recorrente_id: string | null;
+  quem_gastou: string | null;
 };
 
 type CartaoRow = {
@@ -53,41 +55,50 @@ export default async function RelatorioComprasDoMesPage({
   const cutoffDate = new Date(mes.ano, mes.mes - 1 - 60, 1);
   const comprasCutoff = `${cutoffDate.getFullYear()}-${pad2(cutoffDate.getMonth() + 1)}-01`;
 
-  const [, lancRes, contasRes, comprasRes, assinRes, cartoesRes, categorias] =
-    await Promise.all([
-      requireSession(),
-      supabase
-        .from("lancamentos")
-        .select(
-          "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, categoria_id, conta_recorrente_id",
-        )
-        .in("tipo", ["despesa_avulsa", "conta_fixa"])
-        .gte("data_referencia", mes.primeiroDia)
-        .lte("data_referencia", mes.ultimoDia),
-      supabase
-        .from("contas_recorrentes")
-        .select(
-          "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, ativa",
-        )
-        .eq("ativa", true)
-        .lte("inicio_vigencia", mes.ultimoDia)
-        .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
-      supabase
-        .from("compras_cartao")
-        .select(
-          "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id",
-        )
-        .gte("data_compra", comprasCutoff)
-        .lte("data_compra", mes.ultimoDia),
-      supabase
-        .from("assinaturas_cartao")
-        .select(
-          "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa",
-        )
-        .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento"),
-      getCategorias(),
-    ]);
+  const [
+    ,
+    lancRes,
+    contasRes,
+    comprasRes,
+    assinRes,
+    cartoesRes,
+    categorias,
+    membros,
+  ] = await Promise.all([
+    requireSession(),
+    supabase
+      .from("lancamentos")
+      .select(
+        "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, categoria_id, conta_recorrente_id, quem_gastou",
+      )
+      .in("tipo", ["despesa_avulsa", "conta_fixa"])
+      .gte("data_referencia", mes.primeiroDia)
+      .lte("data_referencia", mes.ultimoDia),
+    supabase
+      .from("contas_recorrentes")
+      .select(
+        "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, ativa, quem_gastou",
+      )
+      .eq("ativa", true)
+      .lte("inicio_vigencia", mes.ultimoDia)
+      .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
+    supabase
+      .from("compras_cartao")
+      .select(
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id, quem_gastou",
+      )
+      .gte("data_compra", comprasCutoff)
+      .lte("data_compra", mes.ultimoDia),
+    supabase
+      .from("assinaturas_cartao")
+      .select(
+        "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
+      )
+      .eq("ativa", true),
+    supabase.from("cartoes").select("id, dia_fechamento"),
+    getCategorias(),
+    getMembrosCasal(),
+  ]);
 
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
   const contas = (contasRes.data ?? []) as RecorrenteRow[];
@@ -115,6 +126,7 @@ export default async function RelatorioComprasDoMesPage({
       quinzena: l.quinzena,
       categoria: l.categoria,
       categoria_id: l.categoria_id,
+      quem_gastou: l.quem_gastou,
     };
     linhas.push({
       id: `despesa-${l.id}`,
@@ -273,6 +285,7 @@ export default async function RelatorioComprasDoMesPage({
           todasCategorias={categorias}
           temSemCategoria={temSemCategoria}
           mesLabel={mes.label}
+          membros={membros}
         />
       )}
     </div>
