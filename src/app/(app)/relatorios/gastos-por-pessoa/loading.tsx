@@ -14,8 +14,8 @@ export default function RelatorioGastosPorPessoaLoading() {
         <Skeleton className="h-9 w-40 rounded-full" />
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
-        {Array.from({ length: 3 }).map((_, i) => (
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
             <div className="flex flex-col gap-2 p-5">
               <Skeleton className="h-3 w-24 rounded-full" />
@@ -26,8 +26,8 @@ export default function RelatorioGastosPorPessoaLoading() {
         ))}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {Array.from({ length: 2 }).map((_, i) => (
+      <div className="grid gap-3 md:grid-cols-3">
+        {Array.from({ length: 3 }).map((_, i) => (
           <Card key={i}>
             <div className="flex flex-col gap-4 p-5">
               <div className="flex items-center justify-between gap-3">
@@ -57,7 +57,7 @@ export default function RelatorioGastosPorPessoaLoading() {
             <Skeleton className="mt-2 h-3.5 w-64 rounded-full" />
           </div>
           <div className="flex flex-col gap-3">
-            {Array.from({ length: 2 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline justify-between gap-2">
                   <Skeleton className="h-3.5 w-24 rounded-full" />
@@ -67,14 +67,6 @@ export default function RelatorioGastosPorPessoaLoading() {
               </div>
             ))}
           </div>
-        </div>
-      </Card>
-
-      <Card>
-        <div className="flex flex-col gap-1.5 p-5">
-          <Skeleton className="h-2.5 w-32 rounded-full" />
-          <Skeleton className="h-3.5 w-full rounded-full" />
-          <Skeleton className="h-3.5 w-3/4 rounded-full" />
         </div>
       </Card>
     </div>

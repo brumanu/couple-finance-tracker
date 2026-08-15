@@ -2,19 +2,14 @@ import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { getMembrosCasal } from "@/lib/membros-server";
+import { QUEM_CASAL } from "@/lib/membros";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { parseMesParam } from "@/lib/mes";
 import { parcelaNoMes, assinaturaAtivaNoMes } from "@/lib/cartao-calc";
 import { formatBRL } from "@/lib/format";
 import { MonthSwitcher } from "../../month-switcher";
-
-type ProfileRow = {
-  id: string;
-  nome: string;
-  papel: string;
-};
 
 type LancamentoRow = {
   id: string;
@@ -23,7 +18,7 @@ type LancamentoRow = {
   data_referencia: string;
   data_pagamento: string | null;
   conta_recorrente_id: string | null;
-  criado_por: string | null;
+  quem_gastou: string | null;
 };
 
 type RecorrenteRow = {
@@ -33,6 +28,7 @@ type RecorrenteRow = {
   inicio_vigencia: string;
   fim_vigencia: string | null;
   ativa: boolean;
+  quem_gastou: string | null;
 };
 
 type CompraRow = {
@@ -43,7 +39,7 @@ type CompraRow = {
   data_compra: string;
   parcelas: number;
   parcelas_ja_pagas: number | null;
-  criado_por: string | null;
+  quem_gastou: string | null;
 };
 
 type AssinaturaRow = {
@@ -54,7 +50,7 @@ type AssinaturaRow = {
   inicio_vigencia: string;
   fim_vigencia: string | null;
   ativa: boolean;
-  criada_por: string | null;
+  quem_gastou: string | null;
 };
 
 type CartaoRow = {
@@ -62,12 +58,16 @@ type CartaoRow = {
   dia_fechamento: number;
 };
 
-type PessoaAgg = {
+// Chave usada no Map de agregação pra itens sem `quem_gastou` definido
+// (null/""). Não é um valor real de `quem_gastou` — só uma sentinela
+// interna pra não colidir com uuids de profile nem com QUEM_CASAL.
+const NAO_ESPECIFICADO = "__nao_especificado__";
+
+type GrupoAgg = {
   id: string;
   nome: string;
-  papel: string;
   despesaAvulsa: number;
-  contaFixaPaga: number;
+  contaFixa: number;
   compraCartao: number;
   assinatura: number;
   total: number;
@@ -75,6 +75,18 @@ type PessoaAgg = {
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
+}
+
+function novoGrupo(id: string, nome: string): GrupoAgg {
+  return {
+    id,
+    nome,
+    despesaAvulsa: 0,
+    contaFixa: 0,
+    compraCartao: 0,
+    assinatura: 0,
+    total: 0,
+  };
 }
 
 export default async function RelatorioGastosPorPessoaPage({
@@ -92,110 +104,95 @@ export default async function RelatorioGastosPorPessoaPage({
   const cutoffDate = new Date(mes.ano, mes.mes - 1 - 60, 1);
   const comprasCutoff = `${cutoffDate.getFullYear()}-${pad2(cutoffDate.getMonth() + 1)}-01`;
 
-  const [session, lancRes, contasRes, comprasRes, assinRes, cartoesRes] =
+  const [, membros, lancRes, contasRes, comprasRes, assinRes, cartoesRes] =
     await Promise.all([
       requireSession(),
+      getMembrosCasal(),
       supabase
         .from("lancamentos")
         .select(
-          "id, tipo, valor, data_referencia, data_pagamento, conta_recorrente_id, criado_por",
+          "id, tipo, valor, data_referencia, data_pagamento, conta_recorrente_id, quem_gastou",
         )
         .in("tipo", ["despesa_avulsa", "conta_fixa"])
         .gte("data_referencia", mes.primeiroDia)
         .lte("data_referencia", mes.ultimoDia),
       supabase
         .from("contas_recorrentes")
-        .select("id, descricao, valor_previsto, inicio_vigencia, fim_vigencia, ativa")
+        .select(
+          "id, descricao, valor_previsto, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
+        )
         .eq("ativa", true)
         .lte("inicio_vigencia", mes.ultimoDia)
         .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
       supabase
         .from("compras_cartao")
         .select(
-          "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, criado_por",
+          "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, quem_gastou",
         )
         .gte("data_compra", comprasCutoff)
         .lte("data_compra", mes.ultimoDia),
       supabase
         .from("assinaturas_cartao")
         .select(
-          "id, cartao_id, descricao, valor_mensal, inicio_vigencia, fim_vigencia, ativa, criada_por",
+          "id, cartao_id, descricao, valor_mensal, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
         )
         .eq("ativa", true),
       supabase.from("cartoes").select("id, dia_fechamento"),
     ]);
-
-  // Query de profiles depende do casalId retornado pela sessão, por isso
-  // roda separada (não dá pra colocar no Promise.all acima).
-  const profilesRes = await supabase
-    .from("profiles")
-    .select("id, nome, papel")
-    .eq("casal_id", session.casalId)
-    .order("papel", { ascending: true })
-    .order("nome", { ascending: true });
 
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
   const contas = (contasRes.data ?? []) as RecorrenteRow[];
   const compras = (comprasRes.data ?? []) as CompraRow[];
   const assinaturas = (assinRes.data ?? []) as AssinaturaRow[];
   const cartoes = (cartoesRes.data ?? []) as CartaoRow[];
-  const profiles = (profilesRes.data ?? []) as ProfileRow[];
 
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
 
-  const pessoaAgg = new Map<string, PessoaAgg>();
-  for (const p of profiles) {
-    pessoaAgg.set(p.id, {
-      id: p.id,
-      nome: p.nome,
-      papel: p.papel,
-      despesaAvulsa: 0,
-      contaFixaPaga: 0,
-      compraCartao: 0,
-      assinatura: 0,
-      total: 0,
-    });
+  const grupoAgg = new Map<string, GrupoAgg>();
+  for (const m of membros) {
+    grupoAgg.set(m.id, novoGrupo(m.id, m.nome));
   }
+  grupoAgg.set(QUEM_CASAL, novoGrupo(QUEM_CASAL, "Casal"));
 
-  // Gasto com criado_por/criada_por que não bate com nenhum profile do
-  // casal atual (não deveria acontecer em uso normal, já que toda
-  // gravação registra o autor — mas não deixa quebrar a tela). Entra no
-  // total do casal, só não é atribuído a nenhuma pessoa específica.
-  let naoIdentificado = 0;
-
-  function creditar(pessoaId: string | null, campo: keyof PessoaAgg, valor: number) {
-    const p = pessoaId ? pessoaAgg.get(pessoaId) : undefined;
-    if (!p) {
-      naoIdentificado += valor;
-      return;
+  function creditar(
+    quemGastou: string | null | undefined,
+    campo: keyof Omit<GrupoAgg, "id" | "nome">,
+    valor: number,
+  ) {
+    const bruto = (quemGastou ?? "").trim();
+    const key = bruto === "" ? NAO_ESPECIFICADO : bruto;
+    let grupo = grupoAgg.get(key);
+    if (!grupo) {
+      // uuid de profile fora do casal atual (não deveria acontecer, já
+      // que a validação em resolverQuemGastou garante isso na escrita)
+      // ou a sentinela de "não especificado" — mesmo tratamento: entra
+      // no total do casal, mas não é atribuído a ninguém específico.
+      grupo = novoGrupo(NAO_ESPECIFICADO, "Não especificado");
+      grupoAgg.set(NAO_ESPECIFICADO, grupo);
     }
-    (p[campo] as number) += valor;
+    grupo[campo] += valor;
   }
 
   // Despesas avulsas lançadas no mês.
   for (const l of lancamentos) {
     if (l.tipo !== "despesa_avulsa") continue;
-    creditar(l.criado_por, "despesaAvulsa", Number(l.valor));
+    creditar(l.quem_gastou, "despesaAvulsa", Number(l.valor));
   }
 
-  // Contas fixas: se já tem lançamento (paga) no mês, atribui a quem
-  // registrou o pagamento. Se ainda não foi paga, é só uma previsão — não
-  // foi ninguém que gastou de fato ainda, então vai pro bucket separado
-  // "não atribuído (previsto)" em vez de para uma das duas pessoas.
+  // Contas fixas: `quem_gastou` vive na definição da conta recorrente, não
+  // no lançamento de pagamento — então já dá pra atribuir mesmo antes de
+  // paga (usa o valor previsto). Se já foi paga no mês, usa o valor real
+  // do lançamento em vez do previsto.
   const pagosMes = new Map<string, LancamentoRow>();
   for (const l of lancamentos) {
     if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
       pagosMes.set(l.conta_recorrente_id, l);
     }
   }
-  let naoAtribuidoPrevisto = 0;
   for (const c of contas) {
     const pago = pagosMes.get(c.id);
-    if (pago) {
-      creditar(pago.criado_por, "contaFixaPaga", Number(pago.valor));
-    } else {
-      naoAtribuidoPrevisto += Number(c.valor_previsto);
-    }
+    const valor = pago ? Number(pago.valor) : Number(c.valor_previsto);
+    creditar(c.quem_gastou, "contaFixa", valor);
   }
 
   // Compras no cartão: só a parcela ativa no mês alvo.
@@ -217,7 +214,7 @@ export default async function RelatorioGastosPorPessoaPage({
       mes,
     );
     if (!info) continue;
-    creditar(compra.criado_por, "compraCartao", info.valor);
+    creditar(compra.quem_gastou, "compraCartao", info.valor);
   }
 
   // Assinaturas de cartão ativas no mês alvo.
@@ -236,27 +233,29 @@ export default async function RelatorioGastosPorPessoaPage({
       mes,
     );
     if (!ativa) continue;
-    creditar(a.criada_por, "assinatura", Number(a.valor_mensal));
+    creditar(a.quem_gastou, "assinatura", Number(a.valor_mensal));
   }
 
-  for (const p of pessoaAgg.values()) {
-    p.total = Number(
-      (
-        p.despesaAvulsa +
-        p.contaFixaPaga +
-        p.compraCartao +
-        p.assinatura
-      ).toFixed(2),
+  for (const g of grupoAgg.values()) {
+    g.total = Number(
+      (g.despesaAvulsa + g.contaFixa + g.compraCartao + g.assinatura).toFixed(
+        2,
+      ),
     );
   }
 
-  const pessoas = Array.from(pessoaAgg.values());
-  const totalPessoas = pessoas.reduce((s, p) => s + p.total, 0);
-  const totalCasal = Number(
-    (totalPessoas + naoAtribuidoPrevisto + naoIdentificado).toFixed(2),
-  );
+  const pessoas = membros
+    .map((m) => grupoAgg.get(m.id))
+    .filter((g): g is GrupoAgg => Boolean(g));
+  const casal = grupoAgg.get(QUEM_CASAL)!;
+  const naoEspecificado =
+    grupoAgg.get(NAO_ESPECIFICADO) ?? novoGrupo(NAO_ESPECIFICADO, "Não especificado");
 
-  const grandTotal = totalCasal;
+  const grandTotal = Number(
+    Array.from(grupoAgg.values())
+      .reduce((s, g) => s + g.total, 0)
+      .toFixed(2),
+  );
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:gap-7 md:p-8">
@@ -280,9 +279,9 @@ export default async function RelatorioGastosPorPessoaPage({
             Gastos por pessoa
           </h2>
           <p className="mt-1 max-w-[60ch] text-sm text-muted-foreground">
-            Quanto cada um gastou em {mes.label}, com base em quem registrou
-            cada despesa avulsa, conta fixa paga, compra no cartão e
-            assinatura.
+            Quanto cada um gastou em {mes.label}, com base em quem foi
+            marcado como responsável por cada despesa avulsa, conta fixa,
+            compra no cartão e assinatura.
           </p>
         </div>
         <MonthSwitcher mes={mes} />
@@ -298,54 +297,64 @@ export default async function RelatorioGastosPorPessoaPage({
         </Card>
       ) : (
         <>
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
             <ResumoCard
               label={`Total do casal em ${mes.label}`}
-              valor={formatBRL(totalCasal)}
+              valor={formatBRL(grandTotal)}
               destaque
             />
             <DiferencaCard pessoas={pessoas} />
             <ResumoCard
-              label="Não atribuído (previsto)"
-              valor={formatBRL(naoAtribuidoPrevisto)}
-              hint="contas fixas ainda não pagas"
+              label="Casal (compartilhado)"
+              valor={formatBRL(casal.total)}
+              hint="gastos que não são de um só"
+            />
+            <ResumoCard
+              label="Não especificado"
+              valor={formatBRL(naoEspecificado.total)}
+              hint="ainda sem responsável definido"
             />
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-3">
             {pessoas.map((p, i) => (
-              <PessoaCard key={p.id} pessoa={p} cor={i === 0 ? "primary" : "sage"} />
+              <GrupoCard key={p.id} grupo={p} cor={i === 0 ? "primary" : "sage"} />
             ))}
+            <GrupoCard grupo={casal} cor="accent" />
           </div>
 
           {pessoas.length >= 2 && (
-            <ComparacaoBar pessoaA={pessoas[0]} pessoaB={pessoas[1]} />
+            <ComparacaoBar pessoaA={pessoas[0]} pessoaB={pessoas[1]} casal={casal} />
           )}
 
-          <Card>
-            <div className="flex flex-col gap-1.5 p-5">
-              <p className="text-[11px] uppercase tracking-widest text-primary">
-                Sobre o não atribuído
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Contas fixas de {mes.label} que ainda não foram pagas entram
-                aqui pelo valor previsto (
-                <strong className="text-foreground">
-                  {formatBRL(naoAtribuidoPrevisto)}
-                </strong>
-                ). Como ninguém pagou ainda, não faz sentido atribuir esse
-                valor a uma das duas pessoas — assim que a conta for paga, o
-                lançamento passa a contar pra quem registrou o pagamento.
-              </p>
-              {naoIdentificado > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Além disso, {formatBRL(naoIdentificado)} em gastos do mês
-                  não puderam ser vinculados a nenhuma das duas pessoas e
-                  entram apenas no total do casal.
+          {naoEspecificado.total > 0 && (
+            <Card>
+              <div className="flex flex-col gap-1.5 p-5">
+                <p className="text-[11px] uppercase tracking-widest text-primary">
+                  Sobre o não especificado
                 </p>
-              )}
-            </div>
-          </Card>
+                <p className="text-sm text-muted-foreground">
+                  {formatBRL(naoEspecificado.total)} em gastos de{" "}
+                  {mes.label} ainda não têm um responsável (&quot;quem
+                  gastou&quot;) definido — entram só no total do casal, sem
+                  aparecer no card de nenhuma das duas pessoas nem no do
+                  casal. Isso pode acontecer com lançamentos antigos, de
+                  antes desse campo existir, ou itens criados sem marcar
+                  quem gastou.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Dá pra corrigir editando cada item em{" "}
+                  <Link
+                    href={`/relatorios/compras-do-mes?mes=${mes.chave}`}
+                    className="font-medium text-primary underline underline-offset-2"
+                  >
+                    Todas as compras do mês
+                  </Link>
+                  .
+                </p>
+              </div>
+            </Card>
+          )}
         </>
       )}
     </div>
@@ -385,7 +394,7 @@ function ResumoCard({
   );
 }
 
-function DiferencaCard({ pessoas }: { pessoas: PessoaAgg[] }) {
+function DiferencaCard({ pessoas }: { pessoas: GrupoAgg[] }) {
   if (pessoas.length < 2) {
     return <ResumoCard label="Diferença entre os dois" valor="—" />;
   }
@@ -410,19 +419,26 @@ function DiferencaCard({ pessoas }: { pessoas: PessoaAgg[] }) {
   );
 }
 
-function PessoaCard({
-  pessoa,
+function GrupoCard({
+  grupo,
   cor,
 }: {
-  pessoa: PessoaAgg;
-  cor: "primary" | "sage";
+  grupo: GrupoAgg;
+  cor: "primary" | "sage" | "accent";
 }) {
   const itens: { label: string; valor: number }[] = [
-    { label: "Despesas avulsas", valor: pessoa.despesaAvulsa },
-    { label: "Contas fixas pagas", valor: pessoa.contaFixaPaga },
-    { label: "Compras no cartão", valor: pessoa.compraCartao },
-    { label: "Assinaturas", valor: pessoa.assinatura },
+    { label: "Despesas avulsas", valor: grupo.despesaAvulsa },
+    { label: "Contas fixas", valor: grupo.contaFixa },
+    { label: "Compras no cartão", valor: grupo.compraCartao },
+    { label: "Assinaturas", valor: grupo.assinatura },
   ];
+
+  const corTexto =
+    cor === "primary"
+      ? "text-primary"
+      : cor === "sage"
+        ? "text-sage-700"
+        : "text-accent-700";
 
   return (
     <Card>
@@ -430,19 +446,14 @@ function PessoaCard({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate font-heading text-lg leading-tight">
-              {pessoa.nome}
+              {grupo.nome}
             </p>
-            <Badge variant="neutral" className="mt-1 text-[10px]">
-              {pessoa.papel === "titular" ? "Titular" : "Cônjuge"}
-            </Badge>
           </div>
           <p
-            className={`shrink-0 font-heading tabular-nums ${
-              cor === "primary" ? "text-primary" : "text-sage-700"
-            }`}
+            className={`shrink-0 font-heading tabular-nums ${corTexto}`}
             style={{ fontSize: "clamp(1.4rem, 3vw, 1.8rem)", lineHeight: 1 }}
           >
-            {formatBRL(pessoa.total)}
+            {formatBRL(grupo.total)}
           </p>
         </div>
 
@@ -464,14 +475,17 @@ function PessoaCard({
 function ComparacaoBar({
   pessoaA,
   pessoaB,
+  casal,
 }: {
-  pessoaA: PessoaAgg;
-  pessoaB: PessoaAgg;
+  pessoaA: GrupoAgg;
+  pessoaB: GrupoAgg;
+  casal: GrupoAgg;
 }) {
-  const maximo = Math.max(pessoaA.total, pessoaB.total, 1);
+  const maximo = Math.max(pessoaA.total, pessoaB.total, casal.total, 1);
   const barras = [
-    { pessoa: pessoaA, cor: "bg-primary" },
-    { pessoa: pessoaB, cor: "bg-sage-500" },
+    { grupo: pessoaA, cor: "bg-primary" },
+    { grupo: pessoaB, cor: "bg-sage-500" },
+    { grupo: casal, cor: "bg-accent-500" },
   ];
 
   return (
@@ -482,20 +496,20 @@ function ComparacaoBar({
             Quem gastou mais
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Comparação direta do total gasto por cada pessoa no mês.
+            Comparação direta do total gasto por cada pessoa e pelo casal no
+            mês.
           </p>
         </div>
 
         <div className="flex flex-col gap-3">
-          {barras.map(({ pessoa, cor }) => {
-            const larguraPct =
-              maximo > 0 ? (pessoa.total / maximo) * 100 : 0;
+          {barras.map(({ grupo, cor }) => {
+            const larguraPct = maximo > 0 ? (grupo.total / maximo) * 100 : 0;
             return (
-              <div key={pessoa.id} className="flex flex-col gap-1.5">
+              <div key={grupo.id} className="flex flex-col gap-1.5">
                 <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium">{pessoa.nome}</span>
+                  <span className="text-sm font-medium">{grupo.nome}</span>
                   <span className="tabular-nums text-sm font-medium">
-                    {formatBRL(pessoa.total)}
+                    {formatBRL(grupo.total)}
                   </span>
                 </div>
                 <div className="relative h-4 w-full overflow-hidden rounded-full bg-muted/60">
