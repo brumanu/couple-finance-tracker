@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
+import { getMembrosCasal } from "@/lib/membros-server";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format";
@@ -25,17 +26,18 @@ function categoriaVariant(
 export default async function RecorrentesPage() {
   const supabase = await createClient();
 
-  const [, { data }, categorias] = await Promise.all([
+  const [, { data }, categorias, membros] = await Promise.all([
     requireSession(),
     supabase
       .from("contas_recorrentes")
       .select(
-        "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, ativa",
+        "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, quem_gastou, ativa",
       )
       .order("quinzena", { ascending: true })
       .order("dia_vencimento", { ascending: true, nullsFirst: false })
       .order("descricao", { ascending: true }),
     getCategorias(),
+    getMembrosCasal(),
   ]);
 
   const lista = (data ?? []) as RecorrenteRow[];
@@ -59,7 +61,7 @@ export default async function RecorrentesPage() {
             As que voltam todo mês. Cada uma mora numa quinzena.
           </p>
         </div>
-        <RecorrenteFormDialog categorias={categorias} />
+        <RecorrenteFormDialog categorias={categorias} membros={membros} />
       </header>
 
       {lista.length === 0 ? (
@@ -68,7 +70,7 @@ export default async function RecorrentesPage() {
             <p className="text-sm text-muted-foreground">
               Nenhuma conta cadastrada ainda.
             </p>
-            <RecorrenteFormDialog categorias={categorias} />
+            <RecorrenteFormDialog categorias={categorias} membros={membros} />
           </div>
         </Card>
       ) : (
@@ -78,12 +80,14 @@ export default async function RecorrentesPage() {
             total={total15}
             itens={contas15}
             categorias={categorias}
+            membros={membros}
           />
           <ColunaContas
             titulo="Quinzena do dia 30"
             total={total30}
             itens={contas30}
             categorias={categorias}
+            membros={membros}
           />
         </div>
       )}
@@ -96,11 +100,13 @@ function ColunaContas({
   total,
   itens,
   categorias,
+  membros,
 }: {
   titulo: string;
   total: number;
   itens: RecorrenteRow[];
   categorias: Awaited<ReturnType<typeof getCategorias>>;
+  membros: Awaited<ReturnType<typeof getMembrosCasal>>;
 }) {
   return (
     <section className="flex flex-col gap-3.5">
@@ -154,6 +160,7 @@ function ColunaContas({
               <EditRecorrenteTrigger
                 recorrente={r}
                 categorias={categorias}
+                membros={membros}
               />
               <RecorrenteActionsMenu
                 id={r.id}

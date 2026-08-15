@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
 import { resolverCategoria } from "@/lib/categorias-server";
+import { resolverQuemGastou } from "@/lib/membros-server";
 
 export type RecorrenteFormState = {
   error?: string;
@@ -16,6 +17,7 @@ type Parsed = {
   quinzena: 15 | 30;
   dia_vencimento: number | null;
   categoria_id_raw: string;
+  quem_gastou_raw: string;
   ativa: boolean;
 };
 
@@ -25,6 +27,7 @@ function parseFormData(formData: FormData): Parsed | string {
   const quinzena = Number(formData.get("quinzena"));
   const diaVencRaw = String(formData.get("dia_vencimento") ?? "").trim();
   const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
+  const quem_gastou_raw = String(formData.get("quem_gastou") ?? "").trim();
   const ativa =
     formData.get("ativa") === "on" || formData.get("ativa") === "true";
 
@@ -47,6 +50,7 @@ function parseFormData(formData: FormData): Parsed | string {
     quinzena: quinzena as 15 | 30,
     dia_vencimento,
     categoria_id_raw,
+    quem_gastou_raw,
     ativa,
   };
 }
@@ -78,13 +82,22 @@ export async function createRecorrente(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
-  const { categoria_id_raw, ...rest } = parsed;
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
+  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
   void categoria_id_raw;
+  void quem_gastou_raw;
 
   const { error } = await supabase.from("contas_recorrentes").insert({
     casal_id: profile.casal_id,
     ...rest,
     ...categoriaResolved,
+    ...quemGastouResolved,
   });
 
   if (error) return { error: error.message };
@@ -111,12 +124,20 @@ export async function updateRecorrente(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
-  const { categoria_id_raw, ...rest } = parsed;
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
+  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
   void categoria_id_raw;
+  void quem_gastou_raw;
 
   const { error } = await supabase
     .from("contas_recorrentes")
-    .update({ ...rest, ...categoriaResolved })
+    .update({ ...rest, ...categoriaResolved, ...quemGastouResolved })
     .eq("id", id);
   if (error) return { error: error.message };
 
