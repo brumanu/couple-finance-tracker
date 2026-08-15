@@ -15,6 +15,7 @@ import {
   type AssinaturaCartaoInfo,
 } from "@/lib/cartao-calc";
 import { BancoIcone } from "@/lib/bancos-icones";
+import { calcularSaldoMes, type DadosSaldo } from "@/lib/sobra";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { getCategorias } from "@/lib/categorias-server";
 import { getMembrosCasal } from "@/lib/membros-server";
@@ -338,40 +339,20 @@ export default async function DashboardPage({
     );
   }
 
+  // A fórmula do saldo mora em @/lib/sobra pra a tela de compras futuras
+  // usar o mesmo número. Aqui passamos os dados que o dashboard já carregou,
+  // em vez de deixar a lib refazer as queries.
+  const dadosSaldo: DadosSaldo = {
+    rendas,
+    contas: contasAll,
+    lancamentos,
+    cartoes,
+    compras,
+    assinaturas,
+  };
+
   function calcMes(mesRef: MesRef): CalcMes {
-    const lancsMes = lancamentosDoMes(mesRef);
-    const contasMes = contasVigentesNoMes(mesRef);
-    const faturas = faturasDoMes(mesRef);
-    const pagosMes = new Map<string, LancamentoRow>();
-    for (const l of lancsMes) {
-      if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
-        pagosMes.set(l.conta_recorrente_id, l);
-      }
-    }
-    const totalRendaFixa = rendas.reduce(
-      (s, r) => s + Number(r.valor_previsto),
-      0,
-    );
-    const totalContasRec = contasMes.reduce((s, c) => {
-      const pago = pagosMes.get(c.id);
-      return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
-    }, 0);
-    const totalCartoes = faturas.reduce((s, f) => s + f.total, 0);
-    const totalDespesas = lancsMes
-      .filter((l) => l.tipo === "despesa_avulsa")
-      .reduce((s, l) => s + Number(l.valor), 0);
-    const totalRendaExtra = lancsMes
-      .filter((l) => l.tipo === "renda_extra")
-      .reduce((s, l) => s + Number(l.valor), 0);
-    const totalRenda = totalRendaFixa + totalRendaExtra;
-    return {
-      totalRenda,
-      totalRendaExtra,
-      totalContasRec,
-      totalCartoes,
-      totalDespesas,
-      saldo: totalRenda - totalContasRec - totalCartoes - totalDespesas,
-    };
+    return calcularSaldoMes(dadosSaldo, mesRef);
   }
 
   function calcQuinzena(q: 15 | 30, mesRef: MesRef): CalcQuinzena {

@@ -1,8 +1,15 @@
-import { ExternalLinkIcon, UserIcon, UsersIcon } from "lucide-react";
+import {
+  ExternalLinkIcon,
+  PiggyBankIcon,
+  UserIcon,
+  UsersIcon,
+} from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
 import { getMembrosCasal } from "@/lib/membros-server";
+import { getSaldoMensal } from "@/lib/sobra";
+import { mesAtual } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +22,9 @@ import {
 } from "./compra-futura-form-dialog";
 import { CompraFuturaActionsMenu } from "./compra-futura-actions-menu";
 import { CompreiDialog } from "./comprei-dialog";
+
+/** Mesma janela de projeção do dashboard: mês atual + 5 seguintes. */
+const MESES_PROJECAO = 6;
 
 const GRUPOS = [
   { prioridade: 1, titulo: "Prioridade alta", cor: "bg-primary" },
@@ -30,7 +40,7 @@ function formatDataCurta(iso: string): string {
 export default async function ComprasFuturasPage() {
   const supabase = await createClient();
 
-  const [, itensRes, categorias, membros] = await Promise.all([
+  const [, itensRes, categorias, membros, saldoMensal] = await Promise.all([
     requireSession(),
     supabase
       .from("compras_futuras")
@@ -41,6 +51,9 @@ export default async function ComprasFuturasPage() {
       .order("created_at", { ascending: false }),
     getCategorias(),
     getMembrosCasal(),
+    // Janela de 6 meses: a média absorve parcelas terminando e contas
+    // sazonais melhor do que a sobra de um mês solto.
+    getSaldoMensal(mesAtual(), MESES_PROJECAO),
   ]);
 
   const itens = (itensRes.data ?? []) as CompraFuturaRow[];
@@ -52,6 +65,14 @@ export default async function ComprasFuturasPage() {
     0,
   );
   const semValor = abertos.filter((i) => i.valor_estimado == null).length;
+
+  const sobraMedia =
+    saldoMensal.reduce((s, m) => s + m.saldo.saldo, 0) / saldoMensal.length;
+  // Só faz sentido projetar prazo se sobra algo e se a lista tem preço.
+  const mesesParaComprarTudo =
+    sobraMedia > 0 && totalEstimado > 0
+      ? Math.ceil(totalEstimado / sobraMedia)
+      : null;
 
   const categoriaById = new Map(categorias.map((c) => [c.id, c] as const));
   const membroById = new Map(membros.map((m) => [m.id, m] as const));
@@ -104,6 +125,55 @@ export default async function ComprasFuturasPage() {
               hint={comprados.length === 1 ? "item" : "itens"}
             />
           </div>
+
+          {totalEstimado > 0 && (
+            <div
+              className={`flex items-center gap-4 rounded-[26px] px-5 py-4 ${
+                sobraMedia > 0
+                  ? "bg-card"
+                  : "border border-accent-300 bg-accent-100"
+              }`}
+            >
+              <div
+                className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
+                  sobraMedia > 0
+                    ? "bg-sage-300 text-sage-800"
+                    : "bg-primary text-primary-foreground"
+                }`}
+              >
+                <PiggyBankIcon className="size-5" strokeWidth={2.75} />
+              </div>
+              <div className="min-w-0 flex-1">
+                {sobraMedia > 0 ? (
+                  <>
+                    <p className="text-[15px] font-semibold">
+                      Sobram {formatBRL(sobraMedia)} por mês, na média
+                    </p>
+                    <p className="text-[13px] text-neutral-700">
+                      Nesse ritmo, a lista inteira sai em{" "}
+                      {mesesParaComprarTudo === 1
+                        ? "cerca de 1 mês"
+                        : `cerca de ${mesesParaComprarTudo} meses`}
+                      {semValor > 0 &&
+                        ` — sem contar ${semValor === 1 ? "o item" : `os ${semValor} itens`} sem valor`}
+                      .
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[15px] font-semibold text-accent-800">
+                      Sem sobra no orçamento
+                    </p>
+                    <p className="text-[13px] text-accent-800/85">
+                      A média dos próximos {MESES_PROJECAO} meses fecha em{" "}
+                      {formatBRL(sobraMedia)}. A lista precisa esperar ou o
+                      orçamento precisa mudar.
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
 
           {GRUPOS.map((g) => {
             const doGrupo = abertos.filter((i) => i.prioridade === g.prioridade);
