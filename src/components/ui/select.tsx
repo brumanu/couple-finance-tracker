@@ -63,7 +63,12 @@ function SelectContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  alignItemWithTrigger = true,
+  // false (em vez do default da lib, que imita o <select> nativo alinhando o
+  // item selecionado por cima do trigger): em listas longas dentro de diálogos
+  // curtos isso fazia o menu abrir "no meio do nada", cobrindo campos e
+  // vazando por baixo do card. Abrir sempre colado abaixo do trigger é mais
+  // previsível e nunca foge do diálogo.
+  alignItemWithTrigger = false,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<
