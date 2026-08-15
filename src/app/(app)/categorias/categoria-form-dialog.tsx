@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,7 @@ import {
   updateCategoria,
   type CategoriaFormState,
 } from "./actions";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 
 export type CategoriaRow = {
   id: string;
@@ -57,7 +58,21 @@ export function CategoriaFormDialog({ categoria, trigger }: Props) {
   const action = isEdit
     ? updateCategoria.bind(null, categoria!.id)
     : createCategoria;
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: CategoriaFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(
+          isEdit ? "Categoria atualizada." : "Categoria cadastrada.",
+        );
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -70,14 +85,7 @@ export function CategoriaFormDialog({ categoria, trigger }: Props) {
 
   const [cor, setCor] = useState(defaults.cor);
 
-  useEffect(() => setCor(defaults.cor), [defaults.cor]);
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Categoria atualizada." : "Categoria cadastrada.");
-    }
-  }, [state, isEdit]);
+  useResetAoAbrir(open, () => setCor(defaults.cor));
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

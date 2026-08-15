@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -26,6 +26,7 @@ import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import {
   createCompraFutura,
   updateCompraFutura,
@@ -71,7 +72,19 @@ export function CompraFuturaFormDialog({
   const action = isEdit
     ? updateCompraFutura.bind(null, item!.id)
     : createCompraFutura;
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: CompraFuturaFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Item atualizado." : "Item adicionado à lista.");
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -102,16 +115,11 @@ export function CompraFuturaFormDialog({
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
   const [quem, setQuem] = useState(defaults.quem);
 
-  useEffect(() => setPrioridade(defaults.prioridade), [defaults.prioridade]);
-  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
-  useEffect(() => setQuem(defaults.quem), [defaults.quem]);
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Item atualizado." : "Item adicionado à lista.");
-    }
-  }, [state, isEdit]);
+  useResetAoAbrir(open, () => {
+    setPrioridade(defaults.prioridade);
+    setCategoriaId(defaults.categoriaId);
+    setQuem(defaults.quem);
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

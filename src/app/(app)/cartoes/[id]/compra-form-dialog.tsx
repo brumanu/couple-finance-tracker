@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { playCoinSound } from "@/lib/sound";
@@ -23,6 +23,7 @@ import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import {
   createCompra,
   updateCompra,
@@ -94,7 +95,20 @@ export function CompraFormDialog({
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(compra);
   const action = isEdit ? updateCompra.bind(null, compra!.id) : createCompra;
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: CompraFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Compra atualizada." : "Compra cadastrada.");
+        if (!isEdit) playCoinSound();
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -133,43 +147,39 @@ export function CompraFormDialog({
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
 
-  useEffect(() => setValorRaw(defaults.valor_total), [defaults.valor_total]);
-  useEffect(() => setDataRaw(defaults.data_compra), [defaults.data_compra]);
-  useEffect(() => setParcelasRaw(defaults.parcelas), [defaults.parcelas]);
-  useEffect(() => setEmAndamento(defaults.em_andamento), [defaults.em_andamento]);
-  useEffect(
-    () => setParcelaAtualRaw(defaults.parcela_atual),
-    [defaults.parcela_atual],
-  );
-  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
-  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
+  useResetAoAbrir(open, () => {
+    setValorRaw(defaults.valor_total);
+    setDataRaw(defaults.data_compra);
+    setParcelasRaw(defaults.parcelas);
+    setEmAndamento(defaults.em_andamento);
+    setParcelaAtualRaw(defaults.parcela_atual);
+    setCategoriaId(defaults.categoriaId);
+    setQuemGastou(defaults.quemGastou);
+  });
 
-  // Quando marca "em andamento", sobrescreve data_compra retroativamente.
-  // Só recalcula se parcela_atual >= 2 (parcela 1 = compra nova; nesse caso
-  // deveria desmarcar o checkbox).
-  useEffect(() => {
-    if (!emAndamento) return;
-    const parcelaAtual = Number(parcelaAtualRaw);
-    if (!Number.isInteger(parcelaAtual) || parcelaAtual < 2) return;
-    setDataRaw(calcularDataCompraRetro(parcelaAtual));
-  }, [emAndamento, parcelaAtualRaw]);
+  // "Em andamento" sobrescreve data_compra retroativamente: a parcela 1 tem
+  // que cair (parcelaAtual - 1) meses atrás pra atual bater no mês corrente.
+  // Só recalcula de 2 em diante — parcela 1 é compra nova, sem retroativo.
+  function aplicarDataRetroativa(parcelaAtual: string) {
+    const n = Number(parcelaAtual);
+    if (!Number.isInteger(n) || n < 2) return;
+    setDataRaw(calcularDataCompraRetro(n));
+  }
 
-  // Se o usuário marca o checkbox pela primeira vez (numa compra nova),
-  // limpa o campo de parcela atual pra forçar ele a digitar um número real.
-  // No modo edição, mantém o valor original da compra.
-  useEffect(() => {
-    if (!emAndamento) return;
-    if (!isEdit && parcelaAtualRaw === "1") setParcelaAtualRaw("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emAndamento]);
+  function onEmAndamentoChange(marcado: boolean) {
+    setEmAndamento(marcado);
+    if (!marcado) return;
+    // Marcou numa compra nova: limpa o campo pra forçar digitar a parcela
+    // real. No modo edição mantém o valor que veio da compra.
+    const proxima = !isEdit && parcelaAtualRaw === "1" ? "" : parcelaAtualRaw;
+    setParcelaAtualRaw(proxima);
+    aplicarDataRetroativa(proxima);
+  }
 
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Compra atualizada." : "Compra cadastrada.");
-      if (!isEdit) playCoinSound();
-    }
-  }, [state, isEdit]);
+  function onParcelaAtualChange(valor: string) {
+    setParcelaAtualRaw(valor);
+    if (emAndamento) aplicarDataRetroativa(valor);
+  }
 
   const valorInvalido = useMemo(() => {
     if (!valorRaw.trim()) return false;
@@ -345,7 +355,7 @@ export function CompraFormDialog({
                 type="checkbox"
                 name="em_andamento"
                 checked={emAndamento}
-                onChange={(e) => setEmAndamento(e.target.checked)}
+                onChange={(e) => onEmAndamentoChange(e.target.checked)}
                 className="size-4 rounded border-input"
               />
               Compra em andamento (já paguei algumas parcelas antes de
@@ -367,7 +377,7 @@ export function CompraFormDialog({
                     min={1}
                     max={Number(parcelasRaw) || 60}
                     value={parcelaAtualRaw}
-                    onChange={(e) => setParcelaAtualRaw(e.target.value)}
+                    onChange={(e) => onParcelaAtualChange(e.target.value)}
                     className="max-w-[120px]"
                   />
                   <span className="text-sm text-muted-foreground">

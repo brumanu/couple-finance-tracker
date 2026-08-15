@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BancoIcone } from "@/lib/bancos-icones";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import { createCartao, updateCartao, type CartaoFormState } from "./actions";
 
 export type CartaoRow = {
@@ -63,7 +64,19 @@ export function CartaoFormDialog({ cartao, bancos, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(cartao);
   const action = isEdit ? updateCartao.bind(null, cartao!.id) : createCartao;
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: CartaoFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Cartão atualizado." : "Cartão cadastrado.");
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -87,14 +100,7 @@ export function CartaoFormDialog({ cartao, bancos, trigger }: Props) {
   );
 
   const [bancoId, setBancoId] = useState(defaults.banco_id);
-  useEffect(() => setBancoId(defaults.banco_id), [defaults.banco_id]);
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Cartão atualizado." : "Cartão cadastrado.");
-    }
-  }, [state, isEdit]);
+  useResetAoAbrir(open, () => setBancoId(defaults.banco_id));
 
   const semBanco = bancos.length === 0;
   const bancoSelecionado = bancos.find((b) => b.id === bancoId);

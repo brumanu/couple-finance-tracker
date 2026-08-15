@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { playCoinSound } from "@/lib/sound";
@@ -27,6 +27,7 @@ import { hojeISO } from "@/lib/mes";
 import { parseBRLInput } from "@/lib/format";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import {
   createRendaExtra,
   updateRendaExtra,
@@ -71,7 +72,20 @@ export function RendaExtraFormDialog({
     ? updateRendaExtra.bind(null, rendaExtra!.id)
     : createRendaExtra;
 
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: RendaExtraFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Renda extra atualizada." : "Renda extra cadastrada.");
+        if (!isEdit) playCoinSound();
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(() => {
     const data = rendaExtra?.data_pagamento ?? todayISO();
@@ -100,20 +114,19 @@ export function RendaExtraFormDialog({
   const [quinzenaTouched, setQuinzenaTouched] = useState(false);
   const [valorRaw, setValorRaw] = useState(defaults.valor);
 
-  useEffect(() => setValorRaw(defaults.valor), [defaults.valor]);
-  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
-
   const valorInvalido = useMemo(() => {
     if (!valorRaw.trim()) return false;
     const n = parseBRLInput(valorRaw);
     return n === null || n <= 0;
   }, [valorRaw]);
 
-  useEffect(() => {
+  useResetAoAbrir(open, () => {
+    setValorRaw(defaults.valor);
+    setCategoriaId(defaults.categoriaId);
     setDataValue(defaults.data);
     setQuinzena(defaults.quinzena);
     setQuinzenaTouched(false);
-  }, [open, defaults.data, defaults.quinzena]);
+  });
 
   function handleDataChange(novaData: string) {
     setDataValue(novaData);
@@ -121,14 +134,6 @@ export function RendaExtraFormDialog({
       setQuinzena(inferQuinzena(novaData));
     }
   }
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Renda extra atualizada." : "Renda extra cadastrada.");
-      if (!isEdit) playCoinSound();
-    }
-  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

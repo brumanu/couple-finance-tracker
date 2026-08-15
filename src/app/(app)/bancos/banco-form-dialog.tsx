@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -29,6 +29,7 @@ import {
   isBancoIconeId,
   type BancoIconeId,
 } from "@/lib/bancos-icones";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import { createBanco, updateBanco, type BancoFormState } from "./actions";
 
 export type BancoRow = {
@@ -55,7 +56,19 @@ export function BancoFormDialog({ banco, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(banco);
   const action = isEdit ? updateBanco.bind(null, banco!.id) : createBanco;
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: BancoFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Banco atualizado." : "Banco cadastrado.");
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(() => {
     const iconeInicial: BancoIconeId =
@@ -68,17 +81,10 @@ export function BancoFormDialog({ banco, trigger }: Props) {
 
   const [icone, setIcone] = useState<BancoIconeId>(defaults.icone);
   const [nome, setNome] = useState(defaults.nome);
-  useEffect(() => {
+  useResetAoAbrir(open, () => {
     setIcone(defaults.icone);
     setNome(defaults.nome);
-  }, [defaults.icone, defaults.nome]);
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Banco atualizado." : "Banco cadastrado.");
-    }
-  }, [state, isEdit]);
+  });
 
   function onIconeChange(novo: string | null) {
     if (!novo || !isBancoIconeId(novo)) return;

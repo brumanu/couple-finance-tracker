@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeftIcon, ChevronRightIcon, Loader2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,10 +19,9 @@ export function MonthSwitcher({ mes }: Props) {
   const [isPending, startTransition] = useTransition();
   const [direcao, setDirecao] = useState<Direcao>(null);
 
-  useEffect(() => {
-    if (!isPending) setDirecao(null);
-  }, [isPending]);
-
+  // `direcao` não precisa ser zerada quando a transição acaba: o spinner já
+  // é condicionado a `isPending`, então o valor antigo fica inerte até o
+  // próximo clique — que o sobrescreve antes de começar a transição.
   const prev = mesAnterior(mes);
   const next = mesProximo(mes);
 

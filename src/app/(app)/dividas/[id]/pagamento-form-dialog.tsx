@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -33,8 +33,17 @@ const todayISO = hojeISO;
 
 export function PagamentoFormDialog({ dividaId, restante }: Props) {
   const [open, setOpen] = useState(false);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
   const [state, formAction, pending] = useActionState(
-    createPagamento,
+    async (prev: PagamentoDividaFormState, formData: FormData) => {
+      const resultado = await createPagamento(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success("Pagamento registrado.");
+      }
+      return resultado;
+    },
     INITIAL_STATE,
   );
 
@@ -48,13 +57,6 @@ export function PagamentoFormDialog({ dividaId, restante }: Props) {
     }),
     [restante],
   );
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success("Pagamento registrado.");
-    }
-  }, [state]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

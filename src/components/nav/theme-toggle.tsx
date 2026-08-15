@@ -1,18 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { SunIcon, MoonIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Theme = "light" | "dark";
 
-function readInitialTheme(): Theme {
-  if (typeof window === "undefined") return "light";
-  const stored = window.localStorage.getItem("theme");
-  if (stored === "light" || stored === "dark") return stored;
+// O tema vive no localStorage + na classe do <html> (um script inline decide
+// antes do React montar). Lido via useSyncExternalStore: no servidor o
+// snapshot é null — vira o placeholder invisível — e o valor real entra na
+// hidratação, sem mismatch e sem setState dentro de effect.
+const listeners = new Set<() => void>();
+
+function subscribe(onChange: () => void): () => void {
+  listeners.add(onChange);
+  return () => {
+    listeners.delete(onChange);
+  };
+}
+
+function getSnapshot(): Theme | null {
+  try {
+    const stored = window.localStorage.getItem("theme");
+    if (stored === "light" || stored === "dark") return stored;
+  } catch {}
   return window.matchMedia("(prefers-color-scheme: dark)").matches
     ? "dark"
     : "light";
+}
+
+function getServerSnapshot(): Theme | null {
+  return null;
+}
+
+function aplicarTema(novo: Theme): void {
+  try {
+    window.localStorage.setItem("theme", novo);
+  } catch {}
+  const el = document.documentElement;
+  if (novo === "dark") el.classList.add("dark");
+  else el.classList.remove("dark");
+  for (const l of listeners) l();
 }
 
 type Props = {
@@ -21,28 +49,10 @@ type Props = {
 };
 
 export function ThemeToggle({ className, showLabel = false }: Props) {
-  const [theme, setTheme] = useState<Theme>("light");
-  const [mounted, setMounted] = useState(false);
+  const theme = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  useEffect(() => {
-    setTheme(readInitialTheme());
-    setMounted(true);
-  }, []);
-
-  function toggle() {
-    const novo: Theme = theme === "dark" ? "light" : "dark";
-    setTheme(novo);
-    try {
-      window.localStorage.setItem("theme", novo);
-    } catch {}
-    const el = document.documentElement;
-    if (novo === "dark") el.classList.add("dark");
-    else el.classList.remove("dark");
-  }
-
-  // Renderiza um placeholder invisível até montar pra evitar mismatch
-  // de hidratação (o script inline decide o tema antes de o React montar).
-  if (!mounted) {
+  // Placeholder invisível até a hidratação resolver o tema real.
+  if (theme === null) {
     return (
       <button
         aria-hidden
@@ -62,7 +72,7 @@ export function ThemeToggle({ className, showLabel = false }: Props) {
   return (
     <button
       type="button"
-      onClick={toggle}
+      onClick={() => aplicarTema(theme === "dark" ? "light" : "dark")}
       aria-label={label}
       title={label}
       className={cn(

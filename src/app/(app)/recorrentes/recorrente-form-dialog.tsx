@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { playCoinSound } from "@/lib/sound";
@@ -27,6 +27,7 @@ import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import {
   createRecorrente,
   updateRecorrente,
@@ -67,7 +68,20 @@ export function RecorrenteFormDialog({
     ? updateRecorrente.bind(null, recorrente!.id)
     : createRecorrente;
 
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: RecorrenteFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Conta atualizada." : "Conta cadastrada.");
+        if (!isEdit) playCoinSound();
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -98,18 +112,12 @@ export function RecorrenteFormDialog({
   );
 
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
-  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
-
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
-  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
 
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Conta atualizada." : "Conta cadastrada.");
-      if (!isEdit) playCoinSound();
-    }
-  }, [state, isEdit]);
+  useResetAoAbrir(open, () => {
+    setCategoriaId(defaults.categoriaId);
+    setQuemGastou(defaults.quemGastou);
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

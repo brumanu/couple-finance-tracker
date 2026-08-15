@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { playCoinSound } from "@/lib/sound";
@@ -52,7 +52,20 @@ export function RendaFormDialog({ renda, trigger }: Props) {
     ? updateRenda.bind(null, renda!.id)
     : createRenda;
 
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: RendaFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Renda atualizada." : "Renda cadastrada.");
+        if (!isEdit) playCoinSound();
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -66,14 +79,6 @@ export function RendaFormDialog({ renda, trigger }: Props) {
     }),
     [renda?.id, renda?.descricao, renda?.valor_previsto, renda?.dia_recebimento, renda?.ativa],
   );
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Renda atualizada." : "Renda cadastrada.");
-      if (!isEdit) playCoinSound();
-    }
-  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

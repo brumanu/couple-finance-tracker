@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import { playCoinSound } from "@/lib/sound";
@@ -31,6 +31,7 @@ import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import {
   createDespesa,
   updateDespesa,
@@ -82,7 +83,20 @@ export function DespesaFormDialog({
     ? updateDespesa.bind(null, despesa!.id)
     : createDespesa;
 
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: DespesaFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Despesa atualizada." : "Despesa cadastrada.");
+        if (!isEdit) playCoinSound();
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(() => {
     const data = despesa?.data_pagamento ?? todayISO();
@@ -117,30 +131,27 @@ export function DespesaFormDialog({
   const [quinzenaTouched, setQuinzenaTouched] = useState(false);
   const [valorRaw, setValorRaw] = useState(defaults.valor);
 
-  useEffect(() => setValorRaw(defaults.valor), [defaults.valor]);
-
   const valorInvalido = useMemo(() => {
     if (!valorRaw.trim()) return false;
     const n = parseBRLInput(valorRaw);
     return n === null || n <= 0;
   }, [valorRaw]);
 
-  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
-  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
-
-  useEffect(() => {
+  useResetAoAbrir(open, () => {
+    setValorRaw(defaults.valor);
+    setCategoriaId(defaults.categoriaId);
+    setQuemGastou(defaults.quemGastou);
+    setDataValue(defaults.data);
+    setQuinzena(defaults.quinzena);
+    setQuinzenaTouched(false);
+    // Cartão/parcelamento só existem no cadastro — na edição a despesa já
+    // nasceu avulsa e não pode virar compra de cartão.
     if (!isEdit) {
       setCartaoId(NENHUM);
       setParcelada(false);
       setParcelasRaw("2");
     }
-  }, [isEdit, open]);
-
-  useEffect(() => {
-    setDataValue(defaults.data);
-    setQuinzena(defaults.quinzena);
-    setQuinzenaTouched(false);
-  }, [open, defaults.data, defaults.quinzena]);
+  });
 
   function handleDataChange(novaData: string) {
     setDataValue(novaData);
@@ -149,22 +160,14 @@ export function DespesaFormDialog({
     }
   }
 
-  useEffect(() => {
-    if (cartaoId === NENHUM) {
-      setParcelada(false);
-    }
-  }, [cartaoId]);
+  function handleCartaoChange(novoCartao: string) {
+    setCartaoId(novoCartao);
+    // Sem cartão não existe parcelamento.
+    if (novoCartao === NENHUM) setParcelada(false);
+  }
 
   const usaCartao = cartaoId !== NENHUM;
   const cartaoSelecionado = cartoes.find((c) => c.id === cartaoId);
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Despesa atualizada." : "Despesa cadastrada.");
-      if (!isEdit) playCoinSound();
-    }
-  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -260,7 +263,7 @@ export function DespesaFormDialog({
               />
               <Select
                 value={cartaoId}
-                onValueChange={(v) => v && setCartaoId(v)}
+                onValueChange={(v) => v && handleCartaoChange(v)}
               >
                 <SelectTrigger id="cartao_id">
                   <SelectValue>

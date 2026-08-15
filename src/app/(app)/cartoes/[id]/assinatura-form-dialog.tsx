@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { RepeatIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,7 @@ import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
+import { useResetAoAbrir } from "@/lib/form-dialog";
 import {
   createAssinatura,
   updateAssinatura,
@@ -63,7 +64,21 @@ export function AssinaturaFormDialog({
   const action = isEdit
     ? updateAssinatura.bind(null, assinatura!.id)
     : createAssinatura;
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: AssinaturaFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(
+          isEdit ? "Assinatura atualizada." : "Assinatura cadastrada.",
+        );
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -91,16 +106,12 @@ export function AssinaturaFormDialog({
   );
 
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
-  useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
-  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
 
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Assinatura atualizada." : "Assinatura cadastrada.");
-    }
-  }, [state, isEdit]);
+  useResetAoAbrir(open, () => {
+    setCategoriaId(defaults.categoriaId);
+    setQuemGastou(defaults.quemGastou);
+  });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>

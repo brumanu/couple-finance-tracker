@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { PlusIcon, PencilIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -34,7 +34,19 @@ export function DividaFormDialog({ divida, trigger }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(divida);
   const action = isEdit ? updateDivida.bind(null, divida!.id) : createDivida;
-  const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
+  // Fecha/notifica dentro da própria action em vez de um useEffect que
+  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
+  const [state, formAction, pending] = useActionState(
+    async (prev: DividaFormState, formData: FormData) => {
+      const resultado = await action(prev, formData);
+      if (resultado.ok) {
+        setOpen(false);
+        toast.success(isEdit ? "Dívida atualizada." : "Dívida cadastrada.");
+      }
+      return resultado;
+    },
+    INITIAL_STATE,
+  );
 
   const defaults = useMemo(
     () => ({
@@ -46,13 +58,6 @@ export function DividaFormDialog({ divida, trigger }: Props) {
     }),
     [divida?.id, divida?.descricao, divida?.valor_total],
   );
-
-  useEffect(() => {
-    if (state.ok) {
-      setOpen(false);
-      toast.success(isEdit ? "Dívida atualizada." : "Dívida cadastrada.");
-    }
-  }, [state, isEdit]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
