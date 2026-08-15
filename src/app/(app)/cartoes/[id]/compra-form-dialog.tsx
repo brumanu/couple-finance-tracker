@@ -252,9 +252,9 @@ export function CompraFormDialog({
             {isEdit ? "Editar compra" : "Nova compra no cartão"}
           </DialogTitle>
           <DialogDescription>
-            Se for parcelada, o sistema distribui pelos meses a partir da
-            data da compra. Se algumas parcelas já correram antes de você
-            cadastrar, marca &ldquo;compra em andamento&rdquo;.
+            {isEdit
+              ? "Mudar parcelas ou data redistribui as faturas automaticamente."
+              : "Se for parcelada, o valor é distribuído pelos meses a partir da data da compra."}
           </DialogDescription>
         </DialogHeader>
 

@@ -102,7 +102,11 @@ function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end",
+        // Gruda no rodapé do popup (que é o container de scroll): em diálogos
+        // altos os botões ficam sempre visíveis, sem precisar rolar pra salvar.
+        // As margens negativas casam com o p-6 do DialogContent pra faixa
+        // ocupar a largura toda e cobrir o conteúdo que passa por baixo.
+        "sticky bottom-0 z-10 -mx-6 -mb-6 flex flex-col-reverse gap-2 border-t border-border/60 bg-popover px-6 pt-3 pb-6 sm:flex-row sm:justify-end",
         className
       )}
       {...props}
