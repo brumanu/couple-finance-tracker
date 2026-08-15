@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { getCategorias } from "@/lib/categorias-server";
+import { getMembrosCasal } from "@/lib/membros-server";
 import { Sidebar } from "@/components/nav/sidebar";
 import { BottomNav } from "@/components/nav/bottom-nav";
 import { MobileHeader } from "@/components/nav/mobile-header";
@@ -13,10 +14,11 @@ import { SwRegister } from "@/components/push/sw-register";
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   // As três não dependem uma da outra (RLS escopa por cookie de sessão),
   // então rodam em paralelo em vez de esperar a sessão resolver primeiro.
-  const [session, cartoes, categorias] = await Promise.all([
+  const [session, cartoes, categorias, membros] = await Promise.all([
     requireSession(),
     getCartoesParaSelecao(),
     getCategorias(),
+    getMembrosCasal(),
   ]);
 
   return (
@@ -37,7 +39,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         </div>
 
         <BottomNav />
-        <MobileFab cartoes={cartoes} categorias={categorias} />
+        <MobileFab cartoes={cartoes} categorias={categorias} membros={membros} />
         <Toaster />
         <GlobalSearchDialog />
         <SwRegister />

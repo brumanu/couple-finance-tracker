@@ -17,6 +17,7 @@ import {
 import { BancoIcone } from "@/lib/bancos-icones";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { getCategorias } from "@/lib/categorias-server";
+import { getMembrosCasal } from "@/lib/membros-server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -166,6 +167,7 @@ export default async function DashboardPage({
     session,
     cartoesSel,
     categorias,
+    membros,
     rendasRes,
     contasRes,
     lancRes,
@@ -179,6 +181,7 @@ export default async function DashboardPage({
     requireSession(),
     getCartoesParaSelecao(),
     getCategorias(),
+    getMembrosCasal(),
     supabase
       .from("rendas")
       .select("descricao, valor_previsto, dia_recebimento")
@@ -458,7 +461,11 @@ export default async function DashboardPage({
         <div className="flex items-center gap-3">
           <MonthSwitcher mes={mes} />
           <div className="hidden md:block">
-            <DespesaFormDialog cartoes={cartoesSel} categorias={categorias} />
+            <DespesaFormDialog
+              cartoes={cartoesSel}
+              categorias={categorias}
+              membros={membros}
+            />
           </div>
         </div>
       </header>
