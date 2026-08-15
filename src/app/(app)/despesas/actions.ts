@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
 import { resolverCategoria } from "@/lib/categorias-server";
+import { resolverQuemGastou } from "@/lib/membros-server";
 
 export type DespesaFormState = { error?: string; ok?: boolean };
 
@@ -24,14 +25,25 @@ type ParsedCompra = {
 };
 
 type ParsedInput =
-  | { tipo: "despesa"; dados: ParsedDespesa; categoria_id_raw: string }
-  | { tipo: "compra_cartao"; dados: ParsedCompra; categoria_id_raw: string };
+  | {
+      tipo: "despesa";
+      dados: ParsedDespesa;
+      categoria_id_raw: string;
+      quem_gastou_raw: string;
+    }
+  | {
+      tipo: "compra_cartao";
+      dados: ParsedCompra;
+      categoria_id_raw: string;
+      quem_gastou_raw: string;
+    };
 
 function parseFormData(formData: FormData): ParsedInput | string {
   const descricao = String(formData.get("descricao") ?? "").trim();
   const valorRaw = String(formData.get("valor") ?? "").trim();
   const data = String(formData.get("data") ?? "").trim();
   const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
+  const quem_gastou_raw = String(formData.get("quem_gastou") ?? "").trim();
   const cartao_id = String(formData.get("cartao_id") ?? "").trim();
 
   if (!descricao) return "Descrição é obrigatória.";
@@ -49,6 +61,7 @@ function parseFormData(formData: FormData): ParsedInput | string {
     return {
       tipo: "compra_cartao",
       categoria_id_raw,
+      quem_gastou_raw,
       dados: {
         cartao_id,
         descricao,
@@ -67,6 +80,7 @@ function parseFormData(formData: FormData): ParsedInput | string {
   return {
     tipo: "despesa",
     categoria_id_raw,
+    quem_gastou_raw,
     dados: {
       descricao,
       valor,
@@ -104,6 +118,13 @@ export async function createDespesa(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
   if (parsed.tipo === "compra_cartao") {
     const { error } = await supabase.from("compras_cartao").insert({
       casal_id: profile.casal_id,
@@ -115,6 +136,7 @@ export async function createDespesa(
       parcelas: parsed.dados.parcelas,
       parcelas_ja_pagas: 0,
       ...categoriaResolved,
+      ...quemGastouResolved,
     });
     if (error) return { error: error.message };
 
@@ -132,6 +154,7 @@ export async function createDespesa(
     criado_por: user.id,
     ...parsed.dados,
     ...categoriaResolved,
+    ...quemGastouResolved,
   });
   if (error) return { error: error.message };
 
@@ -165,9 +188,16 @@ export async function updateDespesa(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
   const { error } = await supabase
     .from("lancamentos")
-    .update({ ...parsed.dados, ...categoriaResolved })
+    .update({ ...parsed.dados, ...categoriaResolved, ...quemGastouResolved })
     .eq("id", id)
     .eq("tipo", "despesa_avulsa");
   if (error) return { error: error.message };
