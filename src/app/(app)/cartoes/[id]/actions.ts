@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
 import { resolverCategoria } from "@/lib/categorias-server";
+import { resolverQuemGastou } from "@/lib/membros-server";
 
 export type CompraFormState = { error?: string; ok?: boolean };
 
@@ -15,6 +16,7 @@ type Parsed = {
   parcelas: number;
   parcelas_ja_pagas: number;
   categoria_id_raw: string;
+  quem_gastou_raw: string;
 };
 
 function parseFormData(formData: FormData): Parsed | string {
@@ -30,6 +32,7 @@ function parseFormData(formData: FormData): Parsed | string {
   const parcela_atual =
     emAndamento && parcelaAtualRaw ? Number(parcelaAtualRaw) : 1;
   const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
+  const quem_gastou_raw = String(formData.get("quem_gastou") ?? "").trim();
 
   if (!cartao_id) return "Cartão inválido.";
   if (!descricao) return "Descrição é obrigatória.";
@@ -56,6 +59,7 @@ function parseFormData(formData: FormData): Parsed | string {
     parcelas,
     parcelas_ja_pagas,
     categoria_id_raw,
+    quem_gastou_raw,
   };
 }
 
@@ -86,14 +90,23 @@ export async function createCompra(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
-  const { categoria_id_raw, ...rest } = parsed;
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
+  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
   void categoria_id_raw;
+  void quem_gastou_raw;
 
   const { error } = await supabase.from("compras_cartao").insert({
     casal_id: profile.casal_id,
     criado_por: user.id,
     ...rest,
     ...categoriaResolved,
+    ...quemGastouResolved,
   });
   if (error) return { error: error.message };
 
@@ -120,12 +133,20 @@ export async function updateCompra(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
-  const { categoria_id_raw, ...rest } = parsed;
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
+  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
   void categoria_id_raw;
+  void quem_gastou_raw;
 
   const { error } = await supabase
     .from("compras_cartao")
-    .update({ ...rest, ...categoriaResolved })
+    .update({ ...rest, ...categoriaResolved, ...quemGastouResolved })
     .eq("id", id);
   if (error) return { error: error.message };
 

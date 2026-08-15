@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label";
 import { hojeISO } from "@/lib/mes";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
+import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
+import { QuemGastouSelectField } from "@/components/quem-gastou-select";
 import {
   createAssinatura,
   updateAssinatura,
@@ -34,6 +36,7 @@ export type AssinaturaRow = {
   inicio_vigencia: string;
   fim_vigencia: string | null;
   ativa: boolean;
+  quem_gastou: string | null;
 };
 
 type Props = {
@@ -41,6 +44,7 @@ type Props = {
   assinatura?: AssinaturaRow;
   trigger?: React.ReactElement;
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 };
 
 const INITIAL_STATE: AssinaturaFormState = {};
@@ -52,6 +56,7 @@ export function AssinaturaFormDialog({
   assinatura,
   trigger,
   categorias = [],
+  membros = [],
 }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(assinatura);
@@ -71,6 +76,7 @@ export function AssinaturaFormDialog({
       inicio_vigencia: assinatura?.inicio_vigencia ?? todayISO(),
       fim_vigencia: assinatura?.fim_vigencia ?? "",
       ativa: assinatura?.ativa ?? true,
+      quemGastou: assinatura?.quem_gastou ?? NENHUM_QUEM,
     }),
     [
       assinatura?.id,
@@ -80,11 +86,14 @@ export function AssinaturaFormDialog({
       assinatura?.inicio_vigencia,
       assinatura?.fim_vigencia,
       assinatura?.ativa,
+      assinatura?.quem_gastou,
     ],
   );
 
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
   useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
+  const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
+  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
 
   useEffect(() => {
     if (state.ok) {
@@ -166,6 +175,20 @@ export function AssinaturaFormDialog({
             </div>
           </div>
 
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="quem_gastou"
+              className="text-xs text-muted-foreground"
+            >
+              Quem gastou (opcional)
+            </Label>
+            <QuemGastouSelectField
+              membros={membros}
+              value={quemGastou}
+              onValueChange={setQuemGastou}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
               <Label
@@ -240,16 +263,19 @@ export function EditAssinaturaTrigger({
   assinatura,
   cartaoId,
   categorias,
+  membros,
 }: {
   assinatura: AssinaturaRow;
   cartaoId: string;
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 }) {
   return (
     <AssinaturaFormDialog
       cartaoId={cartaoId}
       assinatura={assinatura}
       categorias={categorias}
+      membros={membros}
       trigger={
         <Button variant="ghost" size="icon-sm" aria-label="Editar">
           <PencilIcon className="size-4" strokeWidth={2.75} />
