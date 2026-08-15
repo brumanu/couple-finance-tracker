@@ -29,6 +29,8 @@ import { BancoIcone } from "@/lib/bancos-icones";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
+import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
+import { QuemGastouSelectField } from "@/components/quem-gastou-select";
 import {
   createDespesa,
   updateDespesa,
@@ -44,6 +46,7 @@ export type DespesaRow = {
   quinzena: number | null;
   categoria: string | null;
   categoria_id: string | null;
+  quem_gastou: string | null;
 };
 
 type Props = {
@@ -51,6 +54,7 @@ type Props = {
   trigger?: React.ReactElement;
   cartoes?: CartaoOpcao[];
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 };
 
 const INITIAL_STATE: DespesaFormState = {};
@@ -69,6 +73,7 @@ export function DespesaFormDialog({
   trigger,
   cartoes = [],
   categorias = [],
+  membros = [],
 }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(despesa);
@@ -90,6 +95,7 @@ export function DespesaFormDialog({
       data,
       quinzena: String(despesa?.quinzena ?? inferQuinzena(data)),
       categoriaId: despesa?.categoria_id ?? NENHUMA_CATEGORIA,
+      quemGastou: despesa?.quem_gastou ?? NENHUM_QUEM,
     };
   }, [
     despesa?.id,
@@ -98,12 +104,14 @@ export function DespesaFormDialog({
     despesa?.data_pagamento,
     despesa?.quinzena,
     despesa?.categoria_id,
+    despesa?.quem_gastou,
   ]);
 
   const [cartaoId, setCartaoId] = useState<string>(NENHUM);
   const [parcelada, setParcelada] = useState(false);
   const [parcelasRaw, setParcelasRaw] = useState("2");
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
+  const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
   const [dataValue, setDataValue] = useState(defaults.data);
   const [quinzena, setQuinzena] = useState(defaults.quinzena);
   const [quinzenaTouched, setQuinzenaTouched] = useState(false);
@@ -118,6 +126,7 @@ export function DespesaFormDialog({
   }, [valorRaw]);
 
   useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
+  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
 
   useEffect(() => {
     if (!isEdit) {
@@ -372,6 +381,19 @@ export function DespesaFormDialog({
                   onValueChange={setCategoriaId}
                 />
               </div>
+              <div className="flex flex-col gap-2">
+                <Label
+                  htmlFor="quem_gastou"
+                  className="text-xs text-muted-foreground"
+                >
+                  Quem gastou (opcional)
+                </Label>
+                <QuemGastouSelectField
+                  membros={membros}
+                  value={quemGastou}
+                  onValueChange={setQuemGastou}
+                />
+              </div>
             </div>
           )}
 
@@ -387,6 +409,17 @@ export function DespesaFormDialog({
                 categorias={categorias}
                 value={categoriaId}
                 onValueChange={setCategoriaId}
+              />
+              <Label
+                htmlFor="quem_gastou"
+                className="text-xs text-muted-foreground"
+              >
+                Quem gastou (opcional)
+              </Label>
+              <QuemGastouSelectField
+                membros={membros}
+                value={quemGastou}
+                onValueChange={setQuemGastou}
               />
             </div>
           )}
@@ -423,14 +456,17 @@ export function DespesaFormDialog({
 export function EditDespesaTrigger({
   despesa,
   categorias,
+  membros,
 }: {
   despesa: DespesaRow;
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 }) {
   return (
     <DespesaFormDialog
       despesa={despesa}
       categorias={categorias}
+      membros={membros}
       trigger={
         <Button variant="ghost" size="icon-sm" aria-label="Editar">
           <PencilIcon className="size-4" strokeWidth={2.75} />

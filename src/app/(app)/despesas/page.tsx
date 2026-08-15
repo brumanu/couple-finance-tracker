@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { getCategorias } from "@/lib/categorias-server";
+import { getMembrosCasal } from "@/lib/membros-server";
 import { parseMesParam, mesAnterior } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
@@ -41,16 +42,17 @@ export default async function DespesasPage({
   const mes = parseMesParam(mesParam);
   const anterior = mesAnterior(mes);
 
-  const [cartoes, categorias] = await Promise.all([
+  const [cartoes, categorias, membros] = await Promise.all([
     getCartoesParaSelecao(),
     getCategorias(),
+    getMembrosCasal(),
   ]);
 
   const [atualRes, anteriorRes] = await Promise.all([
     supabase
       .from("lancamentos")
       .select(
-        "id, descricao, valor, data_pagamento, data_referencia, quinzena, categoria, categoria_id",
+        "id, descricao, valor, data_pagamento, data_referencia, quinzena, categoria, categoria_id, quem_gastou",
       )
       .eq("tipo", "despesa_avulsa")
       .gte("data_referencia", mes.primeiroDia)
@@ -101,7 +103,11 @@ export default async function DespesasPage({
         <div className="flex items-center gap-3">
           <MonthSwitcher mes={mes} />
           <div className="hidden md:block">
-            <DespesaFormDialog cartoes={cartoes} categorias={categorias} />
+            <DespesaFormDialog
+              cartoes={cartoes}
+              categorias={categorias}
+              membros={membros}
+            />
           </div>
         </div>
       </header>
@@ -156,7 +162,11 @@ export default async function DespesasPage({
             <p className="text-sm text-muted-foreground">
               Nenhuma despesa lançada em {mes.label}.
             </p>
-            <DespesaFormDialog cartoes={cartoes} categorias={categorias} />
+            <DespesaFormDialog
+              cartoes={cartoes}
+              categorias={categorias}
+              membros={membros}
+            />
           </div>
         </Card>
       ) : (
@@ -198,6 +208,7 @@ export default async function DespesasPage({
                         <EditDespesaTrigger
                           despesa={d}
                           categorias={categorias}
+                          membros={membros}
                         />
                         <DespesaActionsMenu
                           id={d.id}
