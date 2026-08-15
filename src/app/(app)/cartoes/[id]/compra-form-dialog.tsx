@@ -21,6 +21,8 @@ import { mesPrimeiraParcela, valoresParcelas } from "@/lib/cartao-calc";
 import { buildMes, hojeISO } from "@/lib/mes";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
+import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
+import { QuemGastouSelectField } from "@/components/quem-gastou-select";
 import {
   createCompra,
   updateCompra,
@@ -37,6 +39,7 @@ export type CompraRow = {
   parcelas_ja_pagas: number | null;
   categoria: string | null;
   categoria_id: string | null;
+  quem_gastou: string | null;
 };
 
 type Props = {
@@ -45,6 +48,7 @@ type Props = {
   compra?: CompraRow;
   trigger?: React.ReactElement;
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 };
 
 const INITIAL_STATE: CompraFormState = {};
@@ -85,6 +89,7 @@ export function CompraFormDialog({
   compra,
   trigger,
   categorias = [],
+  membros = [],
 }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(compra);
@@ -103,6 +108,7 @@ export function CompraFormDialog({
       em_andamento: (compra?.parcelas_ja_pagas ?? 0) > 0,
       parcela_atual: String((compra?.parcelas_ja_pagas ?? 0) + 1),
       categoriaId: compra?.categoria_id ?? NENHUMA_CATEGORIA,
+      quemGastou: compra?.quem_gastou ?? NENHUM_QUEM,
     }),
     [
       compra?.id,
@@ -112,6 +118,7 @@ export function CompraFormDialog({
       compra?.parcelas,
       compra?.parcelas_ja_pagas,
       compra?.categoria_id,
+      compra?.quem_gastou,
     ],
   );
 
@@ -124,6 +131,7 @@ export function CompraFormDialog({
     defaults.parcela_atual,
   );
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
+  const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
 
   useEffect(() => setValorRaw(defaults.valor_total), [defaults.valor_total]);
   useEffect(() => setDataRaw(defaults.data_compra), [defaults.data_compra]);
@@ -134,6 +142,7 @@ export function CompraFormDialog({
     [defaults.parcela_atual],
   );
   useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
+  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
 
   // Quando marca "em andamento", sobrescreve data_compra retroativamente.
   // Só recalcula se parcela_atual >= 2 (parcela 1 = compra nova; nesse caso
@@ -383,6 +392,20 @@ export function CompraFormDialog({
             />
           </div>
 
+          <div className="flex flex-col gap-2">
+            <Label
+              htmlFor="quem_gastou"
+              className="text-xs text-muted-foreground"
+            >
+              Quem gastou (opcional)
+            </Label>
+            <QuemGastouSelectField
+              membros={membros}
+              value={quemGastou}
+              onValueChange={setQuemGastou}
+            />
+          </div>
+
           {preview && (
             <div className="rounded-2xl border border-border/60 bg-muted p-4">
               {preview.parcelas === 1 ? (
@@ -460,10 +483,12 @@ export function EditCompraTrigger({
   compra,
   diaFechamento,
   categorias,
+  membros,
 }: {
   compra: CompraRow;
   diaFechamento: number;
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 }) {
   return (
     <CompraFormDialog
@@ -471,6 +496,7 @@ export function EditCompraTrigger({
       diaFechamento={diaFechamento}
       compra={compra}
       categorias={categorias}
+      membros={membros}
       trigger={
         <Button variant="ghost" size="icon-sm" aria-label="Editar">
           <PencilIcon className="size-4" strokeWidth={2.75} />

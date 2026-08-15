@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseBRLInput } from "@/lib/format";
 import { resolverCategoria } from "@/lib/categorias-server";
+import { resolverQuemGastou } from "@/lib/membros-server";
 import { hojeISO } from "@/lib/mes";
 
 export type AssinaturaFormState = { error?: string; ok?: boolean };
@@ -13,6 +14,7 @@ type Parsed = {
   descricao: string;
   valor_mensal: number;
   categoria_id_raw: string;
+  quem_gastou_raw: string;
   inicio_vigencia: string;
   fim_vigencia: string | null;
   ativa: boolean;
@@ -23,6 +25,7 @@ function parseFormData(formData: FormData): Parsed | string {
   const descricao = String(formData.get("descricao") ?? "").trim();
   const valorRaw = String(formData.get("valor_mensal") ?? "").trim();
   const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
+  const quem_gastou_raw = String(formData.get("quem_gastou") ?? "").trim();
   const inicio_vigencia =
     String(formData.get("inicio_vigencia") ?? "").trim() ||
     hojeISO();
@@ -47,6 +50,7 @@ function parseFormData(formData: FormData): Parsed | string {
     descricao,
     valor_mensal: valor,
     categoria_id_raw,
+    quem_gastou_raw,
     inicio_vigencia,
     fim_vigencia,
     ativa,
@@ -80,14 +84,23 @@ export async function createAssinatura(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
-  const { categoria_id_raw, ...rest } = parsed;
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
+  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
   void categoria_id_raw;
+  void quem_gastou_raw;
 
   const { error } = await supabase.from("assinaturas_cartao").insert({
     casal_id: profile.casal_id,
     criada_por: user.id,
     ...rest,
     ...categoriaResolved,
+    ...quemGastouResolved,
   });
   if (error) return { error: error.message };
 
@@ -114,12 +127,20 @@ export async function updateAssinatura(
   if (typeof categoriaResolved === "string")
     return { error: categoriaResolved };
 
-  const { categoria_id_raw, ...rest } = parsed;
+  const quemGastouResolved = await resolverQuemGastou(
+    supabase,
+    parsed.quem_gastou_raw,
+  );
+  if (typeof quemGastouResolved === "string")
+    return { error: quemGastouResolved };
+
+  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
   void categoria_id_raw;
+  void quem_gastou_raw;
 
   const { error } = await supabase
     .from("assinaturas_cartao")
-    .update({ ...rest, ...categoriaResolved })
+    .update({ ...rest, ...categoriaResolved, ...quemGastouResolved })
     .eq("id", id);
   if (error) return { error: error.message };
 

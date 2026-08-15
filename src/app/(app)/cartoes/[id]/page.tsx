@@ -19,6 +19,7 @@ import {
 } from "@/lib/cartao-calc";
 import { BancoIcone } from "@/lib/bancos-icones";
 import { getCategorias } from "@/lib/categorias-server";
+import { getMembrosCasal } from "@/lib/membros-server";
 import { MonthSwitcher } from "../../month-switcher";
 import {
   CompraFormDialog,
@@ -80,29 +81,31 @@ export default async function CartaoDetailPage({
   const cartao = cartaoRes.data;
   if (!cartao) notFound();
 
-  const [bancoRes, comprasRes, assinRes, categorias] = await Promise.all([
-    supabase
-      .from("bancos")
-      .select("id, nome, cor, icone")
-      .eq("id", cartao.banco_id)
-      .maybeSingle(),
-    supabase
-      .from("compras_cartao")
-      .select(
-        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id",
-      )
-      .eq("cartao_id", id)
-      .order("data_compra", { ascending: false }),
-    supabase
-      .from("assinaturas_cartao")
-      .select(
-        "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa",
-      )
-      .eq("cartao_id", id)
-      .order("ativa", { ascending: false })
-      .order("descricao", { ascending: true }),
-    getCategorias(),
-  ]);
+  const [bancoRes, comprasRes, assinRes, categorias, membros] =
+    await Promise.all([
+      supabase
+        .from("bancos")
+        .select("id, nome, cor, icone")
+        .eq("id", cartao.banco_id)
+        .maybeSingle(),
+      supabase
+        .from("compras_cartao")
+        .select(
+          "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id, quem_gastou",
+        )
+        .eq("cartao_id", id)
+        .order("data_compra", { ascending: false }),
+      supabase
+        .from("assinaturas_cartao")
+        .select(
+          "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
+        )
+        .eq("cartao_id", id)
+        .order("ativa", { ascending: false })
+        .order("descricao", { ascending: true }),
+      getCategorias(),
+      getMembrosCasal(),
+    ]);
 
   const banco = bancoRes.data;
   const compras = (comprasRes.data ?? []) as CompraRow[];
@@ -177,11 +180,13 @@ export default async function CartaoDetailPage({
           <AssinaturaFormDialog
             cartaoId={cartao.id}
             categorias={categorias}
+            membros={membros}
           />
           <CompraFormDialog
             cartaoId={cartao.id}
             diaFechamento={cartao.dia_fechamento}
             categorias={categorias}
+            membros={membros}
           />
         </div>
       </header>
@@ -235,6 +240,7 @@ export default async function CartaoDetailPage({
                 cartaoId={cartao.id}
                 diaFechamento={cartao.dia_fechamento}
                 categorias={categorias}
+                membros={membros}
               />
             </div>
           </Card>
@@ -343,6 +349,7 @@ export default async function CartaoDetailPage({
                         compra={c}
                         diaFechamento={cartao.dia_fechamento}
                         categorias={categorias}
+                        membros={membros}
                       />
                       <CompraActionsMenu
                         id={c.id}
@@ -372,7 +379,7 @@ export default async function CartaoDetailPage({
               <p className="text-sm text-muted-foreground">
                 Nenhuma assinatura recorrente cadastrada.
               </p>
-              <AssinaturaFormDialog cartaoId={cartao.id} />
+              <AssinaturaFormDialog cartaoId={cartao.id} membros={membros} />
             </div>
           </Card>
         ) : (
@@ -423,6 +430,7 @@ export default async function CartaoDetailPage({
                     <EditAssinaturaTrigger
                       assinatura={a}
                       cartaoId={cartao.id}
+                      membros={membros}
                     />
                     <AssinaturaActionsMenu
                       id={a.id}
