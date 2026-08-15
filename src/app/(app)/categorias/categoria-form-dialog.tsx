@@ -48,7 +48,7 @@ const CORES_SUGERIDAS = [
   "#8e6bb0", // roxo
   "#b0546b", // vinho
   "#a4a89a", // neutral
-  "#3f3a37", // grafite
+  "#7a6f63", // grafite
 ];
 
 export function CategoriaFormDialog({ categoria, trigger }: Props) {

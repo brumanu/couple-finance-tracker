@@ -130,20 +130,20 @@ function ColunaContas({
               }`}
             >
               <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="truncate text-[15px] font-semibold">
+                <div className="flex min-w-0 items-center gap-2">
+                  <p className="min-w-0 truncate text-[15px] font-semibold">
                     {r.descricao}
                   </p>
                   {r.categoria && (
                     <Badge
                       variant={categoriaVariant(r.categoria)}
-                      className="text-[11px]"
+                      className="shrink-0 text-[11px]"
                     >
                       {r.categoria}
                     </Badge>
                   )}
                   {!r.ativa && (
-                    <Badge variant="neutral" className="text-[10px]">
+                    <Badge variant="neutral" className="shrink-0 text-[10px]">
                       pausada
                     </Badge>
                   )}

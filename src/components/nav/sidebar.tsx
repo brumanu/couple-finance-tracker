@@ -62,9 +62,9 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
           // Mobile: painel fixo que desliza da esquerda.
           "fixed inset-y-0 left-0 z-50 flex w-[17rem] shrink-0 flex-col gap-6 overflow-y-auto bg-sidebar px-[18px] py-7 text-sidebar-foreground transition-transform duration-200 ease-out",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
-          // Desktop: volta a ser coluna no fluxo, sempre visível, com a
-          // largura animando entre rail e expandido.
-          "md:static md:z-auto md:translate-x-0 md:overflow-visible md:transition-[width] md:duration-200",
+          // Desktop: fica grudado no topo da viewport enquanto o conteúdo
+          // principal rola, com a largura animando entre rail e expandido.
+          "md:sticky md:top-0 md:z-auto md:h-screen md:translate-x-0 md:transition-[width] md:duration-200",
           railDesktop ? "md:w-[76px] md:px-3" : "md:w-64",
         )}
       >

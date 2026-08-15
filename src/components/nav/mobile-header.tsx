@@ -23,7 +23,7 @@ export function MobileHeader({ nomeCasal, nomeUsuario }: Props) {
   const { setMobileOpen } = useSidebar();
 
   return (
-    <header className="flex items-center gap-2 px-3 pt-6 pb-2 md:hidden">
+    <header className="sticky top-0 z-30 flex items-center gap-2 bg-background px-3 pt-6 pb-2 md:hidden">
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
