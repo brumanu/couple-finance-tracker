@@ -25,6 +25,8 @@ import {
 } from "@/components/ui/select";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
+import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
+import { QuemGastouSelectField } from "@/components/quem-gastou-select";
 import {
   createRecorrente,
   updateRecorrente,
@@ -39,6 +41,7 @@ export type RecorrenteRow = {
   dia_vencimento: number | null;
   categoria: string | null;
   categoria_id: string | null;
+  quem_gastou: string | null;
   ativa: boolean;
 };
 
@@ -46,6 +49,7 @@ type Props = {
   recorrente?: RecorrenteRow;
   trigger?: React.ReactElement;
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 };
 
 const INITIAL_STATE: RecorrenteFormState = {};
@@ -54,6 +58,7 @@ export function RecorrenteFormDialog({
   recorrente,
   trigger,
   categorias = [],
+  membros = [],
 }: Props) {
   const [open, setOpen] = useState(false);
   const isEdit = Boolean(recorrente);
@@ -77,6 +82,7 @@ export function RecorrenteFormDialog({
           ? String(recorrente.dia_vencimento)
           : "",
       categoriaId: recorrente?.categoria_id ?? NENHUMA_CATEGORIA,
+      quemGastou: recorrente?.quem_gastou ?? NENHUM_QUEM,
       ativa: recorrente?.ativa ?? true,
     }),
     [
@@ -86,12 +92,16 @@ export function RecorrenteFormDialog({
       recorrente?.quinzena,
       recorrente?.dia_vencimento,
       recorrente?.categoria_id,
+      recorrente?.quem_gastou,
       recorrente?.ativa,
     ],
   );
 
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
   useEffect(() => setCategoriaId(defaults.categoriaId), [defaults.categoriaId]);
+
+  const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
+  useEffect(() => setQuemGastou(defaults.quemGastou), [defaults.quemGastou]);
 
   useEffect(() => {
     if (state.ok) {
@@ -186,6 +196,15 @@ export function RecorrenteFormDialog({
             />
           </div>
 
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="quem_gastou">Quem gastou (opcional)</Label>
+            <QuemGastouSelectField
+              membros={membros}
+              value={quemGastou}
+              onValueChange={setQuemGastou}
+            />
+          </div>
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -227,14 +246,17 @@ export function RecorrenteFormDialog({
 export function EditRecorrenteTrigger({
   recorrente,
   categorias,
+  membros,
 }: {
   recorrente: RecorrenteRow;
   categorias?: CategoriaOpcao[];
+  membros?: MembroOpcao[];
 }) {
   return (
     <RecorrenteFormDialog
       recorrente={recorrente}
       categorias={categorias}
+      membros={membros}
       trigger={
         <Button variant="ghost" size="sm" aria-label="Editar">
           <PencilIcon className="size-4" />
