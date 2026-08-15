@@ -34,7 +34,14 @@ type LancamentoRow = {
 
 type CartaoRow = {
   id: string;
+  banco_id: string;
+  apelido: string | null;
   dia_fechamento: number;
+};
+
+type BancoRow = {
+  id: string;
+  nome: string;
 };
 
 function pad2(n: number): string {
@@ -62,6 +69,7 @@ export default async function RelatorioComprasDoMesPage({
     comprasRes,
     assinRes,
     cartoesRes,
+    bancosRes,
     categorias,
     membros,
   ] = await Promise.all([
@@ -95,7 +103,10 @@ export default async function RelatorioComprasDoMesPage({
         "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
       )
       .eq("ativa", true),
-    supabase.from("cartoes").select("id, dia_fechamento"),
+    supabase
+      .from("cartoes")
+      .select("id, banco_id, apelido, dia_fechamento"),
+    supabase.from("bancos").select("id, nome"),
     getCategorias(),
     getMembrosCasal(),
   ]);
@@ -105,11 +116,24 @@ export default async function RelatorioComprasDoMesPage({
   const compras = (comprasRes.data ?? []) as CompraRow[];
   const assinaturas = (assinRes.data ?? []) as AssinaturaRow[];
   const cartoes = (cartoesRes.data ?? []) as CartaoRow[];
+  const bancos = (bancosRes.data ?? []) as BancoRow[];
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
+  const bancoById = new Map(bancos.map((b) => [b.id, b] as const));
   const categoriaById = new Map(categorias.map((c) => [c.id, c] as const));
 
   function nomeCategoria(id: string | null): string | null {
     return id ? (categoriaById.get(id)?.nome ?? null) : null;
+  }
+
+  // Mesma composição de rótulo usada na tela de cartões: "Banco · Apelido".
+  function nomeCartao(cartaoId: string): string {
+    const cartao = cartaoById.get(cartaoId);
+    if (!cartao) return "Cartão";
+    const banco = bancoById.get(cartao.banco_id);
+    if (banco?.nome) {
+      return cartao.apelido ? `${banco.nome} · ${cartao.apelido}` : banco.nome;
+    }
+    return cartao.apelido ?? "Cartão";
   }
 
   const linhas: LinhaCompra[] = [];
@@ -198,6 +222,7 @@ export default async function RelatorioComprasDoMesPage({
       data: compra.data_compra,
       valor: info.valor,
       compra,
+      cartaoNome: nomeCartao(compra.cartao_id),
       diaFechamento,
     });
   }
@@ -228,6 +253,7 @@ export default async function RelatorioComprasDoMesPage({
       data: null,
       valor: Number(a.valor_mensal),
       assinatura: a,
+      cartaoNome: nomeCartao(a.cartao_id),
       ativaHoje: ativaNoMes,
     });
   }

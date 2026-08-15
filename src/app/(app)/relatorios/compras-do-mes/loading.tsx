@@ -17,8 +17,8 @@ export default function RelatorioComprasDoMesLoading() {
       <Card>
         <div className="flex flex-col gap-3 p-4 md:p-5">
           <div className="flex flex-wrap items-end gap-3">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="flex min-w-[200px] flex-1 flex-col gap-1.5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex min-w-[180px] flex-1 flex-col gap-1.5">
                 <Skeleton className="h-2.5 w-16 rounded-full" />
                 <Skeleton className="h-9 w-full rounded-md" />
               </div>

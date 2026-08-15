@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { XIcon, UserIcon, UsersIcon } from "lucide-react";
+import { XIcon, UserIcon, UsersIcon, CreditCardIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,6 +70,7 @@ export type LinhaCompra =
       data: string | null;
       valor: number;
       compra: CompraRow;
+      cartaoNome: string;
       diaFechamento: number;
     }
   | {
@@ -82,11 +83,13 @@ export type LinhaCompra =
       data: string | null;
       valor: number;
       assinatura: AssinaturaRow;
+      cartaoNome: string;
       ativaHoje: boolean;
     };
 
 const TODOS = "__todos__";
 const SEM_CATEGORIA = "__sem_cat__";
+const SEM_QUEM = "__sem_quem__";
 
 type SortKey = "valor_desc" | "valor_asc" | "data_desc" | "data_asc";
 
@@ -144,6 +147,28 @@ function quemGastouDe(linha: LinhaCompra): string | null {
   }
 }
 
+function cartaoDe(linha: LinhaCompra): string | null {
+  switch (linha.tipo) {
+    case "compra_cartao":
+    case "assinatura":
+      return linha.cartaoNome;
+    default:
+      return null;
+  }
+}
+
+function CartaoChip({ nome }: { nome: string | null }) {
+  if (!nome) {
+    return <span className="text-xs text-muted-foreground">—</span>;
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <CreditCardIcon className="size-3.5" />
+      {nome}
+    </span>
+  );
+}
+
 function QuemChip({
   quemGastou,
   membroById,
@@ -189,6 +214,7 @@ export function RelatorioComprasDoMesClient({
   membros,
 }: Props) {
   const [categoriaId, setCategoriaId] = useState<string>(TODOS);
+  const [quem, setQuem] = useState<string>(TODOS);
   const [sort, setSort] = useState<SortKey>("data_desc");
 
   const categoriaById = useMemo(
@@ -200,12 +226,33 @@ export function RelatorioComprasDoMesClient({
     [membros],
   );
 
+  // Só oferece no filtro os "quem" que realmente aparecem no mês.
+  const quemPresentes = useMemo(() => {
+    const set = new Set<string>();
+    let temSemQuem = false;
+    for (const l of linhas) {
+      const q = quemGastouDe(l);
+      if (q) set.add(q);
+      else temSemQuem = true;
+    }
+    return { set, temSemQuem };
+  }, [linhas]);
+
+  const quemOptions = useMemo(
+    () => membros.filter((m) => quemPresentes.set.has(m.id)),
+    [membros, quemPresentes],
+  );
+
   const filtradas = useMemo(() => {
     let arr = linhas;
     if (categoriaId !== TODOS) {
       if (categoriaId === SEM_CATEGORIA)
         arr = arr.filter((l) => !l.categoriaId);
       else arr = arr.filter((l) => l.categoriaId === categoriaId);
+    }
+    if (quem !== TODOS) {
+      if (quem === SEM_QUEM) arr = arr.filter((l) => !quemGastouDe(l));
+      else arr = arr.filter((l) => quemGastouDe(l) === quem);
     }
 
     const sorted = [...arr];
@@ -225,12 +272,16 @@ export function RelatorioComprasDoMesClient({
         break;
     }
     return sorted;
-  }, [linhas, categoriaId, sort]);
+  }, [linhas, categoriaId, quem, sort]);
 
   const grandTotal = linhas.reduce((s, l) => s + l.valor, 0);
+  const totalFiltrado = filtradas.reduce((s, l) => s + l.valor, 0);
 
-  const algumFiltroAtivo = categoriaId !== TODOS;
-  const limparFiltros = () => setCategoriaId(TODOS);
+  const algumFiltroAtivo = categoriaId !== TODOS || quem !== TODOS;
+  const limparFiltros = () => {
+    setCategoriaId(TODOS);
+    setQuem(TODOS);
+  };
 
   const categoriaSelecionada = categoriaOptions.find(
     (c) => c.id === categoriaId,
@@ -306,7 +357,65 @@ export function RelatorioComprasDoMesClient({
               </Select>
             </div>
 
-            <div className="flex min-w-[200px] flex-col gap-1.5">
+            <div className="flex min-w-[180px] flex-col gap-1.5">
+              <Label
+                htmlFor="f-quem"
+                className="text-[10px] uppercase tracking-widest text-muted-foreground"
+              >
+                Quem gastou
+              </Label>
+              <Select value={quem} onValueChange={(v) => v && setQuem(v)}>
+                <SelectTrigger id="f-quem" className="w-full">
+                  <SelectValue>
+                    {quem === SEM_QUEM ? (
+                      <span className="text-muted-foreground">
+                        Não informado
+                      </span>
+                    ) : quem === QUEM_CASAL ? (
+                      <span className="inline-flex items-center gap-2">
+                        <UsersIcon className="size-4" />
+                        Casal
+                      </span>
+                    ) : quem !== TODOS ? (
+                      <span className="inline-flex items-center gap-2">
+                        <UserIcon className="size-4" />
+                        {membroById.get(quem)?.nome ?? "—"}
+                      </span>
+                    ) : (
+                      <span>Todos</span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODOS}>Todos</SelectItem>
+                  {quemPresentes.set.has(QUEM_CASAL) && (
+                    <SelectItem value={QUEM_CASAL}>
+                      <span className="inline-flex items-center gap-2">
+                        <UsersIcon className="size-4" />
+                        Casal
+                      </span>
+                    </SelectItem>
+                  )}
+                  {quemOptions.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      <span className="inline-flex items-center gap-2">
+                        <UserIcon className="size-4" />
+                        {m.nome}
+                      </span>
+                    </SelectItem>
+                  ))}
+                  {quemPresentes.temSemQuem && (
+                    <SelectItem value={SEM_QUEM}>
+                      <span className="text-muted-foreground">
+                        Não informado
+                      </span>
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex min-w-[180px] flex-col gap-1.5">
               <Label
                 htmlFor="f-sort"
                 className="text-[10px] uppercase tracking-widest text-muted-foreground"
@@ -350,6 +459,15 @@ export function RelatorioComprasDoMesClient({
             {linhas.length !== filtradas.length
               ? ` de ${linhas.length} no total`
               : ""}
+            {algumFiltroAtivo ? (
+              <>
+                {" "}
+                somando{" "}
+                <strong className="text-foreground tabular-nums">
+                  {formatBRL(totalFiltrado)}
+                </strong>
+              </>
+            ) : null}
             .
           </p>
         </div>
@@ -394,6 +512,7 @@ export function RelatorioComprasDoMesClient({
                     Categoria
                   </th>
                   <th className="px-4 py-3 text-left font-medium">Quem</th>
+                  <th className="px-4 py-3 text-left font-medium">Cartão</th>
                   <th className="px-4 py-3 text-left font-medium">Origem</th>
                   <th className="px-4 py-3 text-left font-medium">Data</th>
                   <th className="px-4 py-3 text-right font-medium">Valor</th>
@@ -421,6 +540,9 @@ export function RelatorioComprasDoMesClient({
                         quemGastou={quemGastouDe(l)}
                         membroById={membroById}
                       />
+                    </td>
+                    <td className="px-4 py-3">
+                      <CartaoChip nome={cartaoDe(l)} />
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant="neutral" className="text-[10px]">
@@ -479,9 +601,12 @@ export function RelatorioComprasDoMesClient({
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <Badge variant="neutral" className="w-fit text-[10px]">
-                    {l.origem}
-                  </Badge>
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+                    <Badge variant="neutral" className="w-fit text-[10px]">
+                      {l.origem}
+                    </Badge>
+                    {cartaoDe(l) && <CartaoChip nome={cartaoDe(l)} />}
+                  </div>
                   <div className="flex items-center gap-1">
                     <LinhaAcoes
                       linha={l}
