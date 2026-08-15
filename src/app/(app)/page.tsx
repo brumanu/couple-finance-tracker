@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "./month-switcher";
 import { PagarDialog } from "./pagar/pagar-dialog";
+import { PagarFaturaDialog } from "./pagar/pagar-fatura-dialog";
 import { DesmarcarButton } from "./pagar/desmarcar-button";
 import { DespesaFormDialog } from "./despesas/despesa-form-dialog";
 
@@ -68,6 +69,14 @@ type BancoRow = {
   nome: string;
   cor: string;
   icone: string | null;
+};
+
+type PagamentoFaturaRow = {
+  id: string;
+  cartao_id: string;
+  mes_referencia: string;
+  valor: number | string;
+  data_pagamento: string | null;
 };
 
 const QUINZENA_META = {
@@ -126,6 +135,7 @@ type FaturaResumo = {
   bancoIcone: string | null;
   total: number;
   quinzena: 15 | 30;
+  diaVencimento: number;
 };
 
 export default async function DashboardPage({
@@ -177,6 +187,7 @@ export default async function DashboardPage({
     dividasRes,
     pagDividasRes,
     assinRes,
+    pagFaturasRes,
   ] = await Promise.all([
     requireSession(),
     getCartoesParaSelecao(),
@@ -220,6 +231,11 @@ export default async function DashboardPage({
         "id, cartao_id, descricao, valor_mensal, categoria, inicio_vigencia, fim_vigencia, ativa",
       )
       .eq("ativa", true),
+    supabase
+      .from("pagamentos_fatura")
+      .select("id, cartao_id, mes_referencia, valor, data_pagamento")
+      .gte("mes_referencia", primeiroDiaRange)
+      .lte("mes_referencia", ultimoDiaRange),
   ]);
 
   const rendas = (rendasRes.data ?? []) as RendaRow[];
@@ -230,6 +246,13 @@ export default async function DashboardPage({
   const assinaturas = (assinRes.data ?? []) as AssinaturaCartaoInfo[];
   const bancos = (bancosRes.data ?? []) as BancoRow[];
   const bancoById = new Map(bancos.map((b) => [b.id, b]));
+
+  // Faturas já quitadas, indexadas por cartão + mês da fatura.
+  const pagamentosFatura = new Map<string, PagamentoFaturaRow>(
+    ((pagFaturasRes.data ?? []) as PagamentoFaturaRow[]).map(
+      (p) => [`${p.cartao_id}|${p.mes_referencia}`, p] as const,
+    ),
+  );
 
   const dividasRaw = (dividasRes.data ?? []) as {
     id: string;
@@ -293,6 +316,7 @@ export default async function DashboardPage({
           bancoIcone: banco?.icone ?? null,
           total: f.total,
           quinzena: quinzenaDoCartao(c.dia_vencimento),
+          diaVencimento: c.dia_vencimento,
         };
       })
       .filter((f) => f.total > 0);
@@ -541,6 +565,7 @@ export default async function DashboardPage({
               contas={quinzenaAtualDados.contas}
               faturas={quinzenaAtualDados.faturas}
               pagamentos={pagamentosMes}
+              pagamentosFatura={pagamentosFatura}
               mes={mes}
               hojeDia={hojeDia}
               noMesAtual={noMesAtual}
@@ -985,6 +1010,7 @@ function ContasQuinzenaCard({
   contas,
   faturas,
   pagamentos,
+  pagamentosFatura,
   mes,
   hojeDia,
   noMesAtual,
@@ -993,12 +1019,18 @@ function ContasQuinzenaCard({
   contas: RecorrenteRow[];
   faturas: FaturaResumo[];
   pagamentos: Map<string, LancamentoRow>;
+  pagamentosFatura: Map<string, PagamentoFaturaRow>;
   mes: { primeiroDia: string; label: string; chave: string };
   hojeDia: number;
   noMesAtual: boolean;
 }) {
+  const faturaPaga = (f: FaturaResumo) =>
+    pagamentosFatura.get(`${f.cartaoId}|${mes.primeiroDia}`);
+
   const total = contas.length + faturas.length;
-  const pagas = contas.filter((c) => pagamentos.has(c.id)).length;
+  const pagas =
+    contas.filter((c) => pagamentos.has(c.id)).length +
+    faturas.filter((f) => faturaPaga(f)).length;
   const semItens = total === 0;
 
   return (
@@ -1022,42 +1054,73 @@ function ContasQuinzenaCard({
         </div>
       ) : (
         <div className="flex flex-col gap-2.5">
-          {faturas.map((f) => (
-            <div
-              key={f.cartaoId}
-              className="flex items-center gap-4 rounded-[26px] bg-card px-5 py-4"
-            >
-              <BancoIcone
-                icone={f.bancoIcone}
-                corFallback={f.bancoCor}
-                nomeFallback={f.bancoNome}
-                size={38}
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[15px] font-semibold">
-                  Fatura {f.label}
-                </p>
-                <p className="text-[13px] text-neutral-700">Cartão</p>
-              </div>
-              <span className="tabular-nums text-[15px] font-medium">
-                {formatBRL(f.total)}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                nativeButton={false}
-                aria-label="Ver fatura"
-                render={
-                  <Link href={`/cartoes/${f.cartaoId}?mes=${mes.chave}`}>
-                    <ChevronRightIcon
-                      className="size-4"
-                      strokeWidth={2.75}
-                    />
+          {faturas.map((f) => {
+            const pago = faturaPaga(f);
+            const atrasada = noMesAtual && !pago && hojeDia > f.diaVencimento;
+            return (
+              <div
+                key={f.cartaoId}
+                className={`flex items-center gap-4 rounded-[26px] px-5 py-4 ${
+                  atrasada
+                    ? "border border-accent-300 bg-accent-100"
+                    : "bg-card"
+                }`}
+              >
+                {pago ? (
+                  <div className="flex size-[38px] shrink-0 items-center justify-center rounded-full bg-sage-300 text-sage-800">
+                    <CheckIcon className="size-[18px]" strokeWidth={2.75} />
+                  </div>
+                ) : (
+                  <BancoIcone
+                    icone={f.bancoIcone}
+                    corFallback={f.bancoCor}
+                    nomeFallback={f.bancoNome}
+                    size={38}
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/cartoes/${f.cartaoId}?mes=${mes.chave}`}
+                    className={`block truncate text-[15px] font-semibold hover:underline ${
+                      pago ? "text-neutral-700" : ""
+                    }`}
+                  >
+                    Fatura {f.label}
                   </Link>
-                }
-              />
-            </div>
-          ))}
+                  <p
+                    className={`text-[13px] ${atrasada ? "text-accent-800" : "text-neutral-700"}`}
+                  >
+                    {pago
+                      ? `Paga${pago.data_pagamento ? " em " + formatDataCurta(pago.data_pagamento) : ""} · Cartão`
+                      : atrasada
+                        ? `Venceu dia ${f.diaVencimento} · Cartão`
+                        : `Vence dia ${f.diaVencimento} · Cartão`}
+                  </p>
+                </div>
+                <span
+                  className={`tabular-nums text-[15px] font-medium ${
+                    pago ? "text-neutral-700 line-through" : ""
+                  }`}
+                >
+                  {formatBRL(pago ? pago.valor : f.total)}
+                </span>
+                {pago ? (
+                  <DesmarcarButton
+                    id={pago.id}
+                    descricao={`Fatura ${f.label}`}
+                    alvo="fatura"
+                  />
+                ) : (
+                  <PagarFaturaDialog
+                    cartaoId={f.cartaoId}
+                    label={f.label}
+                    totalFatura={f.total}
+                    mesReferencia={mes.primeiroDia}
+                  />
+                )}
+              </div>
+            );
+          })}
           {contas.map((c) => {
             const pago = pagamentos.get(c.id);
             const atrasada =
@@ -1124,10 +1187,7 @@ function ContasQuinzenaCard({
                   {formatBRL(pago ? pago.valor : c.valor_previsto)}
                 </span>
                 {pago ? (
-                  <DesmarcarButton
-                    lancamentoId={pago.id}
-                    descricao={c.descricao}
-                  />
+                  <DesmarcarButton id={pago.id} descricao={c.descricao} />
                 ) : (
                   <PagarDialog
                     contaRecorrenteId={c.id}

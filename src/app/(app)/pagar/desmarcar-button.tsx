@@ -5,14 +5,16 @@ import { XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { desmarcarPagamento } from "./actions";
+import { desmarcarPagamento, desmarcarFatura } from "./actions";
 
 type Props = {
-  lancamentoId: string;
+  /** Id do lançamento (conta fixa) ou do pagamento de fatura, conforme `alvo`. */
+  id: string;
   descricao: string;
+  alvo?: "lancamento" | "fatura";
 };
 
-export function DesmarcarButton({ lancamentoId, descricao }: Props) {
+export function DesmarcarButton({ id, descricao, alvo = "lancamento" }: Props) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
@@ -34,7 +36,10 @@ export function DesmarcarButton({ lancamentoId, descricao }: Props) {
         description={`Desmarcar pagamento de "${descricao}"?`}
         confirmLabel="Desmarcar"
         onConfirm={async () => {
-          const result = await desmarcarPagamento(lancamentoId);
+          const result =
+            alvo === "fatura"
+              ? await desmarcarFatura(id)
+              : await desmarcarPagamento(id);
           if (result?.error) {
             toast.error(result.error);
             return;

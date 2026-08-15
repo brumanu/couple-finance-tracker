@@ -64,3 +64,65 @@ export async function desmarcarPagamento(lancamentoId: string) {
   if (error) return { error: error.message };
   revalidatePath("/");
 }
+
+/**
+ * Marca uma fatura de cartão como paga. Diferente da conta fixa, aqui não
+ * nasce um lançamento: o gasto já está nas compras/assinaturas do cartão, e
+ * a linha em `pagamentos_fatura` só registra que a fatura foi quitada.
+ */
+export async function pagarFatura(
+  cartaoId: string,
+  mesReferencia: string, // YYYY-MM-01
+  _prev: PagarFormState,
+  formData: FormData,
+): Promise<PagarFormState> {
+  const valorRaw = String(formData.get("valor") ?? "").trim();
+  const dataPagamento =
+    String(formData.get("data_pagamento") ?? "").trim() || hojeISO();
+
+  const valor = parseBRLInput(valorRaw);
+  if (valor === null || valor < 0)
+    return { error: "Valor não pode ser negativo." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Não autenticado." };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("casal_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile) return { error: "Profile não encontrado." };
+
+  // upsert em vez de insert: se a fatura já estiver marcada (duas abas, ou
+  // clique duplo), atualiza em vez de estourar o unique (cartao_id, mes).
+  const { error } = await supabase.from("pagamentos_fatura").upsert(
+    {
+      casal_id: profile.casal_id,
+      cartao_id: cartaoId,
+      mes_referencia: mesReferencia,
+      valor,
+      data_pagamento: dataPagamento,
+      criado_por: user.id,
+    },
+    { onConflict: "cartao_id,mes_referencia" },
+  );
+
+  if (error) return { error: error.message };
+
+  revalidatePath("/");
+  return { ok: true };
+}
+
+export async function desmarcarFatura(pagamentoFaturaId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("pagamentos_fatura")
+    .delete()
+    .eq("id", pagamentoFaturaId);
+  if (error) return { error: error.message };
+  revalidatePath("/");
+}
