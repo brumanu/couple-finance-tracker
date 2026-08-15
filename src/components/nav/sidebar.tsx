@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogOutIcon, SearchIcon } from "lucide-react";
+import {
+  LogOutIcon,
+  SearchIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
+  XIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav-items";
 import { signOut } from "@/lib/auth-actions";
@@ -10,6 +16,7 @@ import { LinkPendingDot } from "./link-pending-dot";
 import { ThemeToggle } from "./theme-toggle";
 import { useSearch } from "@/components/search/search-provider";
 import { PushToggleButton } from "@/components/push/push-toggle-button";
+import { useSidebar } from "./sidebar-provider";
 
 type Props = {
   nomeUsuario: string;
@@ -29,84 +36,189 @@ function iniciais(nome: string): string {
 export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
   const pathname = usePathname();
   const { setOpen: setSearchOpen } = useSearch();
+  const { mobileOpen, setMobileOpen, collapsed, toggleCollapsed } =
+    useSidebar();
+
+  // No mobile o rail não existe: o drawer sempre abre por extenso.
+  const railDesktop = collapsed;
 
   return (
-    <aside className="hidden md:flex md:w-64 md:shrink-0 md:flex-col md:gap-6 md:bg-sidebar md:px-[18px] md:py-7 md:text-sidebar-foreground">
-      <div className="px-2.5">
-        <h1 className="font-heading text-[21px] leading-none">Financeiro</h1>
-        <p className="mt-1 text-[13px] text-neutral-700">{nomeCasal}</p>
-      </div>
+    <>
+      {/* Backdrop do drawer — só mobile, some junto com o menu. */}
+      <div
+        onClick={() => setMobileOpen(false)}
+        aria-hidden
+        className={cn(
+          // z acima do bottom-nav e do FAB (ambos z-40), abaixo do drawer.
+          "fixed inset-0 z-[45] bg-[color-mix(in_srgb,var(--organic-neutral-900)_45%,transparent)] transition-opacity duration-200 md:hidden",
+          mobileOpen
+            ? "opacity-100"
+            : "pointer-events-none opacity-0",
+        )}
+      />
 
-      <button
-        type="button"
-        onClick={() => setSearchOpen(true)}
-        className="flex w-full items-center gap-2.5 rounded-full bg-sidebar-accent/50 px-4 py-2.5 text-[14px] text-neutral-700 transition-colors hover:bg-sidebar-accent hover:text-foreground"
+      <aside
+        className={cn(
+          // Mobile: painel fixo que desliza da esquerda.
+          "fixed inset-y-0 left-0 z-50 flex w-[17rem] shrink-0 flex-col gap-6 overflow-y-auto bg-sidebar px-[18px] py-7 text-sidebar-foreground transition-transform duration-200 ease-out",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          // Desktop: volta a ser coluna no fluxo, sempre visível, com a
+          // largura animando entre rail e expandido.
+          "md:static md:z-auto md:translate-x-0 md:overflow-visible md:transition-[width] md:duration-200",
+          railDesktop ? "md:w-[76px] md:px-3" : "md:w-64",
+        )}
       >
-        <SearchIcon className="size-[16px] shrink-0" strokeWidth={2.75} />
-        <span className="flex-1 text-left">Buscar</span>
-        <span className="shrink-0 rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] tracking-wide text-muted-foreground">
-          ⌘K
-        </span>
-      </button>
+        <div
+          className={cn(
+            "flex items-center gap-2",
+            railDesktop ? "md:justify-center md:px-0" : "px-2.5",
+          )}
+        >
+          <div className={cn("min-w-0 flex-1", railDesktop && "md:hidden")}>
+            <h1 className="font-heading text-[21px] leading-none">
+              Financeiro
+            </h1>
+            <p className="mt-1 truncate text-[13px] text-neutral-700">
+              {nomeCasal}
+            </p>
+          </div>
 
-      <nav className="flex flex-1 flex-col gap-1.5">
-        {NAV_ITEMS.map((item) => {
-          const active =
-            item.href === "/"
-              ? pathname === "/"
-              : pathname.startsWith(item.href);
-          const Icon = item.icon;
-          return item.disabled ? (
-            <span
-              key={item.href}
-              className="flex items-center gap-3 rounded-full px-4 py-2.5 text-[15px] text-muted-foreground/50"
-              title="Em breve"
-            >
-              <Icon className="size-[18px]" strokeWidth={2.75} />
-              {item.label}
-              <span className="ml-auto text-[10px] uppercase tracking-wide">
-                em breve
-              </span>
-            </span>
-          ) : (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 rounded-full px-4 py-2.5 text-[15px] transition-colors",
-                active
-                  ? "bg-primary text-primary-foreground"
-                  : "text-neutral-800 hover:bg-sidebar-accent hover:text-foreground",
-              )}
-            >
-              <Icon className="size-[18px]" strokeWidth={2.75} />
-              {item.label}
-              <LinkPendingDot className="ml-auto" />
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="flex items-center gap-2.5 px-2">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage-300 font-heading text-sm text-sage-800">
-          {iniciais(nomeUsuario) || "?"}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[13px] font-semibold">{nomeUsuario}</p>
-          <p className="truncate text-xs text-neutral-700">{emailUsuario}</p>
-        </div>
-        <PushToggleButton />
-        <ThemeToggle />
-        <form action={signOut}>
+          {/* Recolher/expandir: só desktop. */}
           <button
-            type="submit"
-            aria-label="Sair"
-            className="rounded-full p-2 text-neutral-700 hover:bg-sidebar-accent hover:text-foreground"
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label={railDesktop ? "Expandir menu" : "Recolher menu"}
+            title={railDesktop ? "Expandir menu" : "Recolher menu"}
+            className="hidden shrink-0 rounded-full p-2 text-neutral-700 transition-colors hover:bg-sidebar-accent hover:text-foreground md:inline-flex"
           >
-            <LogOutIcon className="size-4" strokeWidth={2.75} />
+            {railDesktop ? (
+              <PanelLeftOpenIcon className="size-[18px]" strokeWidth={2.75} />
+            ) : (
+              <PanelLeftCloseIcon className="size-[18px]" strokeWidth={2.75} />
+            )}
           </button>
-        </form>
-      </div>
-    </aside>
+
+          {/* Fechar o drawer: só mobile. */}
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Fechar menu"
+            className="shrink-0 rounded-full p-2 text-neutral-700 transition-colors hover:bg-sidebar-accent hover:text-foreground md:hidden"
+          >
+            <XIcon className="size-[18px]" strokeWidth={2.75} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMobileOpen(false);
+            setSearchOpen(true);
+          }}
+          title="Buscar"
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-full bg-sidebar-accent/50 py-2.5 text-[14px] text-neutral-700 transition-colors hover:bg-sidebar-accent hover:text-foreground",
+            railDesktop ? "md:justify-center md:px-0" : "px-4",
+          )}
+        >
+          <SearchIcon className="size-[16px] shrink-0" strokeWidth={2.75} />
+          <span
+            className={cn("flex-1 text-left", railDesktop && "md:hidden")}
+          >
+            Buscar
+          </span>
+          <span
+            className={cn(
+              "shrink-0 rounded-md border border-border/60 px-1.5 py-0.5 text-[10px] tracking-wide text-muted-foreground",
+              railDesktop && "md:hidden",
+            )}
+          >
+            ⌘K
+          </span>
+        </button>
+
+        <nav className="flex flex-1 flex-col gap-1.5">
+          {NAV_ITEMS.map((item) => {
+            const active =
+              item.href === "/"
+                ? pathname === "/"
+                : pathname.startsWith(item.href);
+            const Icon = item.icon;
+            const base = cn(
+              "flex items-center gap-3 rounded-full py-2.5 text-[15px] transition-colors",
+              railDesktop ? "md:justify-center md:px-0" : "px-4",
+            );
+            return item.disabled ? (
+              <span
+                key={item.href}
+                className={cn(base, "text-muted-foreground/50")}
+                title="Em breve"
+              >
+                <Icon className="size-[18px] shrink-0" strokeWidth={2.75} />
+                <span className={cn(railDesktop && "md:hidden")}>
+                  {item.label}
+                </span>
+                <span
+                  className={cn(
+                    "ml-auto text-[10px] uppercase tracking-wide",
+                    railDesktop && "md:hidden",
+                  )}
+                >
+                  em breve
+                </span>
+              </span>
+            ) : (
+              <Link
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  base,
+                  active
+                    ? "bg-primary text-primary-foreground"
+                    : "text-neutral-800 hover:bg-sidebar-accent hover:text-foreground",
+                )}
+              >
+                <Icon className="size-[18px] shrink-0" strokeWidth={2.75} />
+                <span className={cn(railDesktop && "md:hidden")}>
+                  {item.label}
+                </span>
+                <LinkPendingDot
+                  className={cn("ml-auto", railDesktop && "md:hidden")}
+                />
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div
+          className={cn(
+            "flex items-center gap-2.5",
+            railDesktop ? "md:flex-col md:gap-1 md:px-0" : "px-2",
+          )}
+        >
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-sage-300 font-heading text-sm text-sage-800">
+            {iniciais(nomeUsuario) || "?"}
+          </div>
+          <div className={cn("min-w-0 flex-1", railDesktop && "md:hidden")}>
+            <p className="truncate text-[13px] font-semibold">{nomeUsuario}</p>
+            <p className="truncate text-xs text-neutral-700">{emailUsuario}</p>
+          </div>
+          <PushToggleButton />
+          <ThemeToggle />
+          <form action={signOut}>
+            <button
+              type="submit"
+              aria-label="Sair"
+              title="Sair"
+              className="rounded-full p-2 text-neutral-700 hover:bg-sidebar-accent hover:text-foreground"
+            >
+              <LogOutIcon className="size-4" strokeWidth={2.75} />
+            </button>
+          </form>
+        </div>
+      </aside>
+    </>
   );
 }
