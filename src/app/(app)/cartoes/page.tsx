@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { parseMesParam } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
+import { MonthSwitcher } from "../month-switcher";
 import {
   faturaDoMes,
   type CompraCartaoInfo,
@@ -82,6 +83,7 @@ export default async function CartoesPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <MonthSwitcher mes={mes} />
           <Button
             variant="outline"
             size="sm"
@@ -197,7 +199,7 @@ export default async function CartoesPage({
                     </p>
                     {!c.ativo && fatura.total > 0 && (
                       <p className="mt-1 text-[11px] text-primary/80">
-                        (n\u00e3o contabilizado no dashboard)
+                        (não contabilizado no dashboard)
                       </p>
                     )}
                   </div>
