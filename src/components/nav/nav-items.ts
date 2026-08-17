@@ -8,6 +8,7 @@ import {
   HandCoinsIcon,
   TagIcon,
   BarChart3Icon,
+  CalculatorIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +34,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShoppingBagIcon,
     // O bottom-nav mobile é um grid de 6 colunas fixas — item novo entra
     // pelo menu lateral, que agora abre no mobile também.
+    desktopOnly: true,
+  },
+  {
+    href: "/salario-liquido",
+    label: "Salário líquido",
+    icon: CalculatorIcon,
     desktopOnly: true,
   },
   { href: "/categorias", label: "Categorias", icon: TagIcon, desktopOnly: true },
