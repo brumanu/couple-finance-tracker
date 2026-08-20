@@ -9,6 +9,7 @@ import {
   TagIcon,
   BarChart3Icon,
   CalculatorIcon,
+  ReceiptTextIcon,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +35,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShoppingBagIcon,
     // O bottom-nav mobile é um grid de 6 colunas fixas — item novo entra
     // pelo menu lateral, que agora abre no mobile também.
+    desktopOnly: true,
+  },
+  {
+    href: "/faturamento-mei",
+    label: "Faturamento MEI",
+    icon: ReceiptTextIcon,
     desktopOnly: true,
   },
   {
