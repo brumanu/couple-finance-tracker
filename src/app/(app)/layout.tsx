@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { requireSession } from "@/lib/auth";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
 import { getCategorias } from "@/lib/categorias-server";
@@ -9,18 +10,28 @@ import { MobileFab } from "@/components/nav/mobile-fab";
 import { Toaster } from "@/components/ui/sonner";
 import { SearchProvider } from "@/components/search/search-provider";
 import { SidebarProvider } from "@/components/nav/sidebar-provider";
-import { GlobalSearchDialog } from "@/components/search/global-search-dialog";
+import { GlobalSearchMount } from "@/components/search/global-search-mount";
 import { SwRegister } from "@/components/push/sw-register";
 
-export default async function AppLayout({ children }: LayoutProps<"/">) {
-  // As três não dependem uma da outra (RLS escopa por cookie de sessão),
-  // então rodam em paralelo em vez de esperar a sessão resolver primeiro.
-  const [session, cartoes, categorias, membros] = await Promise.all([
-    requireSession(),
+/**
+ * Cartões, categorias e membros existem só pra alimentar o dialog do FAB,
+ * que no mobile nem aparece aberto. Ficando fora do await do layout, a shell
+ * (sidebar, nav e o loading.tsx da rota) pinta depois de UMA query em vez de
+ * quatro — o resto chega em streaming.
+ */
+async function MobileFabLoader() {
+  const [cartoes, categorias, membros] = await Promise.all([
     getCartoesParaSelecao(),
     getCategorias(),
     getMembrosCasal(),
   ]);
+  return (
+    <MobileFab cartoes={cartoes} categorias={categorias} membros={membros} />
+  );
+}
+
+export default async function AppLayout({ children }: LayoutProps<"/">) {
+  const session = await requireSession();
 
   return (
     <SearchProvider>
@@ -41,13 +52,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           </div>
 
           <BottomNav />
-          <MobileFab
-            cartoes={cartoes}
-            categorias={categorias}
-            membros={membros}
-          />
+          <Suspense fallback={null}>
+            <MobileFabLoader />
+          </Suspense>
           <Toaster />
-          <GlobalSearchDialog />
+          <GlobalSearchMount />
           <SwRegister />
         </div>
       </SidebarProvider>

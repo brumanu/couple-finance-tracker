@@ -5,7 +5,6 @@ import { getCategorias } from "@/lib/categorias-server";
 import { getMembrosCasal } from "@/lib/membros-server";
 import { parseMesParam, mesAnterior } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "../month-switcher";
 import {

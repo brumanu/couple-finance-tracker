@@ -9,7 +9,7 @@ export default function RelatorioMaioresGastosLoading() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <Skeleton className="h-10 w-72 rounded-lg" />
-          <Skeleton className="mt-2 h-4 w-96 rounded-full" />
+          <Skeleton className="mt-2 h-4 w-full max-w-96 rounded-full" />
         </div>
         <Skeleton className="h-9 w-36 rounded-lg" />
       </div>

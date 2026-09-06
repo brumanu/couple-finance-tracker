@@ -73,7 +73,15 @@ export async function updateBanco(
 export async function deleteBanco(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("bancos").delete().eq("id", id);
-  if (error) return { error: error.message };
+  if (error) {
+    // 23503 = FK: cartoes.banco_id tem on delete restrict.
+    if (error.code === "23503") {
+      return {
+        error: "Exclua ou mova os cartões deste banco antes de excluí-lo.",
+      };
+    }
+    return { error: error.message };
+  }
   revalidatePath("/bancos");
   revalidatePath("/cartoes");
 }

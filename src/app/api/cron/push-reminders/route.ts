@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { createServiceClient } from "@/lib/supabase/service";
 import { hojeISO, buildMes, mesAtual, mesProximo, type MesRef } from "@/lib/mes";
@@ -90,9 +91,19 @@ function diasAte(alvo: Date, hoje: Date): number {
   return Math.round((alvoZero - hojeZero) / 86_400_000);
 }
 
+// Autorização do cron: fail-closed (sem secret configurado, ninguém entra) e
+// comparação em tempo constante.
+function cronAutorizado(request: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || secret.length < 16) return false;
+  const esperado = Buffer.from(`Bearer ${secret}`);
+  const recebido = Buffer.from(request.headers.get("authorization") ?? "");
+  if (esperado.length !== recebido.length) return false;
+  return timingSafeEqual(esperado, recebido);
+}
+
 export async function GET(request: Request) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!cronAutorizado(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
 

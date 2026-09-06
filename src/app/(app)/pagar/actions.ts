@@ -30,11 +30,20 @@ export async function pagarContaRecorrente(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Não autenticado." };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
+  const [{ data: profile }, { data: conta }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("casal_id")
+      .eq("id", user.id)
+      .maybeSingle(),
+    // Herda categoria e quem gastou da conta recorrente: sem isso o lançamento
+    // nasce sem categoria e os relatórios jogam a conta paga em "Sem categoria".
+    supabase
+      .from("contas_recorrentes")
+      .select("categoria_id, categoria, quem_gastou")
+      .eq("id", contaRecorrenteId)
+      .maybeSingle(),
+  ]);
   if (!profile) return { error: "Profile não encontrado." };
 
   const { error } = await supabase.from("lancamentos").insert({
@@ -45,11 +54,22 @@ export async function pagarContaRecorrente(
     data_referencia: dataReferencia,
     data_pagamento: dataPagamento,
     quinzena,
+    categoria_id: conta?.categoria_id ?? null,
+    categoria: conta?.categoria ?? null,
+    quem_gastou: conta?.quem_gastou ?? null,
     conta_recorrente_id: contaRecorrenteId,
     criado_por: user.id,
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    // 23505 = índice único (conta_recorrente_id, data_referencia): o parceiro
+    // já marcou essa conta como paga neste mês, ou a página estava em 2 abas.
+    if (error.code === "23505") {
+      revalidatePath("/");
+      return { error: "Essa conta já está marcada como paga neste mês." };
+    }
+    return { error: error.message };
+  }
 
   revalidatePath("/");
   return { ok: true };

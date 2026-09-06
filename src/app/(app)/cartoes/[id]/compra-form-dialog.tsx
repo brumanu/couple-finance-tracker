@@ -46,6 +46,7 @@ export type CompraRow = {
 type Props = {
   cartaoId: string;
   diaFechamento: number;
+  diaVencimento: number;
   compra?: CompraRow;
   trigger?: React.ReactElement;
   categorias?: CategoriaOpcao[];
@@ -87,6 +88,7 @@ function calcularDataCompraRetro(parcelaAtual: number): string {
 export function CompraFormDialog({
   cartaoId,
   diaFechamento,
+  diaVencimento,
   compra,
   trigger,
   categorias = [],
@@ -209,7 +211,10 @@ export function CompraFormDialog({
       return null;
 
     const valores = valoresParcelas(total, parcelas);
-    const primeira = mesPrimeiraParcela(dataRaw, diaFechamento);
+    const primeira = mesPrimeiraParcela(dataRaw, {
+      dia_fechamento: diaFechamento,
+      dia_vencimento: diaVencimento,
+    });
 
     // Mês da parcela atual (indice 0-based = parcelaAtual - 1)
     const idxAtual = parcelaAtual - 1;
@@ -240,7 +245,15 @@ export function CompraFormDialog({
       ultimaLabel,
       emAndamento,
     };
-  }, [valorRaw, parcelasRaw, dataRaw, diaFechamento, emAndamento, parcelaAtualRaw]);
+  }, [
+    valorRaw,
+    parcelasRaw,
+    dataRaw,
+    diaFechamento,
+    diaVencimento,
+    emAndamento,
+    parcelaAtualRaw,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -492,11 +505,13 @@ export function CompraFormDialog({
 export function EditCompraTrigger({
   compra,
   diaFechamento,
+  diaVencimento,
   categorias,
   membros,
 }: {
   compra: CompraRow;
   diaFechamento: number;
+  diaVencimento: number;
   categorias?: CategoriaOpcao[];
   membros?: MembroOpcao[];
 }) {
@@ -504,6 +519,7 @@ export function EditCompraTrigger({
     <CompraFormDialog
       cartaoId={compra.cartao_id}
       diaFechamento={diaFechamento}
+      diaVencimento={diaVencimento}
       compra={compra}
       categorias={categorias}
       membros={membros}

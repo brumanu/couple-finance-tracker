@@ -26,7 +26,11 @@ export function RendaActionsMenu({ id, ativa, descricao }: Props) {
 
   const onToggle = () => {
     startTransition(async () => {
-      await toggleRendaAtiva(id, !ativa);
+      const result = await toggleRendaAtiva(id, !ativa);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(ativa ? "Renda desativada." : "Renda ativada.");
     });
   };

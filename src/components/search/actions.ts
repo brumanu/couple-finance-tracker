@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { mesAtual } from "@/lib/mes";
-import { mesPrimeiraParcela } from "@/lib/cartao-calc";
+import { mesDaParcela, mesPrimeiraParcela } from "@/lib/cartao-calc";
 import { formatBRL } from "@/lib/format";
 import type { SearchResultItem } from "./types";
 
@@ -37,6 +37,7 @@ type CompraCartaoRow = {
   valor_total: number | string;
   data_compra: string; // YYYY-MM-DD
   parcelas: number;
+  parcelas_ja_pagas: number | null;
 };
 
 type AssinaturaCartaoRow = {
@@ -49,6 +50,7 @@ type AssinaturaCartaoRow = {
 type CartaoRow = {
   id: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 function formatDataBR(iso: string): string {
@@ -100,7 +102,9 @@ export async function buscarGlobal(
       .limit(LIMIT),
     supabase
       .from("compras_cartao")
-      .select("id, cartao_id, descricao, valor_total, data_compra, parcelas")
+      .select(
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas",
+      )
       .ilike("descricao", padrao)
       .order("data_compra", { ascending: false })
       .limit(LIMIT),
@@ -109,15 +113,12 @@ export async function buscarGlobal(
       .select("id, cartao_id, descricao, valor_mensal")
       .ilike("descricao", padrao)
       .limit(LIMIT),
-    // Tabela pequena por casal — sem filtro, só pra casar cartao_id -> dia_fechamento
-    supabase.from("cartoes").select("id, dia_fechamento"),
+    // Tabela pequena por casal — sem filtro, só pra casar cartao_id -> cartão
+    supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
   ]);
 
   const cartaoPorId = new Map(
-    ((cartoesRes.data ?? []) as CartaoRow[]).map((c) => [
-      c.id,
-      c.dia_fechamento,
-    ]),
+    ((cartoesRes.data ?? []) as CartaoRow[]).map((c) => [c.id, c] as const),
   );
 
   const resultados: SearchResultItem[] = [];
@@ -168,9 +169,14 @@ export async function buscarGlobal(
   }
 
   for (const compra of (comprasRes.data ?? []) as CompraCartaoRow[]) {
-    const diaFechamento = cartaoPorId.get(compra.cartao_id);
-    const chave = diaFechamento
-      ? mesPrimeiraParcela(compra.data_compra, diaFechamento).chave
+    const cartao = cartaoPorId.get(compra.cartao_id);
+    // Compra cadastrada "já na parcela N" tem as N primeiras puladas, então o
+    // mês da 1ª parcela abriria uma fatura onde ela nem aparece.
+    const chave = cartao
+      ? mesDaParcela(
+          mesPrimeiraParcela(compra.data_compra, cartao),
+          compra.parcelas_ja_pagas ?? 0,
+        ).chave
       : mesAtual().chave;
     resultados.push({
       categoria: "compra_cartao",

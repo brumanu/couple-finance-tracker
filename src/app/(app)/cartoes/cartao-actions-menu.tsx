@@ -22,7 +22,11 @@ export function CartaoActionsMenu({ id, ativo, label }: Props) {
 
   const onToggle = () => {
     startTransition(async () => {
-      await toggleCartaoAtivo(id, !ativo);
+      const result = await toggleCartaoAtivo(id, !ativo);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(ativo ? "Cartão desativado." : "Cartão ativado.");
     });
   };

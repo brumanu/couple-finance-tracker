@@ -64,6 +64,7 @@ type AssinaturaRow = {
 type CartaoRow = {
   id: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 function pad2(n: number): string {
@@ -116,7 +117,7 @@ export default async function RelatorioMaioresGastosPage({
           "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa",
         )
         .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento"),
+      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
       getCategorias(),
     ]);
 
@@ -174,7 +175,6 @@ export default async function RelatorioMaioresGastosPage({
   // Compras no cartão: só a parcela ativa no mês alvo, se houver.
   for (const compra of compras) {
     const cartao = cartaoById.get(compra.cartao_id);
-    const diaFechamento = cartao?.dia_fechamento ?? 1;
     const info = parcelaNoMes(
       {
         id: compra.id,
@@ -186,7 +186,7 @@ export default async function RelatorioMaioresGastosPage({
         parcelas_ja_pagas: compra.parcelas_ja_pagas ?? undefined,
         categoria: null,
       },
-      diaFechamento,
+      cartao,
       mes,
     );
     if (!info) continue;

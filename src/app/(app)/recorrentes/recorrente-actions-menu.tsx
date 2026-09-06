@@ -26,7 +26,11 @@ export function RecorrenteActionsMenu({ id, ativa, descricao }: Props) {
 
   const onToggle = () => {
     startTransition(async () => {
-      await toggleRecorrenteAtiva(id, !ativa);
+      const result = await toggleRecorrenteAtiva(id, !ativa);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(ativa ? "Conta desativada." : "Conta ativada.");
     });
   };

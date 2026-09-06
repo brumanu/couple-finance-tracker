@@ -93,6 +93,14 @@
   --organic-surface: #ebddc5;
   --organic-text: #201e1d;
   --organic-accent: #c67139;
+  /* Versão legível do accent para texto. O #c67139 sobre o creme dá 3,03:1 e
+     reprova no AA (4,5:1). Este tom passa nas DUAS superfícies claras, que é
+     o que importa: a maior parte do `text-primary` fica dentro de card.
+        sobre --background #f5ead8 → 5,28:1
+        sobre --card       #ebddc5 → 4,70:1
+     O accent original (#c67139) continua nas superfícies grandes (círculo do
+     hero, theme-color, ring), onde contraste de texto não se aplica. */
+  --organic-accent-contrast: #944d1e;
   --organic-accent-2: #7a8a5e;
   --organic-divider: color-mix(in srgb, #201e1d 16%, transparent);
 
@@ -133,7 +141,7 @@
   --card-foreground: var(--organic-text);
   --popover: var(--organic-surface);
   --popover-foreground: var(--organic-text);
-  --primary: var(--organic-accent);
+  --primary: var(--organic-accent-contrast);
   --primary-foreground: var(--organic-bg);
   --secondary: var(--organic-neutral-200);
   --secondary-foreground: var(--organic-neutral-800);
@@ -156,7 +164,7 @@
 
   --sidebar: color-mix(in srgb, var(--organic-surface) 55%, var(--organic-bg));
   --sidebar-foreground: var(--organic-text);
-  --sidebar-primary: var(--organic-accent);
+  --sidebar-primary: var(--organic-accent-contrast);
   --sidebar-primary-foreground: var(--organic-bg);
   --sidebar-accent: color-mix(in srgb, var(--organic-text) 6%, transparent);
   --sidebar-accent-foreground: var(--organic-text);
@@ -175,6 +183,8 @@
   --organic-surface: #2a231d;
   --organic-text: #f5ead8;
   --organic-accent: #e08a52;
+  /* No escuro o accent já dá 6,71:1 sobre o fundo — não precisa de variante. */
+  --organic-accent-contrast: #e08a52;
   --organic-accent-2: #aebf92;
   --organic-divider: color-mix(in srgb, #f5ead8 14%, transparent);
 

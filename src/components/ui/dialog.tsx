@@ -54,6 +54,12 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid max-h-[85dvh] w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl bg-popover p-6 text-sm text-popover-foreground shadow-[0_12px_32px_color-mix(in_srgb,var(--organic-neutral-900)_22%,transparent)] duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // No celular vira bottom-sheet: centralizado, um dialog alto (o de
+          // "Nova compra" tem ~690px) empurrava o rodapé pra fora da tela e,
+          // com o teclado aberto, o botão Salvar ficava atrás dele. Ancorado
+          // embaixo, a rolagem termina no rodapé e ele fica ao alcance do
+          // polegar. As classes de slide substituem o zoom só nesse tamanho.
+          "max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:max-h-[92dvh] max-sm:w-full max-sm:max-w-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-[28px] max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:data-open:zoom-in-100 max-sm:data-closed:zoom-out-100 max-sm:data-open:slide-in-from-bottom max-sm:data-closed:slide-out-to-bottom",
           className
         )}
         {...props}
@@ -109,6 +115,9 @@ function DialogFooter({
         // cancelam o p-6 do DialogContent pra faixa ocupar a largura toda até
         // a borda arredondada.
         "-mx-6 -mb-6 flex flex-col-reverse gap-2 border-t border-border/60 bg-popover px-6 pt-3 pb-6 sm:flex-row sm:justify-end",
+        // No bottom-sheet o padding de safe-area já está no popup; aqui só
+        // cancela a margem negativa pra não comer essa faixa.
+        "max-sm:-mb-[calc(1.5rem+env(safe-area-inset-bottom))] max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
         className
       )}
       {...props}

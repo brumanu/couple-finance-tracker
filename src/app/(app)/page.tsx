@@ -379,10 +379,20 @@ export default async function DashboardPage({
       (s, r) => s + Number(r.valor_previsto),
       0,
     );
-    const totalContasRec = contasQ.reduce((s, c) => {
-      const pago = pagosMes.get(c.id);
-      return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
-    }, 0);
+    // Pagamento de conta desativada/excluída depois do fato: o dinheiro saiu,
+    // então continua contando na quinzena em que foi lançado.
+    const orfasQ = lancsMes.filter(
+      (l) =>
+        l.tipo === "conta_fixa" &&
+        l.quinzena === q &&
+        (!l.conta_recorrente_id ||
+          !contasQ.some((c) => c.id === l.conta_recorrente_id)),
+    );
+    const totalContasRec =
+      contasQ.reduce((s, c) => {
+        const pago = pagosMes.get(c.id);
+        return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
+      }, 0) + orfasQ.reduce((s, l) => s + Number(l.valor), 0);
     const totalCartoes = faturasQ.reduce((s, f) => s + f.total, 0);
     const totalDespesas = despesasQ.reduce((s, l) => s + Number(l.valor), 0);
     const totalRendaExtra = rendasExtraQ.reduce(
@@ -444,15 +454,30 @@ export default async function DashboardPage({
   const nenhumDado =
     rendas.length === 0 &&
     contasAll.length === 0 &&
-    dadosMes.totalCartoes === 0;
+    dadosMes.totalCartoes === 0 &&
+    dadosMes.totalDespesas === 0 &&
+    lancsMesAtual.length === 0;
 
+  const estaAtrasada = (c: RecorrenteRow) => {
+    if (pagamentosMes.has(c.id)) return false;
+    return c.dia_vencimento != null && hojeDia > c.dia_vencimento;
+  };
+
+  // Atraso olha as duas quinzenas: uma conta do dia 15 que não foi paga sumia
+  // do dashboard a partir do dia 16, justamente quando mais importa.
   const contasEmAtraso = noMesAtual
-    ? quinzenaAtualDados.contas.filter((c) => {
-        const paga = pagamentosMes.get(c.id);
-        if (paga) return false;
-        return c.dia_vencimento != null && hojeDia > c.dia_vencimento;
-      })
+    ? [...q15.contas, ...q30.contas].filter(estaAtrasada)
     : [];
+
+  // A checklist mostra a quinzena atual mais o que ficou pendente na outra.
+  const outraQuinzenaDados = quinzenaAtual === 15 ? q30 : q15;
+  const pendentesOutraQuinzena = noMesAtual
+    ? outraQuinzenaDados.contas.filter(estaAtrasada)
+    : [];
+  const contasChecklist = [
+    ...pendentesOutraQuinzena,
+    ...quinzenaAtualDados.contas,
+  ];
 
   const primeiroNome = session.nome.split(/\s+/)[0];
   const contextoHoje = noMesAtual ? saudacaoContexto(hojeDia) : null;
@@ -545,10 +570,13 @@ export default async function DashboardPage({
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-[1.1fr_1fr]">
+          {/* minmax(0,1fr): sem isso a track "auto" do mobile assume a largura
+              min-content das linhas (texto nowrap + valor + botão) e a página
+              inteira passa a rolar de lado em telas de 360-375px. */}
+          <div className="grid gap-4 grid-cols-[minmax(0,1fr)] md:grid-cols-[1.1fr_1fr]">
             <ContasQuinzenaCard
               quinzena={quinzenaAtual}
-              contas={quinzenaAtualDados.contas}
+              contas={contasChecklist}
               pagamentos={pagamentosMes}
               mes={mes}
               hojeDia={hojeDia}

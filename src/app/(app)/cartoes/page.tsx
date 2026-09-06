@@ -82,7 +82,7 @@ export default async function CartoesPage({
             Faturas de {mes.label}. Toque em &ldquo;Detalhes&rdquo; pra abrir as compras.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <MonthSwitcher mes={mes} />
           <Button
             variant="outline"

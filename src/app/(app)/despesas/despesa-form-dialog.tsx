@@ -56,6 +56,13 @@ type Props = {
   cartoes?: CartaoOpcao[];
   categorias?: CategoriaOpcao[];
   membros?: MembroOpcao[];
+  /**
+   * Já nasce aberto. Usado por quem monta o dialog sob demanda (o FAB do
+   * mobile só o carrega no primeiro toque, e aí ele precisa abrir sozinho).
+   */
+  defaultOpen?: boolean;
+  /** Chamado quando o dialog fecha — deixa o pai desmontar o que carregou. */
+  onClose?: () => void;
 };
 
 const INITIAL_STATE: DespesaFormState = {};
@@ -75,8 +82,15 @@ export function DespesaFormDialog({
   cartoes = [],
   categorias = [],
   membros = [],
+  defaultOpen = false,
+  onClose,
 }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) onClose?.();
+  }
   const isEdit = Boolean(despesa);
 
   const action = isEdit
@@ -170,7 +184,7 @@ export function DespesaFormDialog({
   const cartaoSelecionado = cartoes.find((c) => c.id === cartaoId);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       {trigger ? (
         <DialogTrigger render={trigger} />
       ) : (

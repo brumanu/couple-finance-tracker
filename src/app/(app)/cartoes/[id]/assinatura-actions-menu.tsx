@@ -44,7 +44,11 @@ export function AssinaturaActionsMenu({
 
   const onToggle = () => {
     startTransition(async () => {
-      await toggleAssinaturaAtiva(id, cartaoId, !ativa);
+      const result = await toggleAssinaturaAtiva(id, cartaoId, !ativa);
+      if (result?.error) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(ativa ? "Assinatura desativada." : "Assinatura ativada.");
     });
   };

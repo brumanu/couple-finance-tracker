@@ -13,7 +13,6 @@ import {
   Grid3x3Icon,
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
-import { Card } from "@/components/ui/card";
 
 type Relatorio = {
   href: string;
@@ -107,7 +106,7 @@ export default async function RelatoriosPage() {
         </p>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 grid-cols-[minmax(0,1fr)] md:grid-cols-2">
         {RELATORIOS.map((r) => (
           <Link
             key={r.href}
