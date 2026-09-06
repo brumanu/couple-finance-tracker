@@ -37,6 +37,7 @@ type CartaoRow = {
   banco_id: string;
   apelido: string | null;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 type BancoRow = {
@@ -105,7 +106,7 @@ export default async function RelatorioComprasDoMesPage({
       .eq("ativa", true),
     supabase
       .from("cartoes")
-      .select("id, banco_id, apelido, dia_fechamento"),
+      .select("id, banco_id, apelido, dia_fechamento, dia_vencimento"),
     supabase.from("bancos").select("id, nome"),
     getCategorias(),
     getMembrosCasal(),
@@ -193,7 +194,6 @@ export default async function RelatorioComprasDoMesPage({
   // Compras no cartão: só a parcela ativa no mês alvo, se houver.
   for (const compra of compras) {
     const cartao = cartaoById.get(compra.cartao_id);
-    const diaFechamento = cartao?.dia_fechamento ?? 1;
     const info = parcelaNoMes(
       {
         id: compra.id,
@@ -205,7 +205,7 @@ export default async function RelatorioComprasDoMesPage({
         parcelas_ja_pagas: compra.parcelas_ja_pagas ?? undefined,
         categoria: null,
       },
-      diaFechamento,
+      cartao,
       mes,
     );
     if (!info) continue;
@@ -223,7 +223,8 @@ export default async function RelatorioComprasDoMesPage({
       valor: info.valor,
       compra,
       cartaoNome: nomeCartao(compra.cartao_id),
-      diaFechamento,
+      diaFechamento: cartao?.dia_fechamento ?? 1,
+      diaVencimento: cartao?.dia_vencimento ?? 10,
     });
   }
 

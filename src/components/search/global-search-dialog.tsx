@@ -39,12 +39,15 @@ export function GlobalSearchDialog() {
   const [resultados, setResultados] = useState<SearchResultItem[]>([]);
   const [isPending, startTransition] = useTransition();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seqRef = useRef(0);
 
   // Fecha o modal e reseta o estado, pra não reabrir com a busca
   // anterior ainda na tela.
   function handleOpenChange(next: boolean) {
     setOpen(next);
     if (!next) {
+      // Invalida buscas em voo: sem isso a resposta chega depois de fechar.
+      seqRef.current++;
       setTexto("");
       setResultados([]);
     }
@@ -59,9 +62,12 @@ export function GlobalSearchDialog() {
     if (texto.trim().length < 2) return;
 
     timeoutRef.current = setTimeout(() => {
+      // Sequência: uma resposta lenta de "mer" chegando depois da resposta de
+      // "mercado" sobrescrevia a lista com os resultados antigos.
+      const seq = ++seqRef.current;
       startTransition(async () => {
         const res = await buscarGlobal(texto);
-        setResultados(res);
+        if (seq === seqRef.current) setResultados(res);
       });
     }, 300);
 

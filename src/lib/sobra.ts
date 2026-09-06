@@ -62,6 +62,28 @@ export type SaldoMes = {
   saldo: number;
 };
 
+/**
+ * Soma os pagamentos de conta fixa do mês cuja conta não está mais entre as
+ * vigentes — porque foi desativada, excluída (o FK vira null) ou saiu de
+ * vigência depois do pagamento.
+ *
+ * Sem isso o dinheiro que saiu de fato some dos totais quando o casal
+ * desativa a conta meses depois, e a sobra de um mês já fechado muda sozinha.
+ */
+export function totalContasOrfas(
+  lancsMes: LancamentoSaldo[],
+  contasVigentes: { id: string }[],
+): number {
+  const vigentes = new Set(contasVigentes.map((c) => c.id));
+  return lancsMes
+    .filter(
+      (l) =>
+        l.tipo === "conta_fixa" &&
+        (!l.conta_recorrente_id || !vigentes.has(l.conta_recorrente_id)),
+    )
+    .reduce((s, l) => s + Number(l.valor), 0);
+}
+
 /** Fórmula do saldo do mês. Pura — não toca no banco. */
 export function calcularSaldoMes(
   dados: DadosSaldo,
@@ -90,10 +112,11 @@ export function calcularSaldoMes(
     (s, r) => s + Number(r.valor_previsto),
     0,
   );
-  const totalContasRec = contasMes.reduce((s, c) => {
-    const pago = pagosMes.get(c.id);
-    return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
-  }, 0);
+  const totalContasRec =
+    contasMes.reduce((s, c) => {
+      const pago = pagosMes.get(c.id);
+      return s + (pago ? Number(pago.valor) : Number(c.valor_previsto));
+    }, 0) + totalContasOrfas(lancsMes, contasMes);
   const totalCartoes = dados.cartoes.reduce(
     (s, c) =>
       s +

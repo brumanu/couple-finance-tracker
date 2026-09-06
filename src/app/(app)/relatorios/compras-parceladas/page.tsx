@@ -36,6 +36,7 @@ type CartaoRow = {
   banco_id: string;
   apelido: string | null;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 type BancoRow = {
@@ -93,7 +94,7 @@ export default async function RelatorioComprasParceladasPage({
       .gte("data_compra", comprasCutoff)
       .lte("data_compra", mes.ultimoDia)
       .order("data_compra", { ascending: false }),
-    supabase.from("cartoes").select("id, banco_id, apelido, dia_fechamento"),
+    supabase.from("cartoes").select("id, banco_id, apelido, dia_fechamento, dia_vencimento"),
     supabase.from("bancos").select("id, nome, cor, icone"),
     getCategorias(),
   ]);
@@ -108,7 +109,6 @@ export default async function RelatorioComprasParceladasPage({
 
   for (const c of compras) {
     const cartao = cartaoById.get(c.cartao_id);
-    const diaFech = cartao?.dia_fechamento ?? 1;
 
     const compraInfo: CompraCartaoInfo = {
       id: c.id,
@@ -120,7 +120,7 @@ export default async function RelatorioComprasParceladasPage({
       parcelas_ja_pagas: c.parcelas_ja_pagas ?? undefined,
       categoria: c.categoria,
     };
-    const info = parcelaNoMes(compraInfo, diaFech, mes);
+    const info = parcelaNoMes(compraInfo, cartao, mes);
     if (!info) continue; // sem parcela ativa no mês selecionado
 
     const banco = cartao ? bancoById.get(cartao.banco_id) : undefined;
@@ -130,7 +130,7 @@ export default async function RelatorioComprasParceladasPage({
         : banco.nome
       : (cartao?.apelido ?? "Cartão");
 
-    const primeira = mesPrimeiraParcela(c.data_compra, diaFech);
+    const primeira = mesPrimeiraParcela(c.data_compra, cartao);
     const valores = valoresParcelas(Number(c.valor_total), c.parcelas);
     const valorUltimaParcela = valores[c.parcelas - 1];
 

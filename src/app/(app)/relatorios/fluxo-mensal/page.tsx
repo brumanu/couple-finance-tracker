@@ -44,6 +44,7 @@ type AssinaturaRow = {
 type CartaoRow = {
   id: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 type MesTotal = {
@@ -109,7 +110,7 @@ export default async function RelatorioFluxoMensalPage({
           "id, cartao_id, valor_mensal, inicio_vigencia, fim_vigencia, ativa",
         )
         .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento"),
+      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
     ]);
 
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
@@ -157,7 +158,6 @@ export default async function RelatorioFluxoMensalPage({
 
     for (const compra of compras) {
       const cartao = cartaoById.get(compra.cartao_id);
-      const diaFechamento = cartao?.dia_fechamento ?? 1;
       const info = parcelaNoMes(
         {
           id: compra.id,
@@ -169,7 +169,7 @@ export default async function RelatorioFluxoMensalPage({
           parcelas_ja_pagas: compra.parcelas_ja_pagas ?? undefined,
           categoria: null,
         },
-        diaFechamento,
+        cartao,
         mes,
       );
       if (!info) continue;
@@ -272,7 +272,7 @@ export default async function RelatorioFluxoMensalPage({
           <FluxoChart dados={totaisPorMes} maximo={maximoGrafico} />
 
           <Card className="overflow-hidden">
-            <div className="hidden overflow-x-auto md:block">
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full text-sm">
                 <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -307,7 +307,7 @@ export default async function RelatorioFluxoMensalPage({
               </table>
             </div>
 
-            <ul className="flex flex-col divide-y divide-border/60 md:hidden">
+            <ul className="flex flex-col divide-y divide-border/60 lg:hidden">
               {totaisPorMes.map((m, i) => {
                 const anterior = i > 0 ? totaisPorMes[i - 1] : null;
                 const { texto, cor } = formatDelta(m.total, anterior);

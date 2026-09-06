@@ -50,6 +50,7 @@ type AssinaturaRow = {
 type CartaoRow = {
   id: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 type LinhaCategoria = {
@@ -113,7 +114,8 @@ function calcularTotaisPorCategoria(
     if (c.inicio_vigencia > mes.ultimoDia) continue;
     if (c.fim_vigencia !== null && c.fim_vigencia < mes.primeiroDia) continue;
     const pago = pagosMes.get(c.id);
-    const categoriaId = pago ? pago.categoria_id : c.categoria_id;
+    // Lançamentos antigos nasceram sem categoria; cai na categoria da conta.
+    const categoriaId = pago?.categoria_id ?? c.categoria_id;
     const valor = pago ? Number(pago.valor) : Number(c.valor_previsto);
     add(categoriaId, valor);
   }
@@ -121,7 +123,6 @@ function calcularTotaisPorCategoria(
   // Compras no cartão: só a parcela ativa no mês alvo, se houver.
   for (const compra of compras) {
     const cartao = cartaoById.get(compra.cartao_id);
-    const diaFechamento = cartao?.dia_fechamento ?? 1;
     const info = parcelaNoMes(
       {
         id: compra.id,
@@ -133,7 +134,7 @@ function calcularTotaisPorCategoria(
         parcelas_ja_pagas: compra.parcelas_ja_pagas ?? undefined,
         categoria: null,
       },
-      diaFechamento,
+      cartao,
       mes,
     );
     if (!info) continue;
@@ -214,7 +215,7 @@ export default async function RelatorioCategoriaPorMesPage({
           "id, cartao_id, valor_mensal, categoria_id, inicio_vigencia, fim_vigencia, ativa",
         )
         .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento"),
+      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
       getCategorias(),
     ]);
 

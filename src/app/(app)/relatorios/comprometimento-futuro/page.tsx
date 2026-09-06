@@ -46,6 +46,7 @@ type ContaRow = {
 type CartaoRow = {
   id: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 type DividaRow = {
@@ -135,7 +136,7 @@ export default async function RelatorioComprometimentoFuturoPage({
           "id, descricao, valor_previsto, ativa, inicio_vigencia, fim_vigencia",
         )
         .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento"),
+      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
       supabase
         .from("dividas")
         .select("id, descricao, valor_total")
@@ -160,7 +161,6 @@ export default async function RelatorioComprometimentoFuturoPage({
 
     for (const compra of compras) {
       const cartao = cartaoById.get(compra.cartao_id);
-      const diaFechamento = cartao?.dia_fechamento ?? 1;
       const compraInfo: CompraCartaoInfo = {
         id: compra.id,
         cartao_id: compra.cartao_id,
@@ -171,7 +171,7 @@ export default async function RelatorioComprometimentoFuturoPage({
         parcelas_ja_pagas: compra.parcelas_ja_pagas ?? undefined,
         categoria: compra.categoria,
       };
-      const info = parcelaNoMes(compraInfo, diaFechamento, mes);
+      const info = parcelaNoMes(compraInfo, cartao, mes);
       if (!info) continue;
 
       comprasTotal += info.valor;

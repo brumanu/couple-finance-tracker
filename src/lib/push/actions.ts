@@ -58,7 +58,10 @@ export async function unsubscribePush(
   const { error } = await supabase
     .from("push_subscriptions")
     .delete()
-    .eq("endpoint", endpoint);
+    .eq("endpoint", endpoint)
+    // Sem o filtro por profile, um parceiro consegue desativar as notificações
+    // do aparelho do outro (a RLS deixa os dois lerem o endpoint).
+    .eq("profile_id", user.id);
   if (error) return { error: error.message };
 
   return { ok: true };

@@ -52,6 +52,7 @@ type AssinaturaRow = {
 type CartaoRow = {
   id: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 type RendaRow = {
@@ -136,7 +137,6 @@ function computeDespesa(
   let cartao = 0;
   for (const compra of compras) {
     const cartaoInfo = cartaoById.get(compra.cartao_id);
-    const diaFechamento = cartaoInfo?.dia_fechamento ?? 1;
     const info = parcelaNoMes(
       {
         id: compra.id,
@@ -148,7 +148,7 @@ function computeDespesa(
         parcelas_ja_pagas: compra.parcelas_ja_pagas ?? undefined,
         categoria: null,
       },
-      diaFechamento,
+      cartaoInfo,
       mesRef,
     );
     if (info) cartao += info.valor;
@@ -232,7 +232,7 @@ export default async function RelatorioRendaXDespesaPage({
           "id, cartao_id, descricao, valor_mensal, inicio_vigencia, fim_vigencia, ativa",
         )
         .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento"),
+      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
       supabase.from("rendas").select("valor_previsto").eq("ativa", true),
     ]);
 

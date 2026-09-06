@@ -334,7 +334,7 @@ export function RelatorioGastosPorCategoriaClient({
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <div className="hidden overflow-x-auto md:block">
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full text-sm">
               <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
@@ -374,7 +374,7 @@ export function RelatorioGastosPorCategoriaClient({
             </table>
           </div>
 
-          <ul className="flex flex-col divide-y divide-border/60 md:hidden">
+          <ul className="flex flex-col divide-y divide-border/60 lg:hidden">
             {filtradas.map((t) => (
               <li key={t.id} className="flex flex-col gap-1.5 p-4">
                 <div className="flex items-start justify-between gap-3">

@@ -43,15 +43,6 @@ const BANDEIRA_LABEL: Record<string, string> = {
   outra: "Outra",
 };
 
-function iniciais(nome: string): string {
-  return nome
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
 function formatDataBR(iso: string): string {
   const [y, m, d] = iso.split("-");
   return `${d}/${m}/${y.slice(2)}`;
@@ -114,11 +105,7 @@ export default async function CartaoDetailPage({
   // Compras que efetivamente têm parcela na fatura do mês selecionado
   const comprasDoMes = compras
     .map((c) => {
-      const info = parcelaNoMes(
-        c as CompraCartaoInfo,
-        cartao.dia_fechamento,
-        mes,
-      );
+      const info = parcelaNoMes(c as CompraCartaoInfo, cartao, mes);
       return info ? { compra: c, info } : null;
     })
     .filter((x): x is { compra: CompraRow; info: NonNullable<ReturnType<typeof parcelaNoMes>> } => x !== null);
@@ -185,6 +172,7 @@ export default async function CartaoDetailPage({
           <CompraFormDialog
             cartaoId={cartao.id}
             diaFechamento={cartao.dia_fechamento}
+            diaVencimento={cartao.dia_vencimento}
             categorias={categorias}
             membros={membros}
           />
@@ -239,6 +227,7 @@ export default async function CartaoDetailPage({
               <CompraFormDialog
                 cartaoId={cartao.id}
                 diaFechamento={cartao.dia_fechamento}
+                diaVencimento={cartao.dia_vencimento}
                 categorias={categorias}
                 membros={membros}
               />
@@ -256,10 +245,7 @@ export default async function CartaoDetailPage({
           <Card>
             <ul className="flex flex-col divide-y divide-border/60">
               {comprasDoMes.map(({ compra: c, info }) => {
-                const primeira = mesPrimeiraParcela(
-                  c.data_compra,
-                  cartao.dia_fechamento,
-                );
+                const primeira = mesPrimeiraParcela(c.data_compra, cartao);
                 const valores = valoresParcelas(
                   Number(c.valor_total),
                   c.parcelas,
@@ -348,6 +334,7 @@ export default async function CartaoDetailPage({
                       <EditCompraTrigger
                         compra={c}
                         diaFechamento={cartao.dia_fechamento}
+                        diaVencimento={cartao.dia_vencimento}
                         categorias={categorias}
                         membros={membros}
                       />
@@ -379,7 +366,11 @@ export default async function CartaoDetailPage({
               <p className="text-sm text-muted-foreground">
                 Nenhuma assinatura recorrente cadastrada.
               </p>
-              <AssinaturaFormDialog cartaoId={cartao.id} membros={membros} />
+              <AssinaturaFormDialog
+                cartaoId={cartao.id}
+                categorias={categorias}
+                membros={membros}
+              />
             </div>
           </Card>
         ) : (
@@ -430,6 +421,7 @@ export default async function CartaoDetailPage({
                     <EditAssinaturaTrigger
                       assinatura={a}
                       cartaoId={cartao.id}
+                      categorias={categorias}
                       membros={membros}
                     />
                     <AssinaturaActionsMenu

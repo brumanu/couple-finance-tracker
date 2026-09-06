@@ -48,21 +48,56 @@ export function assinaturaAtivaNoMes(
 }
 
 /**
- * Retorna o mês em que a PRIMEIRA parcela da compra cai.
+ * Dados do cartão que definem em qual fatura uma compra cai.
+ * O vencimento importa tanto quanto o fechamento — ver mesPrimeiraParcela.
+ */
+export type CartaoFatura = Pick<
+  CartaoInfo,
+  "dia_fechamento" | "dia_vencimento"
+>;
+
+// Usado quando o cartão da compra não foi encontrado (dado órfão). Vencimento
+// depois do fechamento = sem deslocamento de mês, que era o comportamento
+// antigo do `?? 1` espalhado pelos relatórios.
+const FATURA_PADRAO: CartaoFatura = { dia_fechamento: 1, dia_vencimento: 10 };
+
+/**
+ * Retorna o mês da fatura em que a PRIMEIRA parcela da compra cai.
  *
- * Regra clássica dos bancos brasileiros:
- * - Se o dia da compra <= dia_fechamento do cartão, a compra entra na
- *   fatura que fecha ESSE mês (paga esse mês).
- * - Se o dia da compra > dia_fechamento, entra na fatura do PRÓXIMO mês.
+ * "Mês da fatura" é sempre o mês do VENCIMENTO, que é quando o dinheiro
+ * realmente sai — é assim que a sobra da quinzena, o dashboard e os
+ * relatórios tratam o gasto.
+ *
+ * Duas etapas:
+ * 1. Em que mês a fatura FECHA? Compra até o dia_fechamento fecha no próprio
+ *    mês; depois disso, fecha no mês seguinte.
+ * 2. Em que mês essa fatura VENCE? Se dia_vencimento > dia_fechamento, vence
+ *    no mesmo mês em que fechou (ex.: fecha 10, vence 17). Se o vencimento é
+ *    igual ou anterior ao fechamento, vence no mês seguinte — é o caso comum
+ *    de "fecha 25, vence 5" e era exatamente o que faltava aqui.
  */
 export function mesPrimeiraParcela(
   dataCompraISO: string,
-  diaFechamento: number,
+  cartao: CartaoFatura | null | undefined,
 ): MesRef {
+  const { dia_fechamento, dia_vencimento } = cartao ?? FATURA_PADRAO;
   const [ano, mes, dia] = dataCompraISO.split("-").map(Number);
-  const cai = dia <= diaFechamento ? mes : mes + 1;
-  if (cai > 12) return buildMes(ano + 1, cai - 12);
-  return buildMes(ano, cai);
+  let alvo = dia <= dia_fechamento ? mes : mes + 1;
+  if (dia_vencimento <= dia_fechamento) alvo += 1;
+  return buildMes(ano + Math.floor((alvo - 1) / 12), ((alvo - 1) % 12) + 1);
+}
+
+/**
+ * Mês da parcela que cai `offsetMeses` depois da primeira (offset 0 = a
+ * primeira). Centraliza a aritmética de virada de ano que estava repetida
+ * em parcelaNoMes, no dialog de compra e na tela do cartão.
+ */
+export function mesDaParcela(primeira: MesRef, offsetMeses: number): MesRef {
+  const total = primeira.mes + offsetMeses;
+  return buildMes(
+    primeira.ano + Math.floor((total - 1) / 12),
+    ((total - 1) % 12) + 1,
+  );
 }
 
 /**
@@ -74,13 +109,14 @@ export function valoresParcelas(
   valorTotal: number,
   parcelas: number,
 ): number[] {
-  if (parcelas <= 1) return [Number(valorTotal.toFixed(2))];
-  const base = Math.floor((valorTotal * 100) / parcelas) / 100;
+  // Trabalha em centavos inteiros: (valorTotal * 100) em float perde precisão
+  // (1.15 * 100 = 114.99999999999999) e derrubava um centavo de cada parcela.
   const cents = Math.round(valorTotal * 100);
-  const somaBase = Math.round(base * 100) * (parcelas - 1);
-  const ultima = Math.max(0, (cents - somaBase) / 100);
-  const arr = Array(parcelas - 1).fill(base);
-  arr.push(Number(ultima.toFixed(2)));
+  if (parcelas <= 1) return [cents / 100];
+  const base = Math.floor(cents / parcelas);
+  const ultima = cents - base * (parcelas - 1);
+  const arr: number[] = Array(parcelas - 1).fill(base / 100);
+  arr.push(ultima / 100);
   return arr;
 }
 
@@ -90,7 +126,7 @@ export function valoresParcelas(
  */
 export function parcelaNoMes(
   compra: CompraCartaoInfo,
-  diaFechamento: number,
+  cartao: CartaoFatura | null | undefined,
   mesAlvo: MesRef,
 ): {
   numero: number;
@@ -99,7 +135,7 @@ export function parcelaNoMes(
   ultimaParcela: MesRef;
   restanteAposEste: number; // valor que ainda falta pagar depois desta parcela
 } | null {
-  const primeira = mesPrimeiraParcela(compra.data_compra, diaFechamento);
+  const primeira = mesPrimeiraParcela(compra.data_compra, cartao);
   const parcelas = compra.parcelas;
   const jaPagas = Math.max(0, compra.parcelas_ja_pagas ?? 0);
 
@@ -113,11 +149,7 @@ export function parcelaNoMes(
   const numero = meses + 1;
   const valor = valores[meses];
 
-  // Última parcela = primeira + (parcelas - 1)
-  const totalMesesUltima = primeira.mes + parcelas - 1;
-  const anoUltima = primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
-  const mesUltima = ((totalMesesUltima - 1) % 12) + 1;
-  const ultimaParcela = buildMes(anoUltima, mesUltima);
+  const ultimaParcela = mesDaParcela(primeira, parcelas - 1);
 
   const restanteAposEste = valores
     .slice(numero) // parcelas após a atual
@@ -167,7 +199,7 @@ export function faturaDoMes(
   let total = 0;
   for (const c of compras) {
     if (c.cartao_id !== cartao.id) continue;
-    const info = parcelaNoMes(c, cartao.dia_fechamento, mesAlvo);
+    const info = parcelaNoMes(c, cartao, mesAlvo);
     if (!info) continue;
     parcelas.push({
       compra: c,

@@ -8,7 +8,7 @@ export default function RelatorioComprometimentoFuturoLoading() {
 
       <div>
         <Skeleton className="h-10 w-80 rounded-lg" />
-        <Skeleton className="mt-2 h-4 w-96 rounded-full" />
+        <Skeleton className="mt-2 h-4 w-full max-w-96 rounded-full" />
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">

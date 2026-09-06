@@ -8,7 +8,7 @@ export default function RelatorioCategoriaPorMesLoading() {
 
       <div>
         <Skeleton className="h-10 w-72 rounded-lg" />
-        <Skeleton className="mt-2 h-4 w-96 rounded-full" />
+        <Skeleton className="mt-2 h-4 w-full max-w-96 rounded-full" />
       </div>
 
       <Card className="overflow-hidden">

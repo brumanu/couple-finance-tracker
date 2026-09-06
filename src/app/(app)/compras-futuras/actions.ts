@@ -42,7 +42,23 @@ function parseFormData(
     ? (prioridadeRaw as 1 | 2 | 3)
     : 2;
 
-  const link = String(formData.get("link") ?? "").trim() || null;
+  // Só http(s): um link "javascript:..." executaria script na sessão de quem
+  // clicasse na lista.
+  const linkRaw = String(formData.get("link") ?? "").trim();
+  let link: string | null = null;
+  if (linkRaw) {
+    let url: URL;
+    try {
+      url = new URL(linkRaw);
+    } catch {
+      return "Link inválido. Use um endereço começando com http:// ou https://";
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "Link inválido. Use um endereço começando com http:// ou https://";
+    }
+    link = url.toString();
+  }
+
   const observacao = String(formData.get("observacao") ?? "").trim() || null;
 
   return {

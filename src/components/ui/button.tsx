@@ -19,16 +19,18 @@ const buttonVariants = cva(
           "text-destructive hover:bg-[color-mix(in_srgb,var(--destructive)_10%,transparent)] active:bg-[color-mix(in_srgb,var(--destructive)_18%,transparent)]",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // As alturas `max-md:` levam o alvo de toque pros 44px recomendados no
+      // celular sem mexer no desktop, onde o mouse acerta 32px sem esforço.
       size: {
         default:
-          "h-9 gap-2 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
+          "h-9 max-md:h-11 gap-2 px-4 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",
         xs: "h-7 gap-1 px-2.5 text-xs has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3",
-        sm: "h-8 gap-1.5 px-3 text-[0.8rem] has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3.5",
-        lg: "h-10 gap-2 px-5",
-        icon: "size-9",
+        sm: "h-8 max-md:h-11 gap-1.5 px-3 max-md:px-4 text-[0.8rem] has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 [&_svg:not([class*='size-'])]:size-3.5",
+        lg: "h-10 max-md:h-11 gap-2 px-5",
+        icon: "size-9 max-md:size-11",
         "icon-xs": "size-7 [&_svg:not([class*='size-'])]:size-3",
-        "icon-sm": "size-8",
-        "icon-lg": "size-10",
+        "icon-sm": "size-8 max-md:size-11",
+        "icon-lg": "size-10 max-md:size-11",
       },
     },
     defaultVariants: {

@@ -34,6 +34,9 @@ export const viewport = {
   ],
   width: "device-width",
   initialScale: 1,
+  // Sem isso env(safe-area-inset-*) é sempre 0 no iOS em modo standalone, e a
+  // barra de gestos do iPhone cobre os rótulos do bottom-nav.
+  viewportFit: "cover" as const,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

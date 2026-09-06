@@ -56,6 +56,7 @@ type AssinaturaRow = {
 type CartaoRow = {
   id: string;
   dia_fechamento: number;
+  dia_vencimento: number;
 };
 
 // Chave usada no Map de agregação pra itens sem `quem_gastou` definido
@@ -137,7 +138,7 @@ export default async function RelatorioGastosPorPessoaPage({
           "id, cartao_id, descricao, valor_mensal, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
         )
         .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento"),
+      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
     ]);
 
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
@@ -198,7 +199,6 @@ export default async function RelatorioGastosPorPessoaPage({
   // Compras no cartão: só a parcela ativa no mês alvo.
   for (const compra of compras) {
     const cartao = cartaoById.get(compra.cartao_id);
-    const diaFechamento = cartao?.dia_fechamento ?? 1;
     const info = parcelaNoMes(
       {
         id: compra.id,
@@ -210,7 +210,7 @@ export default async function RelatorioGastosPorPessoaPage({
         parcelas_ja_pagas: compra.parcelas_ja_pagas ?? undefined,
         categoria: null,
       },
-      diaFechamento,
+      cartao,
       mes,
     );
     if (!info) continue;
