@@ -1,18 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { PlusIcon, PencilIcon } from "lucide-react";
-import { toast } from "sonner";
+import { useMemo } from "react";
+import { PencilIcon } from "lucide-react";
 import { playCoinSound } from "@/lib/sound";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,10 +14,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  createRenda,
-  updateRenda,
-  type RendaFormState,
-} from "./actions";
+  useFormDialog,
+  type PropsDialogControlado,
+} from "@/lib/form-dialog";
+import { CampoForm, FormDialogShell } from "@/components/form-dialog-shell";
+import { createRenda, updateRenda, type RendaFormState } from "./actions";
 
 export type RendaRow = {
   id: string;
@@ -37,35 +28,12 @@ export type RendaRow = {
   ativa: boolean;
 };
 
-type Props = {
+type Props = PropsDialogControlado & {
   renda?: RendaRow;
-  trigger?: React.ReactElement;
 };
 
-const INITIAL_STATE: RendaFormState = {};
-
-export function RendaFormDialog({ renda, trigger }: Props) {
-  const [open, setOpen] = useState(false);
+export function RendaFormDialog({ renda, trigger, defaultOpen, onClose }: Props) {
   const isEdit = Boolean(renda);
-
-  const action = isEdit
-    ? updateRenda.bind(null, renda!.id)
-    : createRenda;
-
-  // Fecha/notifica dentro da própria action em vez de um useEffect que
-  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
-  const [state, formAction, pending] = useActionState(
-    async (prev: RendaFormState, formData: FormData) => {
-      const resultado = await action(prev, formData);
-      if (resultado.ok) {
-        setOpen(false);
-        toast.success(isEdit ? "Renda atualizada." : "Renda cadastrada.");
-        if (!isEdit) playCoinSound();
-      }
-      return resultado;
-    },
-    INITIAL_STATE,
-  );
 
   const defaults = useMemo(
     () => ({
@@ -77,103 +45,77 @@ export function RendaFormDialog({ renda, trigger }: Props) {
       dia_recebimento: String(renda?.dia_recebimento ?? "15"),
       ativa: renda?.ativa ?? true,
     }),
-    [renda?.id, renda?.descricao, renda?.valor_previsto, renda?.dia_recebimento, renda?.ativa],
+    [
+      renda?.id,
+      renda?.descricao,
+      renda?.valor_previsto,
+      renda?.dia_recebimento,
+      renda?.ativa,
+    ],
   );
 
+  const ctrl = useFormDialog<RendaFormState>({
+    action: isEdit ? updateRenda.bind(null, renda!.id) : createRenda,
+    sucesso: isEdit ? "Renda atualizada." : "Renda cadastrada.",
+    defaultOpen,
+    onClose,
+    aoSalvar: isEdit ? undefined : playCoinSound,
+  });
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger ? (
-        <DialogTrigger render={trigger} />
-      ) : (
-        <DialogTrigger
-          render={
-            <Button size="sm">
-              <PlusIcon className="size-4" />
-              Nova renda
-            </Button>
-          }
+    <FormDialogShell
+      ctrl={ctrl}
+      trigger={trigger}
+      rotuloNovo="Nova renda"
+      titulo={isEdit ? "Editar renda" : "Nova renda"}
+      descricao="Cadastre uma renda que entra na quinzena do dia 15 ou do dia 30."
+    >
+      <CampoForm htmlFor="descricao" rotulo="Descrição">
+        <Input
+          id="descricao"
+          name="descricao"
+          required
+          defaultValue={defaults.descricao}
+          placeholder="Ex: Salário Esposa"
         />
-      )}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar renda" : "Nova renda"}</DialogTitle>
-          <DialogDescription>
-            Cadastre uma renda que entra na quinzena do dia 15 ou do dia 30.
-          </DialogDescription>
-        </DialogHeader>
+      </CampoForm>
 
-        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="descricao">Descrição</Label>
-            <Input
-              id="descricao"
-              name="descricao"
-              required
-              defaultValue={defaults.descricao}
-              placeholder="Ex: Salário Esposa"
-            />
-          </div>
+      <CampoForm htmlFor="valor_previsto" rotulo="Valor previsto (R$)">
+        <Input
+          id="valor_previsto"
+          name="valor_previsto"
+          required
+          inputMode="decimal"
+          defaultValue={defaults.valor_previsto}
+          placeholder="Ex: 3200,00"
+        />
+      </CampoForm>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="valor_previsto">Valor previsto (R$)</Label>
-            <Input
-              id="valor_previsto"
-              name="valor_previsto"
-              required
-              inputMode="decimal"
-              defaultValue={defaults.valor_previsto}
-              placeholder="Ex: 3200,00"
-            />
-          </div>
+      <CampoForm htmlFor="dia_recebimento" rotulo="Dia de recebimento">
+        <Select name="dia_recebimento" defaultValue={defaults.dia_recebimento}>
+          <SelectTrigger id="dia_recebimento">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="15">Dia 15 (adiantamento)</SelectItem>
+            <SelectItem value="30">Dia 30 (salário final)</SelectItem>
+          </SelectContent>
+        </Select>
+      </CampoForm>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="dia_recebimento">Dia de recebimento</Label>
-            <Select name="dia_recebimento" defaultValue={defaults.dia_recebimento}>
-              <SelectTrigger id="dia_recebimento">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="15">Dia 15 (adiantamento)</SelectItem>
-                <SelectItem value="30">Dia 30 (salário final)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="ativa"
-              name="ativa"
-              defaultChecked={defaults.ativa}
-              className="size-4 rounded border-input"
-            />
-            <Label htmlFor="ativa" className="cursor-pointer">
-              Renda ativa (entra no cálculo do dashboard)
-            </Label>
-          </div>
-
-          {state.error && (
-            <p className="text-sm text-red-600" role="alert">
-              {state.error}
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="ativa"
+          name="ativa"
+          defaultChecked={defaults.ativa}
+          className="size-4 rounded border-input"
+        />
+        <Label htmlFor="ativa" className="cursor-pointer">
+          Renda ativa (entra no cálculo do dashboard)
+        </Label>
+      </div>
+    </FormDialogShell>
   );
 }
 

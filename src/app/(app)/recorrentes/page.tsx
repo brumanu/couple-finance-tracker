@@ -5,11 +5,12 @@ import { getMembrosCasal } from "@/lib/membros-server";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format";
+import type { RecorrenteRow } from "./recorrente-form-dialog";
 import {
-  RecorrenteFormDialog,
-  EditRecorrenteTrigger,
-  type RecorrenteRow,
-} from "./recorrente-form-dialog";
+  EditarRecorrente,
+  NovaRecorrente,
+  RecorrenteDialogs,
+} from "./recorrente-dialogs";
 import { RecorrenteActionsMenu } from "./recorrente-actions-menu";
 
 // Cartão / crédito = accent; demais = sage; pausadas caem para neutral
@@ -51,47 +52,45 @@ export default async function RecorrentesPage() {
     .reduce((s, r) => s + Number(r.valor_previsto), 0);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
-            Contas fixas
-          </h2>
-          <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
-            As que voltam todo mês. Cada uma mora numa quinzena.
-          </p>
-        </div>
-        <RecorrenteFormDialog categorias={categorias} membros={membros} />
-      </header>
-
-      {lista.length === 0 ? (
-        <Card>
-          <div className="flex flex-col items-center gap-3 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Nenhuma conta cadastrada ainda.
+    <RecorrenteDialogs categorias={categorias} membros={membros}>
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
+              Contas fixas
+            </h2>
+            <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
+              As que voltam todo mês. Cada uma mora numa quinzena.
             </p>
-            <RecorrenteFormDialog categorias={categorias} membros={membros} />
           </div>
-        </Card>
-      ) : (
-        <div className="grid items-start gap-6 grid-cols-[minmax(0,1fr)] lg:grid-cols-2">
-          <ColunaContas
-            titulo="Quinzena do dia 15"
-            total={total15}
-            itens={contas15}
-            categorias={categorias}
-            membros={membros}
-          />
-          <ColunaContas
-            titulo="Quinzena do dia 30"
-            total={total30}
-            itens={contas30}
-            categorias={categorias}
-            membros={membros}
-          />
-        </div>
-      )}
-    </div>
+          <NovaRecorrente />
+        </header>
+
+        {lista.length === 0 ? (
+          <Card>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Nenhuma conta cadastrada ainda.
+              </p>
+              <NovaRecorrente />
+            </div>
+          </Card>
+        ) : (
+          <div className="grid items-start gap-6 grid-cols-[minmax(0,1fr)] lg:grid-cols-2">
+            <ColunaContas
+              titulo="Quinzena do dia 15"
+              total={total15}
+              itens={contas15}
+            />
+            <ColunaContas
+              titulo="Quinzena do dia 30"
+              total={total30}
+              itens={contas30}
+            />
+          </div>
+        )}
+      </div>
+    </RecorrenteDialogs>
   );
 }
 
@@ -99,14 +98,10 @@ function ColunaContas({
   titulo,
   total,
   itens,
-  categorias,
-  membros,
 }: {
   titulo: string;
   total: number;
   itens: RecorrenteRow[];
-  categorias: Awaited<ReturnType<typeof getCategorias>>;
-  membros: Awaited<ReturnType<typeof getMembrosCasal>>;
 }) {
   return (
     <section className="flex flex-col gap-3.5">
@@ -157,11 +152,7 @@ function ColunaContas({
               <span className="whitespace-nowrap font-heading text-[17px] tabular-nums">
                 {formatBRL(r.valor_previsto)}
               </span>
-              <EditRecorrenteTrigger
-                recorrente={r}
-                categorias={categorias}
-                membros={membros}
-              />
+              <EditarRecorrente linha={r} />
               <RecorrenteActionsMenu
                 id={r.id}
                 ativa={r.ativa}

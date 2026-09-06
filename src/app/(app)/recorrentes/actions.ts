@@ -1,110 +1,69 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseBRLInput } from "@/lib/format";
-import { resolverCategoria } from "@/lib/categorias-server";
-import { resolverQuemGastou } from "@/lib/membros-server";
+import { campo, opcional, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  resolverClassificacao,
+  revalidar,
+  type EstadoForm,
+} from "@/lib/acoes";
 
-export type RecorrenteFormState = {
-  error?: string;
-  ok?: boolean;
+export type RecorrenteFormState = EstadoForm;
+
+const ESQUEMA = {
+  descricao: campo.texto("Descrição"),
+  valor_previsto: campo.dinheiro("Valor"),
+  quinzena: campo.umDeNumero("Quinzena", [15, 30] as const),
+  dia_vencimento: opcional(
+    campo.inteiro("Dia de vencimento", { min: 1, max: 31 }),
+  ),
+  ativa: campo.booleano(),
 };
 
-type Parsed = {
-  descricao: string;
-  valor_previsto: number;
-  quinzena: 15 | 30;
-  dia_vencimento: number | null;
-  categoria_id_raw: string;
-  quem_gastou_raw: string;
-  ativa: boolean;
+const CLASSIFICACAO = {
+  categoria_id: campo.cru(),
+  quem_gastou: campo.cru(),
 };
 
-function parseFormData(formData: FormData): Parsed | string {
-  const descricao = String(formData.get("descricao") ?? "").trim();
-  const valorRaw = String(formData.get("valor_previsto") ?? "").trim();
-  const quinzena = Number(formData.get("quinzena"));
-  const diaVencRaw = String(formData.get("dia_vencimento") ?? "").trim();
-  const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
-  const quem_gastou_raw = String(formData.get("quem_gastou") ?? "").trim();
-  const ativa =
-    formData.get("ativa") === "on" || formData.get("ativa") === "true";
+const ROTAS = ["/recorrentes", "/relatorios/compras-do-mes", "/"];
 
-  if (!descricao) return "Descrição é obrigatória.";
-  const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor <= 0) return "Valor deve ser maior que zero.";
-  if (quinzena !== 15 && quinzena !== 30) return "Quinzena inválida.";
+/** Campos do formulário + categoria/quem já validados contra o banco. */
+async function montarLinha(formData: FormData) {
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return dados;
 
-  let dia_vencimento: number | null = null;
-  if (diaVencRaw) {
-    const d = Number(diaVencRaw);
-    if (!Number.isInteger(d) || d < 1 || d > 31)
-      return "Dia de vencimento inválido.";
-    dia_vencimento = d;
-  }
+  const brutos = parseForm(formData, CLASSIFICACAO);
+  if (typeof brutos === "string") return brutos;
 
-  return {
-    descricao,
-    valor_previsto: valor,
-    quinzena: quinzena as 15 | 30,
-    dia_vencimento,
-    categoria_id_raw,
-    quem_gastou_raw,
-    ativa,
-  };
+  const supabase = await createClient();
+  const classificacao = await resolverClassificacao(
+    supabase,
+    brutos.categoria_id,
+    brutos.quem_gastou,
+  );
+  if (typeof classificacao === "string") return classificacao;
+
+  return { supabase, linha: { ...dados, ...classificacao } };
 }
 
 export async function createRecorrente(
   _prev: RecorrenteFormState,
   formData: FormData,
 ): Promise<RecorrenteFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const montado = await montarLinha(formData);
+  if (typeof montado === "string") return { error: montado };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
+  const { error } = await montado.supabase
+    .from("contas_recorrentes")
+    .insert(montado.linha);
+  if (error) return { error: erroAmigavel(error) };
 
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
-
-  const quemGastouResolved = await resolverQuemGastou(
-    supabase,
-    parsed.quem_gastou_raw,
-  );
-  if (typeof quemGastouResolved === "string")
-    return { error: quemGastouResolved };
-
-  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
-  void categoria_id_raw;
-  void quem_gastou_raw;
-
-  const { error } = await supabase.from("contas_recorrentes").insert({
-    casal_id: profile.casal_id,
-    ...rest,
-    ...categoriaResolved,
-    ...quemGastouResolved,
-  });
-
-  if (error) return { error: error.message };
-
-  revalidatePath("/recorrentes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  revalidar(...ROTAS);
   return { ok: true };
 }
 
@@ -113,37 +72,16 @@ export async function updateRecorrente(
   _prev: RecorrenteFormState,
   formData: FormData,
 ): Promise<RecorrenteFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const montado = await montarLinha(formData);
+  if (typeof montado === "string") return { error: montado };
 
-  const supabase = await createClient();
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
-
-  const quemGastouResolved = await resolverQuemGastou(
-    supabase,
-    parsed.quem_gastou_raw,
-  );
-  if (typeof quemGastouResolved === "string")
-    return { error: quemGastouResolved };
-
-  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
-  void categoria_id_raw;
-  void quem_gastou_raw;
-
-  const { error } = await supabase
+  const { error } = await montado.supabase
     .from("contas_recorrentes")
-    .update({ ...rest, ...categoriaResolved, ...quemGastouResolved })
+    .update(montado.linha)
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: erroAmigavel(error) };
 
-  revalidatePath("/recorrentes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  revalidar(...ROTAS);
   return { ok: true };
 }
 
@@ -153,10 +91,8 @@ export async function deleteRecorrente(id: string) {
     .from("contas_recorrentes")
     .delete()
     .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/recorrentes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...ROTAS);
 }
 
 export async function toggleRecorrenteAtiva(id: string, ativa: boolean) {
@@ -165,8 +101,6 @@ export async function toggleRecorrenteAtiva(id: string, ativa: boolean) {
     .from("contas_recorrentes")
     .update({ ativa })
     .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/recorrentes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...ROTAS);
 }

@@ -23,10 +23,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "./month-switcher";
-import { PagarDialog } from "./pagar/pagar-dialog";
-import { PagarFaturaDialog } from "./pagar/pagar-fatura-dialog";
+import { PagarConta, PagarFatura } from "./pagar/pagar-botoes";
 import { DesmarcarButton } from "./pagar/desmarcar-button";
-import { DespesaFormDialog } from "./despesas/despesa-form-dialog";
+import { DespesaDialogs, NovaDespesa } from "./despesas/despesa-dialogs";
 
 type RendaRow = {
   descricao: string;
@@ -483,131 +482,133 @@ export default async function DashboardPage({
   const contextoHoje = noMesAtual ? saudacaoContexto(hojeDia) : null;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-8 md:p-8">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
-            Oi, {primeiroNome}
-          </h2>
-          <p className="mt-1.5 text-[15px] text-neutral-700">
-            {contextoHoje ?? `Estimativa para ${mes.label}.`}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <MonthSwitcher mes={mes} />
-          <div className="hidden md:block">
-            <DespesaFormDialog
-              cartoes={cartoesSel}
-              categorias={categorias}
-              membros={membros}
-            />
-          </div>
-        </div>
-      </header>
-
-      {nenhumDado ? (
-        <Card>
-          <div className="flex flex-col items-center gap-3 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Ainda não tem nenhuma renda ou conta cadastrada em {mes.label}.
+    <DespesaDialogs
+      cartoes={cartoesSel}
+      categorias={categorias}
+      membros={membros}
+    >
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-8 md:p-8">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
+              Oi, {primeiroNome}
+            </h2>
+            <p className="mt-1.5 text-[15px] text-neutral-700">
+              {contextoHoje ?? `Estimativa para ${mes.label}.`}
             </p>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                nativeButton={false}
-                render={<Link href="/rendas">Cadastrar rendas</Link>}
-              />
-              <Button
-                size="sm"
-                nativeButton={false}
-                render={<Link href="/recorrentes">Cadastrar contas</Link>}
-              />
+          </div>
+          <div className="flex items-center gap-3">
+            <MonthSwitcher mes={mes} />
+            <div className="hidden md:block">
+              <NovaDespesa />
             </div>
           </div>
-        </Card>
-      ) : (
-        <>
-          <SobraMesHeroCard
-            dados={dadosMes}
-            mesLabel={mes.label}
-            noMesAtual={noMesAtual}
-          />
+        </header>
 
-          <SobraHistoricoChart
-            historico={historico}
-            selecionadaChave={mes.chave}
-          />
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <QuinzenaSaldoCard
-              dados={q15}
-              ehAtual={noMesAtual && quinzenaAtual === 15}
-            />
-            <QuinzenaSaldoCard
-              dados={q30}
-              ehAtual={noMesAtual && quinzenaAtual === 30}
-            />
-          </div>
-
-          {contasEmAtraso.length > 0 && (
-            <div className="flex items-center gap-4 rounded-[26px] border border-accent-300 bg-accent-100 px-5 py-4">
-              <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                <AlertTriangleIcon className="size-5" strokeWidth={2.75} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-heading text-[17px] text-accent-800">
-                  {contasEmAtraso.length === 1
-                    ? `A ${contasEmAtraso[0].descricao.toLowerCase()} venceu`
-                    : `${contasEmAtraso.length} contas em atraso`}
-                </p>
-                <p className="text-sm text-accent-800/85">
-                  {contasEmAtraso.length === 1
-                    ? `${formatBRL(contasEmAtraso[0].valor_previsto)} · vencimento dia ${contasEmAtraso[0].dia_vencimento}`
-                    : contasEmAtraso.map((c) => c.descricao).join(", ")}
-                </p>
+        {nenhumDado ? (
+          <Card>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Ainda não tem nenhuma renda ou conta cadastrada em {mes.label}.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  nativeButton={false}
+                  render={<Link href="/rendas">Cadastrar rendas</Link>}
+                />
+                <Button
+                  size="sm"
+                  nativeButton={false}
+                  render={<Link href="/recorrentes">Cadastrar contas</Link>}
+                />
               </div>
             </div>
-          )}
+          </Card>
+        ) : (
+          <>
+            <SobraMesHeroCard
+              dados={dadosMes}
+              mesLabel={mes.label}
+              noMesAtual={noMesAtual}
+            />
 
-          {/* minmax(0,1fr): sem isso a track "auto" do mobile assume a largura
-              min-content das linhas (texto nowrap + valor + botão) e a página
-              inteira passa a rolar de lado em telas de 360-375px. */}
-          <div className="grid gap-4 grid-cols-[minmax(0,1fr)] md:grid-cols-[1.1fr_1fr]">
-            <ContasQuinzenaCard
-              quinzena={quinzenaAtual}
-              contas={contasChecklist}
-              pagamentos={pagamentosMes}
+            <SobraHistoricoChart
+              historico={historico}
+              selecionadaChave={mes.chave}
+            />
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <QuinzenaSaldoCard
+                dados={q15}
+                ehAtual={noMesAtual && quinzenaAtual === 15}
+              />
+              <QuinzenaSaldoCard
+                dados={q30}
+                ehAtual={noMesAtual && quinzenaAtual === 30}
+              />
+            </div>
+
+            {contasEmAtraso.length > 0 && (
+              <div className="flex items-center gap-4 rounded-[26px] border border-accent-300 bg-accent-100 px-5 py-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <AlertTriangleIcon className="size-5" strokeWidth={2.75} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-heading text-[17px] text-accent-800">
+                    {contasEmAtraso.length === 1
+                      ? `A ${contasEmAtraso[0].descricao.toLowerCase()} venceu`
+                      : `${contasEmAtraso.length} contas em atraso`}
+                  </p>
+                  <p className="text-sm text-accent-800/85">
+                    {contasEmAtraso.length === 1
+                      ? `${formatBRL(contasEmAtraso[0].valor_previsto)} · vencimento dia ${contasEmAtraso[0].dia_vencimento}`
+                      : contasEmAtraso.map((c) => c.descricao).join(", ")}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* minmax(0,1fr): sem isso a track "auto" do mobile assume a largura
+                min-content das linhas (texto nowrap + valor + botão) e a página
+                inteira passa a rolar de lado em telas de 360-375px. */}
+            <div className="grid gap-4 grid-cols-[minmax(0,1fr)] md:grid-cols-[1.1fr_1fr]">
+              <ContasQuinzenaCard
+                quinzena={quinzenaAtual}
+                contas={contasChecklist}
+                pagamentos={pagamentosMes}
+                mes={mes}
+                hojeDia={hojeDia}
+                noMesAtual={noMesAtual}
+              />
+              <UltimasDespesasCard despesas={despesasAvulsasMes.slice(0, 6)} />
+            </div>
+
+            <FaturasCartaoCard
+              faturas={faturasMes}
+              pagamentosFatura={pagamentosFatura}
               mes={mes}
               hojeDia={hojeDia}
               noMesAtual={noMesAtual}
             />
-            <UltimasDespesasCard despesas={despesasAvulsasMes.slice(0, 6)} />
-          </div>
 
-          <FaturasCartaoCard
-            faturas={faturasMes}
-            pagamentosFatura={pagamentosFatura}
-            mes={mes}
-            hojeDia={hojeDia}
-            noMesAtual={noMesAtual}
-          />
+            {dadosMes.totalRendaExtra > 0 && (
+              <RendaExtraMesCard itens={rendaExtraMes} />
+            )}
 
-          {dadosMes.totalRendaExtra > 0 && (
-            <RendaExtraMesCard itens={rendaExtraMes} />
-          )}
-
-          {dividasAbertas.length > 0 && (
-            <DividasCard
-              total={totalDividas}
-              topDividas={dividasAbertas.slice(0, 3)}
-              temMais={dividasAbertas.length > 3}
-            />
-          )}
-        </>
-      )}
-    </div>
-  );
+            {dividasAbertas.length > 0 && (
+              <DividasCard
+                total={totalDividas}
+                topDividas={dividasAbertas.slice(0, 3)}
+                temMais={dividasAbertas.length > 3}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </DespesaDialogs>
+ );
 }
 
 function SobraMesHeroCard({
@@ -1128,7 +1129,7 @@ function ContasQuinzenaCard({
                 {pago ? (
                   <DesmarcarButton id={pago.id} descricao={c.descricao} />
                 ) : (
-                  <PagarDialog
+                  <PagarConta
                     contaRecorrenteId={c.id}
                     descricao={c.descricao}
                     valorPrevisto={c.valor_previsto}
@@ -1252,7 +1253,7 @@ function FaturasCartaoCard({
                     alvo="fatura"
                   />
                 ) : (
-                  <PagarFaturaDialog
+                  <PagarFatura
                     cartaoId={f.cartaoId}
                     label={f.label}
                     totalFatura={f.total}

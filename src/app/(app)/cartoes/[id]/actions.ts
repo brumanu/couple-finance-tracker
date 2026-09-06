@@ -1,65 +1,78 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseBRLInput } from "@/lib/format";
-import { resolverCategoria } from "@/lib/categorias-server";
-import { resolverQuemGastou } from "@/lib/membros-server";
+import { campo, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  resolverClassificacao,
+  revalidar,
+  type EstadoForm,
+  type SessaoDaAcao,
+} from "@/lib/acoes";
 
-export type CompraFormState = { error?: string; ok?: boolean };
+export type CompraFormState = EstadoForm;
 
-type Parsed = {
-  cartao_id: string;
-  descricao: string;
-  valor_total: number;
-  data_compra: string;
-  parcelas: number;
-  parcelas_ja_pagas: number;
-  categoria_id_raw: string;
-  quem_gastou_raw: string;
+const ESQUEMA = {
+  cartao_id: campo.texto("Cartão"),
+  descricao: campo.texto("Descrição"),
+  valor_total: campo.dinheiro("Valor"),
+  data_compra: campo.data("Data"),
+  parcelas: campo.inteiro("Parcelas", { min: 1, max: 60 }),
+  categoria_id: campo.cru(),
+  quem_gastou: campo.cru(),
 };
 
-function parseFormData(formData: FormData): Parsed | string {
-  const cartao_id = String(formData.get("cartao_id") ?? "").trim();
-  const descricao = String(formData.get("descricao") ?? "").trim();
-  const valorRaw = String(formData.get("valor_total") ?? "").trim();
-  const data_compra = String(formData.get("data_compra") ?? "").trim();
-  const parcelas = Number(formData.get("parcelas"));
+const rotas = (cartaoId: string) => [
+  `/cartoes/${cartaoId}`,
+  "/cartoes",
+  "/relatorios/compras-do-mes",
+  "/",
+];
+
+/**
+ * Lê o formulário e devolve a linha pronta pra `compras_cartao`.
+ *
+ * "Compra em andamento" é o caso de uma compra antiga que já vinha sendo paga
+ * quando entrou no app: o usuário informa em qual parcela está e a gente
+ * guarda quantas já foram.
+ */
+async function montarLinha(supabase: SessaoDaAcao, formData: FormData) {
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return dados;
+
   const emAndamento =
     formData.get("em_andamento") === "on" ||
     formData.get("em_andamento") === "true";
-  const parcelaAtualRaw = formData.get("parcela_atual");
-  const parcela_atual =
-    emAndamento && parcelaAtualRaw ? Number(parcelaAtualRaw) : 1;
-  const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
-  const quem_gastou_raw = String(formData.get("quem_gastou") ?? "").trim();
 
-  if (!cartao_id) return "Cartão inválido.";
-  if (!descricao) return "Descrição é obrigatória.";
-  const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor <= 0) return "Valor deve ser maior que zero.";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data_compra)) return "Data inválida.";
-  if (!Number.isInteger(parcelas) || parcelas < 1 || parcelas > 60)
-    return "Parcelas inválidas (1 a 60).";
-  if (
-    emAndamento &&
-    (!Number.isInteger(parcela_atual) ||
-      parcela_atual < 2 ||
-      parcela_atual > parcelas)
-  )
-    return `Se a compra está em andamento, a parcela atual deve estar entre 2 e ${parcelas}. Se você está na parcela 1, desmarque "Compra em andamento".`;
+  let parcelasJaPagas = 0;
+  if (emAndamento) {
+    const parcelaAtual = Number(formData.get("parcela_atual") ?? 1);
+    if (
+      !Number.isInteger(parcelaAtual) ||
+      parcelaAtual < 2 ||
+      parcelaAtual > dados.parcelas
+    ) {
+      return `Se a compra está em andamento, a parcela atual deve estar entre 2 e ${dados.parcelas}. Se você está na parcela 1, desmarque "Compra em andamento".`;
+    }
+    parcelasJaPagas = parcelaAtual - 1;
+  }
 
-  const parcelas_ja_pagas = emAndamento ? parcela_atual - 1 : 0;
+  const classificacao = await resolverClassificacao(
+    supabase,
+    dados.categoria_id,
+    dados.quem_gastou,
+  );
+  if (typeof classificacao === "string") return classificacao;
+
+  const { categoria_id, quem_gastou, ...campos } = dados;
+  void categoria_id;
+  void quem_gastou;
 
   return {
-    cartao_id,
-    descricao,
-    valor_total: valor,
-    data_compra,
-    parcelas,
-    parcelas_ja_pagas,
-    categoria_id_raw,
-    quem_gastou_raw,
+    ...campos,
+    parcelas_ja_pagas: parcelasJaPagas,
+    ...classificacao,
   };
 }
 
@@ -67,53 +80,18 @@ export async function createCompra(
   _prev: CompraFormState,
   formData: FormData,
 ): Promise<CompraFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const linha = await montarLinha(sessao.supabase, formData);
+  if (typeof linha === "string") return { error: linha };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
+  const { error } = await sessao.supabase
+    .from("compras_cartao")
+    .insert(linha);
+  if (error) return { error: erroAmigavel(error) };
 
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
-
-  const quemGastouResolved = await resolverQuemGastou(
-    supabase,
-    parsed.quem_gastou_raw,
-  );
-  if (typeof quemGastouResolved === "string")
-    return { error: quemGastouResolved };
-
-  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
-  void categoria_id_raw;
-  void quem_gastou_raw;
-
-  const { error } = await supabase.from("compras_cartao").insert({
-    casal_id: profile.casal_id,
-    criado_por: user.id,
-    ...rest,
-    ...categoriaResolved,
-    ...quemGastouResolved,
-  });
-  if (error) return { error: error.message };
-
-  revalidatePath(`/cartoes/${parsed.cartao_id}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  revalidar(...rotas(linha.cartao_id));
   return { ok: true };
 }
 
@@ -122,38 +100,18 @@ export async function updateCompra(
   _prev: CompraFormState,
   formData: FormData,
 ): Promise<CompraFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
-
   const supabase = await createClient();
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
 
-  const quemGastouResolved = await resolverQuemGastou(
-    supabase,
-    parsed.quem_gastou_raw,
-  );
-  if (typeof quemGastouResolved === "string")
-    return { error: quemGastouResolved };
-
-  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
-  void categoria_id_raw;
-  void quem_gastou_raw;
+  const linha = await montarLinha(supabase, formData);
+  if (typeof linha === "string") return { error: linha };
 
   const { error } = await supabase
     .from("compras_cartao")
-    .update({ ...rest, ...categoriaResolved, ...quemGastouResolved })
+    .update(linha)
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: erroAmigavel(error) };
 
-  revalidatePath(`/cartoes/${parsed.cartao_id}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  revalidar(...rotas(linha.cartao_id));
   return { ok: true };
 }
 
@@ -163,9 +121,6 @@ export async function deleteCompra(id: string, cartaoId: string) {
     .from("compras_cartao")
     .delete()
     .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath(`/cartoes/${cartaoId}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...rotas(cartaoId));
 }

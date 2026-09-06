@@ -1,152 +1,109 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CheckIcon } from "lucide-react";
-import { toast } from "sonner";
 import { playCoinSound } from "@/lib/sound";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { hojeISO } from "@/lib/mes";
+import { useFormDialog, type PropsDialogControlado } from "@/lib/form-dialog";
+import { CampoForm, FormDialogShell } from "@/components/form-dialog-shell";
 import { marcarComprada, type CompraFuturaFormState } from "./actions";
 
-type Props = {
+type Props = PropsDialogControlado & {
   id: string;
   descricao: string;
   valorEstimado: number | null;
 };
 
-const INITIAL_STATE: CompraFuturaFormState = {};
-
-export function CompreiDialog({ id, descricao, valorEstimado }: Props) {
-  const [open, setOpen] = useState(false);
-  const action = marcarComprada.bind(null, id);
-  // Fecha/notifica dentro da própria action em vez de um useEffect que
-  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
-  const [state, formAction, pending] = useActionState(
-    async (prev: CompraFuturaFormState, formData: FormData) => {
-      const resultado = await action(prev, formData);
-      if (resultado.ok) {
-        setOpen(false);
-        toast.success("Marcado como comprado.");
-        playCoinSound();
-      }
-      return resultado;
-    },
-    INITIAL_STATE,
-  );
+export function CompreiDialog({
+  id,
+  descricao,
+  valorEstimado,
+  trigger,
+  defaultOpen,
+  onClose,
+}: Props) {
   const [lancar, setLancar] = useState(true);
 
   const defaults = useMemo(
     () => ({
       valor:
-        valorEstimado != null
-          ? valorEstimado.toFixed(2).replace(".", ",")
-          : "",
+        valorEstimado != null ? valorEstimado.toFixed(2).replace(".", ",") : "",
       hoje: hojeISO(),
     }),
     [valorEstimado],
   );
 
+  const ctrl = useFormDialog<CompraFuturaFormState>({
+    action: marcarComprada.bind(null, id),
+    sucesso: "Marcado como comprado.",
+    defaultOpen,
+    onClose,
+    aoSalvar: playCoinSound,
+    reset: () => setLancar(true),
+  });
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
+    <FormDialogShell
+      ctrl={ctrl}
+      rotuloSalvar="Confirmar"
+      titulo={`Comprei “${descricao}”`}
+      descricao="O item sai da lista de desejos. Se quiser, já lanço a despesa junto — categoria e quem quer vêm do próprio item."
+      trigger={
+        // O provider/botão sob demanda passa o seu; sem isso, o botão daqui.
+        trigger !== undefined ? (
+          trigger
+        ) : (
           <Button size="sm" variant="outline" title="Marcar como comprado">
             <CheckIcon className="size-3.5" />
             Comprei
           </Button>
-        }
-      />
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Comprei &ldquo;{descricao}&rdquo;</DialogTitle>
-          <DialogDescription>
-            O item sai da lista de desejos. Se quiser, já lanço a despesa
-            junto — categoria e quem quer vêm do próprio item.
-          </DialogDescription>
-        </DialogHeader>
+        )
+      }
+    >
+      <CampoForm htmlFor="data_compra" rotulo="Data da compra">
+        <Input
+          id="data_compra"
+          name="data_compra"
+          type="date"
+          defaultValue={defaults.hoje}
+        />
+      </CampoForm>
 
-        <form
-          key={open ? "open" : "closed"}
-          action={formAction}
-          className="flex flex-col gap-4"
-        >
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="data_compra" className="text-xs text-muted-foreground">
-              Data da compra
+      <div className="flex flex-col gap-2 rounded-2xl border border-border/60 p-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="lancar_despesa"
+            checked={lancar}
+            onChange={(e) => setLancar(e.target.checked)}
+            className="size-4 rounded border-input"
+          />
+          Lançar como despesa
+        </label>
+        {lancar && (
+          <div className="flex flex-col gap-2 pl-6 pt-1">
+            <Label htmlFor="valor" className="text-xs text-muted-foreground">
+              Valor pago (R$)
             </Label>
             <Input
-              id="data_compra"
-              name="data_compra"
-              type="date"
-              defaultValue={defaults.hoje}
+              id="valor"
+              name="valor"
+              required
+              inputMode="decimal"
+              defaultValue={defaults.valor}
+              placeholder="Ex: 2500,00"
+              className="max-w-[180px]"
             />
-          </div>
-
-          <div className="flex flex-col gap-2 rounded-2xl border border-border/60 p-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="lancar_despesa"
-                checked={lancar}
-                onChange={(e) => setLancar(e.target.checked)}
-                className="size-4 rounded border-input"
-              />
-              Lançar como despesa
-            </label>
-            {lancar && (
-              <div className="flex flex-col gap-2 pl-6 pt-1">
-                <Label htmlFor="valor" className="text-xs text-muted-foreground">
-                  Valor pago (R$)
-                </Label>
-                <Input
-                  id="valor"
-                  name="valor"
-                  required
-                  inputMode="decimal"
-                  defaultValue={defaults.valor}
-                  placeholder="Ex: 2500,00"
-                  className="max-w-[180px]"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Cria uma despesa avulsa. Se foi no cartão, deixe
-                  desmarcado e cadastre a compra pelo cartão.
-                </p>
-              </div>
-            )}
-          </div>
-
-          {state.error && (
-            <p className="text-sm text-primary" role="alert">
-              {state.error}
+            <p className="text-xs text-muted-foreground">
+              Cria uma despesa avulsa. Se foi no cartão, deixe desmarcado e
+              cadastre a compra pelo cartão.
             </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Confirmar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+          </div>
+        )}
+      </div>
+    </FormDialogShell>
   );
 }
