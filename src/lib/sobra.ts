@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
-import { mesProximo, type MesRef } from "@/lib/mes";
+import { mesProximo, vigenteNoMes, type MesRef } from "@/lib/mes";
 import {
   faturaDoMes,
   type CompraCartaoInfo,
@@ -22,6 +22,8 @@ import {
 
 export type RendaFixa = {
   valor_previsto: number | string;
+  inicio_vigencia: string;
+  fim_vigencia: string | null;
 };
 
 export type ContaRecorrente = {
@@ -94,11 +96,11 @@ export function calcularSaldoMes(
       l.data_referencia >= mesRef.primeiroDia &&
       l.data_referencia <= mesRef.ultimoDia,
   );
-  const contasMes = dados.contas.filter(
-    (c) =>
-      c.inicio_vigencia <= mesRef.ultimoDia &&
-      (c.fim_vigencia === null || c.fim_vigencia >= mesRef.primeiroDia),
-  );
+  const contasMes = dados.contas.filter((c) => vigenteNoMes(c, mesRef));
+  // Rendas seguem a mesma regra das contas: só entram nos meses em que
+  // valem. É isso que faz a projeção dos próximos meses já contar um emprego
+  // que começa lá na frente — e não contar nos meses anteriores a ele.
+  const rendasMes = dados.rendas.filter((r) => vigenteNoMes(r, mesRef));
 
   // Conta fixa já paga vale o valor real do pagamento, não o previsto.
   const pagosMes = new Map<string, LancamentoSaldo>();
@@ -108,7 +110,7 @@ export function calcularSaldoMes(
     }
   }
 
-  const totalRendaFixa = dados.rendas.reduce(
+  const totalRendaFixa = rendasMes.reduce(
     (s, r) => s + Number(r.valor_previsto),
     0,
   );
@@ -179,7 +181,11 @@ export async function getSaldoMensal(
   const supabase = await createClient();
   const [rendasRes, contasRes, lancRes, cartoesRes, comprasRes, assinRes] =
     await Promise.all([
-      supabase.from("rendas").select("valor_previsto").eq("ativa", true),
+      supabase
+        .from("rendas")
+        .select("valor_previsto, inicio_vigencia, fim_vigencia")
+        .eq("ativa", true)
+        .or(`fim_vigencia.is.null,fim_vigencia.gte.${primeiroDia}`),
       supabase
         .from("contas_recorrentes")
         .select("id, valor_previsto, inicio_vigencia, fim_vigencia")

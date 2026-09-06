@@ -4,7 +4,12 @@ import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { parseMesParam, mesAnterior, type MesRef } from "@/lib/mes";
+import {
+  parseMesParam,
+  mesAnterior,
+  vigenteNoMes,
+  type MesRef,
+} from "@/lib/mes";
 import { parcelaNoMes, assinaturaAtivaNoMes } from "@/lib/cartao-calc";
 import { formatBRL } from "@/lib/format";
 import { MonthSwitcher } from "../../month-switcher";
@@ -57,6 +62,8 @@ type CartaoRow = {
 
 type RendaRow = {
   valor_previsto: number | string;
+  inicio_vigencia: string;
+  fim_vigencia: string | null;
 };
 
 type DespesaBreakdown = {
@@ -73,14 +80,20 @@ type RendaBreakdown = {
   total: number;
 };
 
-// RENDA do mês = rendas fixas ativas (valor integral, sempre) + renda
+// RENDA do mês = rendas fixas vigentes no mês (valor integral) + renda
 // extra (lançamentos tipo="renda_extra" lançados dentro do mês).
+//
+// A vigência importa aqui porque a tela compara o mês com o anterior: sem
+// ela, cadastrar uma renda nova fazia o mês passado subir junto e a variação
+// aparecia como zero.
 function computeRenda(
   mesRef: MesRef,
   rendas: RendaRow[],
   lancamentos: LancamentoRow[],
 ): RendaBreakdown {
-  const fixa = rendas.reduce((s, r) => s + Number(r.valor_previsto), 0);
+  const fixa = rendas
+    .filter((r) => vigenteNoMes(r, mesRef))
+    .reduce((s, r) => s + Number(r.valor_previsto), 0);
   const extra = lancamentos
     .filter(
       (l) =>
@@ -233,7 +246,11 @@ export default async function RelatorioRendaXDespesaPage({
         )
         .eq("ativa", true),
       supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
-      supabase.from("rendas").select("valor_previsto").eq("ativa", true),
+      supabase
+        .from("rendas")
+        .select("valor_previsto, inicio_vigencia, fim_vigencia")
+        .eq("ativa", true)
+        .or(`fim_vigencia.is.null,fim_vigencia.gte.${anterior.primeiroDia}`),
     ]);
 
   const lancamentos = (lancRes.data ?? []) as LancamentoRow[];

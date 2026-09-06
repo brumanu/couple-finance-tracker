@@ -6,7 +6,13 @@ import {
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { hojeISO, mesProximo, parseMesParam, type MesRef } from "@/lib/mes";
+import {
+  hojeISO,
+  mesProximo,
+  parseMesParam,
+  vigenteNoMes,
+  type MesRef,
+} from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import {
   faturaDoMes,
@@ -31,6 +37,8 @@ type RendaRow = {
   descricao: string;
   valor_previsto: number | string;
   dia_recebimento: number;
+  inicio_vigencia: string;
+  fim_vigencia: string | null;
 };
 
 type RecorrenteRow = {
@@ -195,8 +203,11 @@ export default async function DashboardPage({
     getMembrosCasal(),
     supabase
       .from("rendas")
-      .select("descricao, valor_previsto, dia_recebimento")
-      .eq("ativa", true),
+      .select(
+        "descricao, valor_previsto, dia_recebimento, inicio_vigencia, fim_vigencia",
+      )
+      .eq("ativa", true)
+      .or(`fim_vigencia.is.null,fim_vigencia.gte.${primeiroDiaRange}`),
     supabase
       .from("contas_recorrentes")
       .select(
@@ -323,11 +334,7 @@ export default async function DashboardPage({
   }
 
   function contasVigentesNoMes(mesRef: MesRef): RecorrenteRow[] {
-    return contasAll.filter(
-      (c) =>
-        c.inicio_vigencia <= mesRef.ultimoDia &&
-        (c.fim_vigencia === null || c.fim_vigencia >= mesRef.primeiroDia),
-    );
+    return contasAll.filter((c) => vigenteNoMes(c, mesRef));
   }
 
   function lancamentosDoMes(mesRef: MesRef): LancamentoRow[] {
@@ -363,7 +370,11 @@ export default async function DashboardPage({
         pagosMes.set(l.conta_recorrente_id, l);
       }
     }
-    const rendasQ = rendas.filter((r) => r.dia_recebimento === q);
+    // Renda que ainda não começou (ou já terminou) não entra no mês: é o que
+    // permite cadastrar hoje um salário que só passa a cair em outubro.
+    const rendasQ = rendas.filter(
+      (r) => r.dia_recebimento === q && vigenteNoMes(r, mesRef),
+    );
     const contasQ = contasVigentesNoMes(mesRef).filter(
       (c) => c.quinzena === q,
     );
