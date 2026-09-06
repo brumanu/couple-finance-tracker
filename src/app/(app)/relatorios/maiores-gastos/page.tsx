@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { dadosDoMes } from "@/lib/gastos-do-mes";
 import { getCategorias } from "@/lib/categorias-server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,106 +26,24 @@ type LancamentoRow = {
   conta_recorrente_id: string | null;
 };
 
-type RecorrenteRow = {
-  id: string;
-  descricao: string;
-  valor_previsto: number | string;
-  quinzena: number | null;
-  dia_vencimento: number;
-  categoria: string | null;
-  categoria_id: string | null;
-  ativa: boolean;
-};
 
-type CompraRow = {
-  id: string;
-  cartao_id: string;
-  descricao: string;
-  valor_total: number | string;
-  data_compra: string;
-  parcelas: number;
-  parcelas_ja_pagas: number | null;
-  categoria: string | null;
-  categoria_id: string | null;
-};
 
-type AssinaturaRow = {
-  id: string;
-  cartao_id: string;
-  descricao: string;
-  valor_mensal: number | string;
-  categoria: string | null;
-  categoria_id: string | null;
-  inicio_vigencia: string;
-  fim_vigencia: string | null;
-  ativa: boolean;
-};
 
-type CartaoRow = {
-  id: string;
-  dia_fechamento: number;
-  dia_vencimento: number;
-};
-
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
 
 export default async function RelatorioMaioresGastosPage({
   searchParams,
 }: PageProps<"/relatorios/maiores-gastos">) {
-  const supabase = await createClient();
-
   const sp = await searchParams;
   const mesParam = typeof sp.mes === "string" ? sp.mes : undefined;
   const mes = parseMesParam(mesParam);
 
-  // Cutoff pra compras_cartao: uma compra feita há mais de 60 meses (máximo
-  // de parcelas) antes do mês alvo não pode ter parcela ativa nesse mês.
-  const cutoffDate = new Date(mes.ano, mes.mes - 1 - 60, 1);
-  const comprasCutoff = `${cutoffDate.getFullYear()}-${pad2(cutoffDate.getMonth() + 1)}-01`;
+  const [, dados, categorias] = await Promise.all([
+    requireSession(),
+    dadosDoMes(mes),
+    getCategorias(),
+  ]);
 
-  const [, lancRes, contasRes, comprasRes, assinRes, cartoesRes, categorias] =
-    await Promise.all([
-      requireSession(),
-      supabase
-        .from("lancamentos")
-        .select(
-          "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, categoria_id, conta_recorrente_id",
-        )
-        .in("tipo", ["despesa_avulsa", "conta_fixa"])
-        .gte("data_referencia", mes.primeiroDia)
-        .lte("data_referencia", mes.ultimoDia),
-      supabase
-        .from("contas_recorrentes")
-        .select(
-          "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, ativa",
-        )
-        .eq("ativa", true)
-        .lte("inicio_vigencia", mes.ultimoDia)
-        .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
-      supabase
-        .from("compras_cartao")
-        .select(
-          "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id",
-        )
-        .gte("data_compra", comprasCutoff)
-        .lte("data_compra", mes.ultimoDia),
-      supabase
-        .from("assinaturas_cartao")
-        .select(
-          "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa",
-        )
-        .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
-      getCategorias(),
-    ]);
-
-  const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
-  const contas = (contasRes.data ?? []) as RecorrenteRow[];
-  const compras = (comprasRes.data ?? []) as CompraRow[];
-  const assinaturas = (assinRes.data ?? []) as AssinaturaRow[];
-  const cartoes = (cartoesRes.data ?? []) as CartaoRow[];
+  const { lancamentos, contas, compras, assinaturas, cartoes } = dados;
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
   const categoriaById = new Map(categorias.map((c) => [c.id, c] as const));
 

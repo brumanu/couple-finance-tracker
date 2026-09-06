@@ -7,11 +7,12 @@ import { parseMesParam, mesAnterior } from "@/lib/mes";
 import { formatBRL } from "@/lib/format";
 import { Card } from "@/components/ui/card";
 import { MonthSwitcher } from "../month-switcher";
+import type { DespesaRow } from "./despesa-form-dialog";
 import {
-  DespesaFormDialog,
-  EditDespesaTrigger,
-  type DespesaRow,
-} from "./despesa-form-dialog";
+  DespesaDialogs,
+  EditarDespesa,
+  NovaDespesa,
+} from "./despesa-dialogs";
 import { DespesaActionsMenu } from "./despesa-actions-menu";
 
 const DIAS_SEMANA = [
@@ -89,7 +90,12 @@ export default async function DespesasPage({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
+    <DespesaDialogs
+      cartoes={cartoes}
+      categorias={categorias}
+      membros={membros}
+    >
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
@@ -102,11 +108,7 @@ export default async function DespesasPage({
         <div className="flex items-center gap-3">
           <MonthSwitcher mes={mes} />
           <div className="hidden md:block">
-            <DespesaFormDialog
-              cartoes={cartoes}
-              categorias={categorias}
-              membros={membros}
-            />
+            <NovaDespesa />
           </div>
         </div>
       </header>
@@ -161,11 +163,7 @@ export default async function DespesasPage({
             <p className="text-sm text-muted-foreground">
               Nenhuma despesa lançada em {mes.label}.
             </p>
-            <DespesaFormDialog
-              cartoes={cartoes}
-              categorias={categorias}
-              membros={membros}
-            />
+            <NovaDespesa />
           </div>
         </Card>
       ) : (
@@ -204,11 +202,7 @@ export default async function DespesasPage({
                         <span className="whitespace-nowrap font-heading text-[17px] tabular-nums">
                           {formatBRL(d.valor)}
                         </span>
-                        <EditDespesaTrigger
-                          despesa={d}
-                          categorias={categorias}
-                          membros={membros}
-                        />
+                        <EditarDespesa linha={d} />
                         <DespesaActionsMenu
                           id={d.id}
                           descricao={d.descricao}
@@ -222,6 +216,7 @@ export default async function DespesasPage({
           })}
         </div>
       )}
-    </div>
+      </div>
+    </DespesaDialogs>
   );
 }

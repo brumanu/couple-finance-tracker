@@ -1,113 +1,82 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseBRLInput } from "@/lib/format";
-import { resolverCategoria } from "@/lib/categorias-server";
-import { resolverQuemGastou } from "@/lib/membros-server";
 import { hojeISO } from "@/lib/mes";
+import { campo, opcional, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  resolverClassificacao,
+  revalidar,
+  type EstadoForm,
+  type SessaoDaAcao,
+} from "@/lib/acoes";
 
-export type AssinaturaFormState = { error?: string; ok?: boolean };
+export type AssinaturaFormState = EstadoForm;
 
-type Parsed = {
-  cartao_id: string;
-  descricao: string;
-  valor_mensal: number;
-  categoria_id_raw: string;
-  quem_gastou_raw: string;
-  inicio_vigencia: string;
-  fim_vigencia: string | null;
-  ativa: boolean;
+const ESQUEMA = {
+  cartao_id: campo.texto("Cartão"),
+  descricao: campo.texto("Descrição"),
+  valor_mensal: campo.dinheiro("Valor mensal"),
+  fim_vigencia: opcional(campo.data("Data de fim")),
+  ativa: campo.booleano(),
+  categoria_id: campo.cru(),
+  quem_gastou: campo.cru(),
 };
 
-function parseFormData(formData: FormData): Parsed | string {
-  const cartao_id = String(formData.get("cartao_id") ?? "").trim();
-  const descricao = String(formData.get("descricao") ?? "").trim();
-  const valorRaw = String(formData.get("valor_mensal") ?? "").trim();
-  const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
-  const quem_gastou_raw = String(formData.get("quem_gastou") ?? "").trim();
-  const inicio_vigencia =
-    String(formData.get("inicio_vigencia") ?? "").trim() ||
-    hojeISO();
-  const fimRaw = String(formData.get("fim_vigencia") ?? "").trim();
-  const fim_vigencia = fimRaw || null;
-  const ativa =
-    formData.get("ativa") === "on" || formData.get("ativa") === "true";
+const rotas = (cartaoId: string) => [
+  `/cartoes/${cartaoId}`,
+  "/cartoes",
+  "/relatorios/compras-do-mes",
+  "/",
+];
 
-  if (!cartao_id) return "Cartão inválido.";
-  if (!descricao) return "Descrição é obrigatória.";
-  const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor <= 0) return "Valor mensal deve ser maior que zero.";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio_vigencia))
+async function montarLinha(supabase: SessaoDaAcao, formData: FormData) {
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return dados;
+
+  // Início em branco = começa hoje. Fica fora do esquema porque o default
+  // depende do relógio, e `campo.data` é puro.
+  const inicio = String(formData.get("inicio_vigencia") ?? "").trim();
+  const inicio_vigencia = inicio || hojeISO();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio_vigencia)) {
     return "Data de início inválida.";
-  if (fim_vigencia && !/^\d{4}-\d{2}-\d{2}$/.test(fim_vigencia))
-    return "Data de fim inválida.";
-  if (fim_vigencia && fim_vigencia < inicio_vigencia)
+  }
+  if (dados.fim_vigencia && dados.fim_vigencia < inicio_vigencia) {
     return "Data de fim deve ser depois da de início.";
+  }
 
-  return {
-    cartao_id,
-    descricao,
-    valor_mensal: valor,
-    categoria_id_raw,
-    quem_gastou_raw,
-    inicio_vigencia,
-    fim_vigencia,
-    ativa,
-  };
+  const classificacao = await resolverClassificacao(
+    supabase,
+    dados.categoria_id,
+    dados.quem_gastou,
+  );
+  if (typeof classificacao === "string") return classificacao;
+
+  const { categoria_id, quem_gastou, ...campos } = dados;
+  void categoria_id;
+  void quem_gastou;
+
+  return { ...campos, inicio_vigencia, ...classificacao };
 }
 
 export async function createAssinatura(
   _prev: AssinaturaFormState,
   formData: FormData,
 ): Promise<AssinaturaFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const linha = await montarLinha(sessao.supabase, formData);
+  if (typeof linha === "string") return { error: linha };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
+  // `casal_id` e `criada_por` vêm dos defaults da coluna (migration 0014).
+  const { error } = await sessao.supabase
+    .from("assinaturas_cartao")
+    .insert(linha);
+  if (error) return { error: erroAmigavel(error) };
 
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
-
-  const quemGastouResolved = await resolverQuemGastou(
-    supabase,
-    parsed.quem_gastou_raw,
-  );
-  if (typeof quemGastouResolved === "string")
-    return { error: quemGastouResolved };
-
-  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
-  void categoria_id_raw;
-  void quem_gastou_raw;
-
-  const { error } = await supabase.from("assinaturas_cartao").insert({
-    casal_id: profile.casal_id,
-    criada_por: user.id,
-    ...rest,
-    ...categoriaResolved,
-    ...quemGastouResolved,
-  });
-  if (error) return { error: error.message };
-
-  revalidatePath(`/cartoes/${parsed.cartao_id}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  revalidar(...rotas(linha.cartao_id));
   return { ok: true };
 }
 
@@ -116,38 +85,18 @@ export async function updateAssinatura(
   _prev: AssinaturaFormState,
   formData: FormData,
 ): Promise<AssinaturaFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
-
   const supabase = await createClient();
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
 
-  const quemGastouResolved = await resolverQuemGastou(
-    supabase,
-    parsed.quem_gastou_raw,
-  );
-  if (typeof quemGastouResolved === "string")
-    return { error: quemGastouResolved };
-
-  const { categoria_id_raw, quem_gastou_raw, ...rest } = parsed;
-  void categoria_id_raw;
-  void quem_gastou_raw;
+  const linha = await montarLinha(supabase, formData);
+  if (typeof linha === "string") return { error: linha };
 
   const { error } = await supabase
     .from("assinaturas_cartao")
-    .update({ ...rest, ...categoriaResolved, ...quemGastouResolved })
+    .update(linha)
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return { error: erroAmigavel(error) };
 
-  revalidatePath(`/cartoes/${parsed.cartao_id}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  revalidar(...rotas(linha.cartao_id));
   return { ok: true };
 }
 
@@ -157,11 +106,8 @@ export async function deleteAssinatura(id: string, cartaoId: string) {
     .from("assinaturas_cartao")
     .delete()
     .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath(`/cartoes/${cartaoId}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...rotas(cartaoId));
 }
 
 export async function toggleAssinaturaAtiva(
@@ -174,24 +120,17 @@ export async function toggleAssinaturaAtiva(
     .from("assinaturas_cartao")
     .update({ ativa })
     .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath(`/cartoes/${cartaoId}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...rotas(cartaoId));
 }
 
 /** Encerra a assinatura setando fim_vigencia como hoje. */
 export async function cancelarAssinatura(id: string, cartaoId: string) {
   const supabase = await createClient();
-  const hoje = hojeISO();
   const { error } = await supabase
     .from("assinaturas_cartao")
-    .update({ fim_vigencia: hoje })
+    .update({ fim_vigencia: hojeISO() })
     .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath(`/cartoes/${cartaoId}`);
-  revalidatePath("/cartoes");
-  revalidatePath("/relatorios/compras-do-mes");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...rotas(cartaoId));
 }

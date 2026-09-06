@@ -1,54 +1,41 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { isBancoIconeId, type BancoIconeId } from "@/lib/bancos-icones";
+import { isBancoIconeId } from "@/lib/bancos-icones";
+import { campo, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  revalidar,
+  type EstadoForm,
+} from "@/lib/acoes";
 
-export type BancoFormState = { error?: string; ok?: boolean };
+export type BancoFormState = EstadoForm;
 
-type Parsed = {
-  nome: string;
-  icone: BancoIconeId;
+const ESQUEMA = {
+  nome: campo.texto("Nome"),
+  icone: campo.customizado((bruto) =>
+    isBancoIconeId(bruto) ? { valor: bruto } : { erro: "Ícone inválido." },
+  ),
 };
 
-function parseFormData(formData: FormData): Parsed | string {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const icone = String(formData.get("icone") ?? "").trim();
-
-  if (!nome) return "Nome é obrigatório.";
-  if (!isBancoIconeId(icone)) return "Ícone inválido.";
-
-  return { nome, icone };
-}
+const ROTAS = ["/bancos", "/cartoes"];
 
 export async function createBanco(
   _prev: BancoFormState,
   formData: FormData,
 ): Promise<BancoFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return { error: dados };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
+  // `casal_id` vem do default da coluna (migration 0014).
+  const { error } = await sessao.supabase.from("bancos").insert(dados);
+  if (error) return { error: erroAmigavel(error) };
 
-  const { error } = await supabase.from("bancos").insert({
-    casal_id: profile.casal_id,
-    ...parsed,
-  });
-  if (error) return { error: error.message };
-
-  revalidatePath("/bancos");
-  revalidatePath("/cartoes");
+  revalidar(...ROTAS);
   return { ok: true };
 }
 
@@ -57,16 +44,14 @@ export async function updateBanco(
   _prev: BancoFormState,
   formData: FormData,
 ): Promise<BancoFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return { error: dados };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("bancos").update(parsed).eq("id", id);
-  if (error) return { error: error.message };
+  const { error } = await supabase.from("bancos").update(dados).eq("id", id);
+  if (error) return { error: erroAmigavel(error) };
 
-  revalidatePath("/bancos");
-  revalidatePath("/cartoes");
-  revalidatePath("/");
+  revalidar(...ROTAS, "/");
   return { ok: true };
 }
 
@@ -74,14 +59,12 @@ export async function deleteBanco(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("bancos").delete().eq("id", id);
   if (error) {
-    // 23503 = FK: cartoes.banco_id tem on delete restrict.
-    if (error.code === "23503") {
-      return {
-        error: "Exclua ou mova os cartões deste banco antes de excluí-lo.",
-      };
-    }
-    return { error: error.message };
+    return {
+      error: erroAmigavel(error, {
+        // cartoes.banco_id é on delete restrict.
+        "23503": "Exclua ou mova os cartões deste banco antes de excluí-lo.",
+      }),
+    };
   }
-  revalidatePath("/bancos");
-  revalidatePath("/cartoes");
+  revalidar(...ROTAS);
 }

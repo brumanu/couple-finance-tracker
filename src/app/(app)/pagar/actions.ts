@@ -1,11 +1,23 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseBRLInput } from "@/lib/format";
 import { hojeISO } from "@/lib/mes";
+import { campo, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  revalidar,
+  type EstadoForm,
+} from "@/lib/acoes";
 
-export type PagarFormState = { error?: string; ok?: boolean };
+export type PagarFormState = EstadoForm;
+
+/** Data em branco = hoje. Os dois dialogs de pagamento aceitam isso. */
+function dataOuHoje(formData: FormData): string | null {
+  const bruta = String(formData.get("data_pagamento") ?? "").trim();
+  if (!bruta) return hojeISO();
+  return /^\d{4}-\d{2}-\d{2}$/.test(bruta) ? bruta : null;
+}
 
 export async function pagarContaRecorrente(
   contaRecorrenteId: string,
@@ -14,43 +26,30 @@ export async function pagarContaRecorrente(
   _prev: PagarFormState,
   formData: FormData,
 ): Promise<PagarFormState> {
-  const valorRaw = String(formData.get("valor") ?? "").trim();
-  const dataPagamento =
-    String(formData.get("data_pagamento") ?? "").trim() ||
-    hojeISO();
-  const descricao = String(formData.get("descricao") ?? "").trim();
+  const dados = parseForm(formData, {
+    valor: campo.dinheiro("Valor"),
+    descricao: campo.texto("Descrição"),
+  });
+  if (typeof dados === "string") return { error: dados };
 
-  const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor <= 0) return { error: "Valor deve ser maior que zero." };
-  if (!descricao) return { error: "Descrição obrigatória." };
+  const dataPagamento = dataOuHoje(formData);
+  if (!dataPagamento) return { error: "Data inválida." };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const [{ data: profile }, { data: conta }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("casal_id")
-      .eq("id", user.id)
-      .maybeSingle(),
-    // Herda categoria e quem gastou da conta recorrente: sem isso o lançamento
-    // nasce sem categoria e os relatórios jogam a conta paga em "Sem categoria".
-    supabase
-      .from("contas_recorrentes")
-      .select("categoria_id, categoria, quem_gastou")
-      .eq("id", contaRecorrenteId)
-      .maybeSingle(),
-  ]);
-  if (!profile) return { error: "Profile não encontrado." };
+  // Herda categoria e quem gastou da conta recorrente: sem isso o lançamento
+  // nasce sem categoria e os relatórios jogam a conta paga em "Sem categoria".
+  const { data: conta } = await sessao.supabase
+    .from("contas_recorrentes")
+    .select("categoria_id, categoria, quem_gastou")
+    .eq("id", contaRecorrenteId)
+    .maybeSingle();
 
-  const { error } = await supabase.from("lancamentos").insert({
-    casal_id: profile.casal_id,
+  const { error } = await sessao.supabase.from("lancamentos").insert({
     tipo: "conta_fixa",
-    descricao,
-    valor,
+    descricao: dados.descricao,
+    valor: dados.valor,
     data_referencia: dataReferencia,
     data_pagamento: dataPagamento,
     quinzena,
@@ -58,20 +57,21 @@ export async function pagarContaRecorrente(
     categoria: conta?.categoria ?? null,
     quem_gastou: conta?.quem_gastou ?? null,
     conta_recorrente_id: contaRecorrenteId,
-    criado_por: user.id,
   });
 
   if (error) {
     // 23505 = índice único (conta_recorrente_id, data_referencia): o parceiro
     // já marcou essa conta como paga neste mês, ou a página estava em 2 abas.
-    if (error.code === "23505") {
-      revalidatePath("/");
-      return { error: "Essa conta já está marcada como paga neste mês." };
-    }
-    return { error: error.message };
+    // Revalida antes de responder pra tela já mostrar o estado real.
+    if (error.code === "23505") revalidar("/");
+    return {
+      error: erroAmigavel(error, {
+        "23505": "Essa conta já está marcada como paga neste mês.",
+      }),
+    };
   }
 
-  revalidatePath("/");
+  revalidar("/");
   return { ok: true };
 }
 
@@ -81,8 +81,8 @@ export async function desmarcarPagamento(lancamentoId: string) {
     .from("lancamentos")
     .delete()
     .eq("id", lancamentoId);
-  if (error) return { error: error.message };
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar("/");
 }
 
 /**
@@ -96,44 +96,33 @@ export async function pagarFatura(
   _prev: PagarFormState,
   formData: FormData,
 ): Promise<PagarFormState> {
-  const valorRaw = String(formData.get("valor") ?? "").trim();
-  const dataPagamento =
-    String(formData.get("data_pagamento") ?? "").trim() || hojeISO();
+  // Fatura zerada é um caso real (mês sem compra), então aqui zero passa.
+  const dados = parseForm(formData, {
+    valor: campo.dinheiro("Valor", { permiteZero: true }),
+  });
+  if (typeof dados === "string") return { error: dados };
 
-  const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor < 0)
-    return { error: "Valor não pode ser negativo." };
+  const dataPagamento = dataOuHoje(formData);
+  if (!dataPagamento) return { error: "Data inválida." };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
   // upsert em vez de insert: se a fatura já estiver marcada (duas abas, ou
   // clique duplo), atualiza em vez de estourar o unique (cartao_id, mes).
-  const { error } = await supabase.from("pagamentos_fatura").upsert(
+  const { error } = await sessao.supabase.from("pagamentos_fatura").upsert(
     {
-      casal_id: profile.casal_id,
       cartao_id: cartaoId,
       mes_referencia: mesReferencia,
-      valor,
+      valor: dados.valor,
       data_pagamento: dataPagamento,
-      criado_por: user.id,
     },
     { onConflict: "cartao_id,mes_referencia" },
   );
 
-  if (error) return { error: error.message };
+  if (error) return { error: erroAmigavel(error) };
 
-  revalidatePath("/");
+  revalidar("/");
   return { ok: true };
 }
 
@@ -143,6 +132,6 @@ export async function desmarcarFatura(pagamentoFaturaId: string) {
     .from("pagamentos_fatura")
     .delete()
     .eq("id", pagamentoFaturaId);
-  if (error) return { error: error.message };
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar("/");
 }

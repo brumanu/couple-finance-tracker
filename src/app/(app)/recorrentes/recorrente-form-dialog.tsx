@@ -1,18 +1,8 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { PlusIcon, PencilIcon } from "lucide-react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
+import { PencilIcon } from "lucide-react";
 import { playCoinSound } from "@/lib/sound";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,7 +17,11 @@ import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
-import { useResetAoAbrir } from "@/lib/form-dialog";
+import {
+  useFormDialog,
+  type PropsDialogControlado,
+} from "@/lib/form-dialog";
+import { CampoForm, FormDialogShell } from "@/components/form-dialog-shell";
 import {
   createRecorrente,
   updateRecorrente,
@@ -46,42 +40,21 @@ export type RecorrenteRow = {
   ativa: boolean;
 };
 
-type Props = {
+type Props = PropsDialogControlado & {
   recorrente?: RecorrenteRow;
-  trigger?: React.ReactElement;
   categorias?: CategoriaOpcao[];
   membros?: MembroOpcao[];
 };
 
-const INITIAL_STATE: RecorrenteFormState = {};
-
 export function RecorrenteFormDialog({
   recorrente,
   trigger,
+  defaultOpen,
+  onClose,
   categorias = [],
   membros = [],
 }: Props) {
-  const [open, setOpen] = useState(false);
   const isEdit = Boolean(recorrente);
-
-  const action = isEdit
-    ? updateRecorrente.bind(null, recorrente!.id)
-    : createRecorrente;
-
-  // Fecha/notifica dentro da própria action em vez de um useEffect que
-  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
-  const [state, formAction, pending] = useActionState(
-    async (prev: RecorrenteFormState, formData: FormData) => {
-      const resultado = await action(prev, formData);
-      if (resultado.ok) {
-        setOpen(false);
-        toast.success(isEdit ? "Conta atualizada." : "Conta cadastrada.");
-        if (!isEdit) playCoinSound();
-      }
-      return resultado;
-    },
-    INITIAL_STATE,
-  );
 
   const defaults = useMemo(
     () => ({
@@ -114,140 +87,104 @@ export function RecorrenteFormDialog({
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
 
-  useResetAoAbrir(open, () => {
-    setCategoriaId(defaults.categoriaId);
-    setQuemGastou(defaults.quemGastou);
+  const ctrl = useFormDialog<RecorrenteFormState>({
+    action: isEdit
+      ? updateRecorrente.bind(null, recorrente!.id)
+      : createRecorrente,
+    sucesso: isEdit ? "Conta atualizada." : "Conta cadastrada.",
+    defaultOpen,
+    onClose,
+    aoSalvar: isEdit ? undefined : playCoinSound,
+    reset: () => {
+      setCategoriaId(defaults.categoriaId);
+      setQuemGastou(defaults.quemGastou);
+    },
   });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger ? (
-        <DialogTrigger render={trigger} />
-      ) : (
-        <DialogTrigger
-          render={
-            <Button size="sm">
-              <PlusIcon className="size-4" />
-              Nova conta
-            </Button>
-          }
+    <FormDialogShell
+      ctrl={ctrl}
+      trigger={trigger}
+      rotuloNovo="Nova conta"
+      titulo={isEdit ? "Editar conta recorrente" : "Nova conta recorrente"}
+      descricao="Contas fixas que se repetem todo mês (aluguel, luz, internet…)."
+    >
+      <CampoForm htmlFor="descricao" rotulo="Descrição">
+        <Input
+          id="descricao"
+          name="descricao"
+          required
+          defaultValue={defaults.descricao}
+          placeholder="Ex: Aluguel"
         />
-      )}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Editar conta recorrente" : "Nova conta recorrente"}
-          </DialogTitle>
-          <DialogDescription>
-            Contas fixas que se repetem todo mês (aluguel, luz, internet…).
-          </DialogDescription>
-        </DialogHeader>
+      </CampoForm>
 
-        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="descricao">Descrição</Label>
-            <Input
-              id="descricao"
-              name="descricao"
-              required
-              defaultValue={defaults.descricao}
-              placeholder="Ex: Aluguel"
-            />
-          </div>
+      <CampoForm htmlFor="valor_previsto" rotulo="Valor previsto (R$)">
+        <Input
+          id="valor_previsto"
+          name="valor_previsto"
+          required
+          inputMode="decimal"
+          defaultValue={defaults.valor_previsto}
+          placeholder="Ex: 1500,00"
+        />
+      </CampoForm>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="valor_previsto">Valor previsto (R$)</Label>
-            <Input
-              id="valor_previsto"
-              name="valor_previsto"
-              required
-              inputMode="decimal"
-              defaultValue={defaults.valor_previsto}
-              placeholder="Ex: 1500,00"
-            />
-          </div>
+      <div className="grid grid-cols-2 gap-3">
+        <CampoForm htmlFor="quinzena" rotulo="Quinzena de pagamento">
+          <Select name="quinzena" defaultValue={defaults.quinzena}>
+            <SelectTrigger id="quinzena">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">Dia 15</SelectItem>
+              <SelectItem value="30">Dia 30</SelectItem>
+            </SelectContent>
+          </Select>
+        </CampoForm>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="quinzena">Quinzena de pagamento</Label>
-              <Select name="quinzena" defaultValue={defaults.quinzena}>
-                <SelectTrigger id="quinzena">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="15">Dia 15</SelectItem>
-                  <SelectItem value="30">Dia 30</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <CampoForm htmlFor="dia_vencimento" rotulo="Vence dia (opcional)">
+          <Input
+            id="dia_vencimento"
+            name="dia_vencimento"
+            type="number"
+            min={1}
+            max={31}
+            defaultValue={defaults.dia_vencimento}
+            placeholder="Ex: 10"
+          />
+        </CampoForm>
+      </div>
 
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="dia_vencimento">Vence dia (opcional)</Label>
-              <Input
-                id="dia_vencimento"
-                name="dia_vencimento"
-                type="number"
-                min={1}
-                max={31}
-                defaultValue={defaults.dia_vencimento}
-                placeholder="Ex: 10"
-              />
-            </div>
-          </div>
+      <CampoForm htmlFor="categoria_id" rotulo="Categoria (opcional)">
+        <CategoriaSelectField
+          categorias={categorias}
+          value={categoriaId}
+          onValueChange={setCategoriaId}
+        />
+      </CampoForm>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="categoria_id">Categoria (opcional)</Label>
-            <CategoriaSelectField
-              categorias={categorias}
-              value={categoriaId}
-              onValueChange={setCategoriaId}
-            />
-          </div>
+      <CampoForm htmlFor="quem_gastou" rotulo="Quem gastou (opcional)">
+        <QuemGastouSelectField
+          membros={membros}
+          value={quemGastou}
+          onValueChange={setQuemGastou}
+        />
+      </CampoForm>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="quem_gastou">Quem gastou (opcional)</Label>
-            <QuemGastouSelectField
-              membros={membros}
-              value={quemGastou}
-              onValueChange={setQuemGastou}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="ativa"
-              name="ativa"
-              defaultChecked={defaults.ativa}
-              className="size-4 rounded border-input"
-            />
-            <Label htmlFor="ativa" className="cursor-pointer">
-              Conta ativa (entra no cálculo do dashboard)
-            </Label>
-          </div>
-
-          {state.error && (
-            <p className="text-sm text-red-600" role="alert">
-              {state.error}
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="ativa"
+          name="ativa"
+          defaultChecked={defaults.ativa}
+          className="size-4 rounded border-input"
+        />
+        <Label htmlFor="ativa" className="cursor-pointer">
+          Conta ativa (entra no cálculo do dashboard)
+        </Label>
+      </div>
+    </FormDialogShell>
   );
 }
 

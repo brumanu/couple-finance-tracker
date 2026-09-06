@@ -1,34 +1,28 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { PlusIcon, PencilIcon } from "lucide-react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
+import { PencilIcon } from "lucide-react";
 import { playCoinSound } from "@/lib/sound";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatBRL, parseBRLInput } from "@/lib/format";
-import { mesPrimeiraParcela, valoresParcelas } from "@/lib/cartao-calc";
-import { buildMes, hojeISO } from "@/lib/mes";
+import {
+  mesDaParcela,
+  mesPrimeiraParcela,
+  valoresParcelas,
+} from "@/lib/cartao-calc";
+import { hojeISO } from "@/lib/mes";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
-import { useResetAoAbrir } from "@/lib/form-dialog";
 import {
-  createCompra,
-  updateCompra,
-  type CompraFormState,
-} from "./actions";
+  useFormDialog,
+  type PropsDialogControlado,
+} from "@/lib/form-dialog";
+import { CampoForm, FormDialogShell } from "@/components/form-dialog-shell";
+import { createCompra, updateCompra, type CompraFormState } from "./actions";
 
 export type CompraRow = {
   id: string;
@@ -43,17 +37,14 @@ export type CompraRow = {
   quem_gastou: string | null;
 };
 
-type Props = {
+type Props = PropsDialogControlado & {
   cartaoId: string;
   diaFechamento: number;
   diaVencimento: number;
   compra?: CompraRow;
-  trigger?: React.ReactElement;
   categorias?: CategoriaOpcao[];
   membros?: MembroOpcao[];
 };
-
-const INITIAL_STATE: CompraFormState = {};
 
 const MESES_PT_ABREV = [
   "Jan",
@@ -69,8 +60,6 @@ const MESES_PT_ABREV = [
   "Nov",
   "Dez",
 ];
-
-const todayISO = hojeISO;
 
 // Se o usuário marcar "compra em andamento" com parcela atual X, a
 // primeira parcela ativa (X) deve cair no mês corrente. Backfilla a
@@ -91,26 +80,12 @@ export function CompraFormDialog({
   diaVencimento,
   compra,
   trigger,
+  defaultOpen,
+  onClose,
   categorias = [],
   membros = [],
 }: Props) {
-  const [open, setOpen] = useState(false);
   const isEdit = Boolean(compra);
-  const action = isEdit ? updateCompra.bind(null, compra!.id) : createCompra;
-  // Fecha/notifica dentro da própria action em vez de um useEffect que
-  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
-  const [state, formAction, pending] = useActionState(
-    async (prev: CompraFormState, formData: FormData) => {
-      const resultado = await action(prev, formData);
-      if (resultado.ok) {
-        setOpen(false);
-        toast.success(isEdit ? "Compra atualizada." : "Compra cadastrada.");
-        if (!isEdit) playCoinSound();
-      }
-      return resultado;
-    },
-    INITIAL_STATE,
-  );
 
   const defaults = useMemo(
     () => ({
@@ -119,7 +94,7 @@ export function CompraFormDialog({
         compra?.valor_total != null
           ? Number(compra.valor_total).toFixed(2).replace(".", ",")
           : "",
-      data_compra: compra?.data_compra ?? todayISO(),
+      data_compra: compra?.data_compra ?? hojeISO(),
       parcelas: String(compra?.parcelas ?? 1),
       em_andamento: (compra?.parcelas_ja_pagas ?? 0) > 0,
       parcela_atual: String((compra?.parcelas_ja_pagas ?? 0) + 1),
@@ -149,14 +124,21 @@ export function CompraFormDialog({
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
 
-  useResetAoAbrir(open, () => {
-    setValorRaw(defaults.valor_total);
-    setDataRaw(defaults.data_compra);
-    setParcelasRaw(defaults.parcelas);
-    setEmAndamento(defaults.em_andamento);
-    setParcelaAtualRaw(defaults.parcela_atual);
-    setCategoriaId(defaults.categoriaId);
-    setQuemGastou(defaults.quemGastou);
+  const ctrl = useFormDialog<CompraFormState>({
+    action: isEdit ? updateCompra.bind(null, compra!.id) : createCompra,
+    sucesso: isEdit ? "Compra atualizada." : "Compra cadastrada.",
+    defaultOpen,
+    onClose,
+    aoSalvar: isEdit ? undefined : playCoinSound,
+    reset: () => {
+      setValorRaw(defaults.valor_total);
+      setDataRaw(defaults.data_compra);
+      setParcelasRaw(defaults.parcelas);
+      setEmAndamento(defaults.em_andamento);
+      setParcelaAtualRaw(defaults.parcela_atual);
+      setCategoriaId(defaults.categoriaId);
+      setQuemGastou(defaults.quemGastou);
+    },
   });
 
   // "Em andamento" sobrescreve data_compra retroativamente: a parcela 1 tem
@@ -216,31 +198,20 @@ export function CompraFormDialog({
       dia_vencimento: diaVencimento,
     });
 
-    // Mês da parcela atual (indice 0-based = parcelaAtual - 1)
+    // A virada de ano fica com `mesDaParcela`, o mesmo helper que o servidor
+    // usa — este preview repetia a conta na mão e podia divergir dela.
     const idxAtual = parcelaAtual - 1;
-    const totalMesesAtual = primeira.mes + idxAtual;
-    const anoAtual = primeira.ano + Math.floor((totalMesesAtual - 1) / 12);
-    const mesAtualNum = ((totalMesesAtual - 1) % 12) + 1;
-    const mesAtualRef = buildMes(anoAtual, mesAtualNum);
-
-    // Última parcela
-    const totalMesesUltima = primeira.mes + parcelas - 1;
-    const anoUltima = primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
-    const mesUltimaNum = ((totalMesesUltima - 1) % 12) + 1;
-    const ultimaLabel = `${MESES_PT_ABREV[mesUltimaNum - 1]}/${String(anoUltima).slice(2)}`;
-
-    const valorParcela = valores[idxAtual];
-    const restantes = parcelas - parcelaAtual;
-    const somaRestantes = valores
-      .slice(parcelaAtual) // parcelas depois da atual
-      .reduce((s, v) => s + v, 0);
+    const mesAtualRef = mesDaParcela(primeira, idxAtual);
+    const mesUltima = mesDaParcela(primeira, parcelas - 1);
+    const ultimaLabel = `${MESES_PT_ABREV[mesUltima.mes - 1]}/${String(mesUltima.ano).slice(2)}`;
 
     return {
-      valorParcela,
+      valorParcela: valores[idxAtual],
       parcelaAtual,
       parcelas,
-      restantes,
-      somaRestantes,
+      restantes: parcelas - parcelaAtual,
+      // Parcelas depois da atual.
+      somaRestantes: valores.slice(parcelaAtual).reduce((s, v) => s + v, 0),
       mesAtualLabel: mesAtualRef.label,
       ultimaLabel,
       emAndamento,
@@ -256,249 +227,181 @@ export function CompraFormDialog({
   ]);
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger ? (
-        <DialogTrigger render={trigger} />
-      ) : (
-        <DialogTrigger
-          render={
-            <Button size="sm">
-              <PlusIcon className="size-4" strokeWidth={2.75} />
-              Nova compra
-            </Button>
-          }
+    <FormDialogShell
+      ctrl={ctrl}
+      trigger={trigger}
+      rotuloNovo="Nova compra"
+      titulo={isEdit ? "Editar compra" : "Nova compra no cartão"}
+      descricao={
+        isEdit
+          ? "Mudar parcelas ou data redistribui as faturas automaticamente."
+          : "Se for parcelada, o valor é distribuído pelos meses a partir da data da compra."
+      }
+    >
+      <input type="hidden" name="cartao_id" value={cartaoId} />
+
+      <CampoForm htmlFor="descricao" rotulo="Descrição">
+        <Input
+          id="descricao"
+          name="descricao"
+          required
+          defaultValue={defaults.descricao}
+          placeholder="Ex: iPhone, Amazon, Mercado"
         />
-      )}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Editar compra" : "Nova compra no cartão"}
-          </DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? "Mudar parcelas ou data redistribui as faturas automaticamente."
-              : "Se for parcelada, o valor é distribuído pelos meses a partir da data da compra."}
-          </DialogDescription>
-        </DialogHeader>
+      </CampoForm>
 
-        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="cartao_id" value={cartaoId} />
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="descricao" className="text-xs text-muted-foreground">
-              Descrição
-            </Label>
-            <Input
-              id="descricao"
-              name="descricao"
-              required
-              defaultValue={defaults.descricao}
-              placeholder="Ex: iPhone, Amazon, Mercado"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="valor_total"
-                className="text-xs text-muted-foreground"
-              >
-                Valor total (R$)
-              </Label>
-              <Input
-                id="valor_total"
-                name="valor_total"
-                required
-                inputMode="decimal"
-                aria-invalid={valorInvalido}
-                value={valorRaw}
-                onChange={(e) => setValorRaw(e.target.value)}
-                placeholder="Ex: 1200,00"
-              />
-              {valorInvalido && (
-                <p className="text-xs text-destructive">
-                  Digite um valor válido, ex: 1200,00.
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="data_compra"
-                className="text-xs text-muted-foreground"
-              >
-                Data da compra
-              </Label>
-              <Input
-                id="data_compra"
-                name="data_compra"
-                type="date"
-                required
-                value={dataRaw}
-                onChange={(e) => setDataRaw(e.target.value)}
-                readOnly={emAndamento}
-                className={emAndamento ? "opacity-60" : undefined}
-                title={
-                  emAndamento
-                    ? "Calculada automaticamente pela parcela atual"
-                    : undefined
-                }
-              />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="parcelas" className="text-xs text-muted-foreground">
-              Parcelas
-            </Label>
-            <Input
-              id="parcelas"
-              name="parcelas"
-              type="number"
-              min={1}
-              max={60}
-              required
-              value={parcelasRaw}
-              onChange={(e) => setParcelasRaw(e.target.value)}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2 rounded-2xl border border-border/60 p-4">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="em_andamento"
-                checked={emAndamento}
-                onChange={(e) => onEmAndamentoChange(e.target.checked)}
-                className="size-4 rounded border-input"
-              />
-              Compra em andamento (já paguei algumas parcelas antes de
-              cadastrar)
-            </label>
-            {emAndamento && (
-              <div className="flex flex-col gap-2 pl-6 pt-1">
-                <Label
-                  htmlFor="parcela_atual"
-                  className="text-xs text-muted-foreground"
-                >
-                  Estou na parcela
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    id="parcela_atual"
-                    name="parcela_atual"
-                    type="number"
-                    min={1}
-                    max={Number(parcelasRaw) || 60}
-                    value={parcelaAtualRaw}
-                    onChange={(e) => onParcelaAtualChange(e.target.value)}
-                    className="max-w-[120px]"
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    de {parcelasRaw || "?"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label
-              htmlFor="categoria_id"
-              className="text-xs text-muted-foreground"
-            >
-              Categoria (opcional)
-            </Label>
-            <CategoriaSelectField
-              categorias={categorias}
-              value={categoriaId}
-              onValueChange={setCategoriaId}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label
-              htmlFor="quem_gastou"
-              className="text-xs text-muted-foreground"
-            >
-              Quem gastou (opcional)
-            </Label>
-            <QuemGastouSelectField
-              membros={membros}
-              value={quemGastou}
-              onValueChange={setQuemGastou}
-            />
-          </div>
-
-          {preview && (
-            <div className="rounded-2xl border border-border/60 bg-muted p-4">
-              {preview.parcelas === 1 ? (
-                <p className="text-sm">
-                  Cai integralmente na fatura de{" "}
-                  <strong>{preview.mesAtualLabel}</strong>.
-                </p>
-              ) : preview.emAndamento ? (
-                <>
-                  <p className="text-sm">
-                    Parcela{" "}
-                    <strong className="tabular-nums">
-                      {preview.parcelaAtual}/{preview.parcelas}
-                    </strong>{" "}
-                    de{" "}
-                    <strong className="tabular-nums">
-                      {formatBRL(preview.valorParcela)}
-                    </strong>{" "}
-                    na fatura de <strong>{preview.mesAtualLabel}</strong>
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Ainda faltam{" "}
-                    <span className="tabular-nums">
-                      {preview.restantes} parcelas
-                    </span>{" "}
-                    (
-                    <span className="tabular-nums">
-                      {formatBRL(preview.somaRestantes)}
-                    </span>
-                    ) — última em {preview.ultimaLabel}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className="text-sm">
-                    <strong>{preview.parcelas}x</strong> de{" "}
-                    <strong className="tabular-nums">
-                      {formatBRL(preview.valorParcela)}
-                    </strong>
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    De {preview.mesAtualLabel} até {preview.ultimaLabel}
-                  </p>
-                </>
-              )}
-            </div>
-          )}
-
-          {state.error && (
-            <p className="text-sm text-primary" role="alert">
-              {state.error}
+      <div className="grid grid-cols-2 gap-3">
+        <CampoForm htmlFor="valor_total" rotulo="Valor total (R$)">
+          <Input
+            id="valor_total"
+            name="valor_total"
+            required
+            inputMode="decimal"
+            aria-invalid={valorInvalido}
+            value={valorRaw}
+            onChange={(e) => setValorRaw(e.target.value)}
+            placeholder="Ex: 1200,00"
+          />
+          {valorInvalido && (
+            <p className="text-xs text-destructive">
+              Digite um valor válido, ex: 1200,00.
             </p>
           )}
+        </CampoForm>
+        <CampoForm htmlFor="data_compra" rotulo="Data da compra">
+          <Input
+            id="data_compra"
+            name="data_compra"
+            type="date"
+            required
+            value={dataRaw}
+            onChange={(e) => setDataRaw(e.target.value)}
+            readOnly={emAndamento}
+            className={emAndamento ? "opacity-60" : undefined}
+            title={
+              emAndamento
+                ? "Calculada automaticamente pela parcela atual"
+                : undefined
+            }
+          />
+        </CampoForm>
+      </div>
 
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending}
+      <CampoForm htmlFor="parcelas" rotulo="Parcelas">
+        <Input
+          id="parcelas"
+          name="parcelas"
+          type="number"
+          min={1}
+          max={60}
+          required
+          value={parcelasRaw}
+          onChange={(e) => setParcelasRaw(e.target.value)}
+        />
+      </CampoForm>
+
+      <div className="flex flex-col gap-2 rounded-2xl border border-border/60 p-4">
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="em_andamento"
+            checked={emAndamento}
+            onChange={(e) => onEmAndamentoChange(e.target.checked)}
+            className="size-4 rounded border-input"
+          />
+          Compra em andamento (já paguei algumas parcelas antes de cadastrar)
+        </label>
+        {emAndamento && (
+          <div className="flex flex-col gap-2 pl-6 pt-1">
+            <Label
+              htmlFor="parcela_atual"
+              className="text-xs text-muted-foreground"
             >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+              Estou na parcela
+            </Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="parcela_atual"
+                name="parcela_atual"
+                type="number"
+                min={1}
+                max={Number(parcelasRaw) || 60}
+                value={parcelaAtualRaw}
+                onChange={(e) => onParcelaAtualChange(e.target.value)}
+                className="max-w-[120px]"
+              />
+              <span className="text-sm text-muted-foreground">
+                de {parcelasRaw || "?"}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <CampoForm htmlFor="categoria_id" rotulo="Categoria (opcional)">
+        <CategoriaSelectField
+          categorias={categorias}
+          value={categoriaId}
+          onValueChange={setCategoriaId}
+        />
+      </CampoForm>
+
+      <CampoForm htmlFor="quem_gastou" rotulo="Quem gastou (opcional)">
+        <QuemGastouSelectField
+          membros={membros}
+          value={quemGastou}
+          onValueChange={setQuemGastou}
+        />
+      </CampoForm>
+
+      {preview && (
+        <div className="rounded-2xl border border-border/60 bg-muted p-4">
+          {preview.parcelas === 1 ? (
+            <p className="text-sm">
+              Cai integralmente na fatura de{" "}
+              <strong>{preview.mesAtualLabel}</strong>.
+            </p>
+          ) : preview.emAndamento ? (
+            <>
+              <p className="text-sm">
+                Parcela{" "}
+                <strong className="tabular-nums">
+                  {preview.parcelaAtual}/{preview.parcelas}
+                </strong>{" "}
+                de{" "}
+                <strong className="tabular-nums">
+                  {formatBRL(preview.valorParcela)}
+                </strong>{" "}
+                na fatura de <strong>{preview.mesAtualLabel}</strong>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Ainda faltam{" "}
+                <span className="tabular-nums">
+                  {preview.restantes} parcelas
+                </span>{" "}
+                (
+                <span className="tabular-nums">
+                  {formatBRL(preview.somaRestantes)}
+                </span>
+                ) — última em {preview.ultimaLabel}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm">
+                <strong>{preview.parcelas}x</strong> de{" "}
+                <strong className="tabular-nums">
+                  {formatBRL(preview.valorParcela)}
+                </strong>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                De {preview.mesAtualLabel} até {preview.ultimaLabel}
+              </p>
+            </>
+          )}
+        </div>
+      )}
+    </FormDialogShell>
   );
 }
 

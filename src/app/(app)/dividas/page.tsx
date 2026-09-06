@@ -6,11 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format";
-import {
-  DividaFormDialog,
-  EditDividaTrigger,
-  type DividaRow,
-} from "./divida-form-dialog";
+import type { DividaRow } from "./divida-form-dialog";
+import { DividaDialogs, EditarDivida, NovaDivida } from "./divida-dialogs";
 import { DividaActionsMenu } from "./divida-actions-menu";
 
 export default async function DividasPage() {
@@ -54,92 +51,94 @@ export default async function DividasPage() {
   const totalPagoAbertas = abertas.reduce((s, d) => s + d.pago, 0);
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
-            Dívidas
-          </h2>
-          <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
-            Cadastre o que você deve e vai baixando conforme paga. Não entra
-            no saldo da quinzena — é só pra não esquecer.
-          </p>
-        </div>
-        <DividaFormDialog />
-      </header>
-
-      {dividas.length === 0 ? (
-        <Card>
-          <div className="flex flex-col items-center gap-3 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              Nada em aberto por aqui.
+    <DividaDialogs>
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
+              Dívidas
+            </h2>
+            <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
+              Cadastre o que você deve e vai baixando conforme paga. Não entra
+              no saldo da quinzena — é só pra não esquecer.
             </p>
-            <DividaFormDialog />
           </div>
-        </Card>
-      ) : (
-        <>
-          {abertas.length > 0 && (
-            <div className="flex flex-wrap items-baseline gap-8 rounded-[28px] border border-accent-300/70 bg-accent-100 px-7 py-6">
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-accent-700">
-                  Falta pagar
-                </p>
-                <p
-                  className="mt-1.5 font-heading tabular-nums text-primary"
-                  style={{
-                    fontSize: "clamp(2rem, 4vw, 2.5rem)",
-                    lineHeight: 1,
-                  }}
-                >
-                  {formatBRL(totalDevido)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-neutral-700">
-                  Já pago
-                </p>
-                <p className="mt-1.5 font-heading tabular-nums text-sage-700">
-                  {formatBRL(totalPagoAbertas)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] uppercase tracking-widest text-neutral-700">
-                  {abertas.length === 1
-                    ? "1 dívida"
-                    : `${abertas.length} dívidas`}
-                </p>
-                <p className="mt-1.5 font-heading">em aberto</p>
-              </div>
+          <NovaDivida />
+        </header>
+
+        {dividas.length === 0 ? (
+          <Card>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Nada em aberto por aqui.
+              </p>
+              <NovaDivida />
             </div>
-          )}
-
-          {abertas.length > 0 && (
-            <section className="flex flex-col gap-3">
-              <h3 className="px-1 font-heading text-[20px]">Em aberto</h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                {abertas.map((d) => (
-                  <DividaCard key={d.divida.id} detalhe={d} />
-                ))}
+          </Card>
+        ) : (
+          <>
+            {abertas.length > 0 && (
+              <div className="flex flex-wrap items-baseline gap-8 rounded-[28px] border border-accent-300/70 bg-accent-100 px-7 py-6">
+                <div>
+                  <p className="text-[11px] uppercase tracking-widest text-accent-700">
+                    Falta pagar
+                  </p>
+                  <p
+                    className="mt-1.5 font-heading tabular-nums text-primary"
+                    style={{
+                      fontSize: "clamp(2rem, 4vw, 2.5rem)",
+                      lineHeight: 1,
+                    }}
+                  >
+                    {formatBRL(totalDevido)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-widest text-neutral-700">
+                    Já pago
+                  </p>
+                  <p className="mt-1.5 font-heading tabular-nums text-sage-700">
+                    {formatBRL(totalPagoAbertas)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-widest text-neutral-700">
+                    {abertas.length === 1
+                      ? "1 dívida"
+                      : `${abertas.length} dívidas`}
+                  </p>
+                  <p className="mt-1.5 font-heading">em aberto</p>
+                </div>
               </div>
-            </section>
-          )}
+            )}
 
-          {quitadas.length > 0 && (
-            <section className="flex flex-col gap-3">
-              <h3 className="px-1 font-heading text-[20px] text-neutral-700">
-                Quitadas
-              </h3>
-              <div className="grid gap-4 md:grid-cols-2">
-                {quitadas.map((d) => (
-                  <DividaCard key={d.divida.id} detalhe={d} />
-                ))}
-              </div>
-            </section>
-          )}
-        </>
-      )}
-    </div>
+            {abertas.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <h3 className="px-1 font-heading text-[20px]">Em aberto</h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {abertas.map((d) => (
+                    <DividaCard key={d.divida.id} detalhe={d} />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {quitadas.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <h3 className="px-1 font-heading text-[20px] text-neutral-700">
+                  Quitadas
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {quitadas.map((d) => (
+                    <DividaCard key={d.divida.id} detalhe={d} />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </DividaDialogs>
   );
 }
 
@@ -179,7 +178,7 @@ function DividaCard({
             Total {formatBRL(total)} · Pago {formatBRL(pago)}
           </p>
         </div>
-        <EditDividaTrigger divida={divida} />
+        <EditarDivida linha={divida} />
         <DividaActionsMenu id={divida.id} descricao={divida.descricao} />
       </div>
 

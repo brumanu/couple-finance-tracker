@@ -1,70 +1,90 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { campo, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  revalidar,
+  type EstadoForm,
+  type SessaoDaAcao,
+} from "@/lib/acoes";
 
-export type CategoriaFormState = { error?: string; ok?: boolean };
+export type CategoriaFormState = EstadoForm;
 
-type Parsed = {
-  nome: string;
-  cor: string;
-  emoji: string | null;
+const ESQUEMA = {
+  nome: campo.texto("Nome", { max: 60 }),
+  cor: campo.customizado((bruto) => {
+    const cor = bruto || "#c67139";
+    return /^#[0-9a-fA-F]{6}$/.test(cor)
+      ? { valor: cor }
+      : { erro: "Cor inválida." };
+  }),
+  emoji: campo.customizado((bruto) => {
+    if (!bruto) return { valor: null as string | null };
+    return bruto.length > 8
+      ? { erro: "Emoji muito longo." }
+      : { valor: bruto as string | null };
+  }),
 };
 
-function parseFormData(formData: FormData): Parsed | string {
-  const nome = String(formData.get("nome") ?? "").trim();
-  const cor = String(formData.get("cor") ?? "").trim() || "#c67139";
-  const emojiRaw = String(formData.get("emoji") ?? "").trim();
-  const emoji = emojiRaw ? emojiRaw : null;
+// Categorias aparecem em quase toda tela — invalida geral por segurança.
+const ROTAS = ["/categorias", "/despesas", "/recorrentes", "/cartoes", "/"];
 
-  if (!nome) return "Nome é obrigatório.";
-  if (nome.length > 60) return "Nome muito longo (máx 60).";
-  if (!/^#[0-9a-fA-F]{6}$/.test(cor)) return "Cor inválida.";
-  if (emoji && emoji.length > 8) return "Emoji muito longo.";
+/**
+ * Tabelas que ainda guardam o NOME da categoria em texto, além do FK.
+ * Renomear ou excluir uma categoria precisa acertar as quatro.
+ */
+const TABELAS_COM_TEXTO_LEGADO = [
+  "contas_recorrentes",
+  "lancamentos",
+  "compras_cartao",
+  "assinaturas_cartao",
+] as const;
 
-  return { nome, cor, emoji };
-}
-
-async function revalidaTudoQueUsa() {
-  // categorias podem aparecer em quase todas as telas — invalida por segurança
-  revalidatePath("/categorias");
-  revalidatePath("/despesas");
-  revalidatePath("/recorrentes");
-  revalidatePath("/cartoes");
-  revalidatePath("/");
+/**
+ * Propaga o texto legado. As quatro tabelas são independentes, então vão
+ * juntas — antes eram quatro `await` em fila.
+ *
+ * Não filtra por `casal_id`: a RLS já restringe cada update ao casal do
+ * usuário, então o filtro extra que existia aqui só custava uma busca a mais
+ * do `casal_id` no `profiles`.
+ */
+async function propagarNome(
+  supabase: SessaoDaAcao,
+  categoriaId: string,
+  nome: string | null,
+) {
+  await Promise.all(
+    TABELAS_COM_TEXTO_LEGADO.map((tabela) =>
+      supabase
+        .from(tabela)
+        .update({ categoria: nome })
+        .eq("categoria_id", categoriaId),
+    ),
+  );
 }
 
 export async function createCategoria(
   _prev: CategoriaFormState,
   formData: FormData,
 ): Promise<CategoriaFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return { error: dados };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
-
-  const { error } = await supabase.from("categorias").insert({
-    casal_id: profile.casal_id,
-    ...parsed,
-  });
+  const { error } = await sessao.supabase.from("categorias").insert(dados);
   if (error) {
-    if (error.code === "23505")
-      return { error: `Já existe uma categoria "${parsed.nome}".` };
-    return { error: error.message };
+    return {
+      error: erroAmigavel(error, {
+        "23505": `Já existe uma categoria "${dados.nome}".`,
+      }),
+    };
   }
 
-  await revalidaTudoQueUsa();
+  revalidar(...ROTAS);
   return { ok: true };
 }
 
@@ -73,97 +93,34 @@ export async function updateCategoria(
   _prev: CategoriaFormState,
   formData: FormData,
 ): Promise<CategoriaFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return { error: dados };
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
-
-  const { error } = await supabase
-    .from("categorias")
-    .update(parsed)
-    .eq("id", id);
+  const { error } = await supabase.from("categorias").update(dados).eq("id", id);
   if (error) {
-    if (error.code === "23505")
-      return { error: `Já existe uma categoria "${parsed.nome}".` };
-    return { error: error.message };
+    return {
+      error: erroAmigavel(error, {
+        "23505": `Já existe uma categoria "${dados.nome}".`,
+      }),
+    };
   }
 
-  // se o nome mudou, sincroniza o texto legado nas 4 tabelas que ainda o mostram
-  await supabase
-    .from("contas_recorrentes")
-    .update({ categoria: parsed.nome })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
-  await supabase
-    .from("lancamentos")
-    .update({ categoria: parsed.nome })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
-  await supabase
-    .from("compras_cartao")
-    .update({ categoria: parsed.nome })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
-  await supabase
-    .from("assinaturas_cartao")
-    .update({ categoria: parsed.nome })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
+  await propagarNome(supabase, id, dados.nome);
 
-  await revalidaTudoQueUsa();
+  revalidar(...ROTAS);
   return { ok: true };
 }
 
 export async function deleteCategoria(id: string) {
   const supabase = await createClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
-
-  // FK on delete set null → registros perdem o categoria_id
-  // O texto legado (categoria text) fica; limpamos pra consistência.
-  await supabase
-    .from("contas_recorrentes")
-    .update({ categoria: null })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
-  await supabase
-    .from("lancamentos")
-    .update({ categoria: null })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
-  await supabase
-    .from("compras_cartao")
-    .update({ categoria: null })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
-  await supabase
-    .from("assinaturas_cartao")
-    .update({ categoria: null })
-    .eq("categoria_id", id)
-    .eq("casal_id", profile.casal_id);
+  // A FK é `on delete set null`, então o categoria_id se resolve sozinho.
+  // O texto legado não — limpamos antes pra não sobrar nome de categoria
+  // que já não existe.
+  await propagarNome(supabase, id, null);
 
   const { error } = await supabase.from("categorias").delete().eq("id", id);
-  if (error) return { error: error.message };
-  await revalidaTudoQueUsa();
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...ROTAS);
 }

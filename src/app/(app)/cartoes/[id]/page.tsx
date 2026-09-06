@@ -21,17 +21,16 @@ import { BancoIcone } from "@/lib/bancos-icones";
 import { getCategorias } from "@/lib/categorias-server";
 import { getMembrosCasal } from "@/lib/membros-server";
 import { MonthSwitcher } from "../../month-switcher";
-import {
-  CompraFormDialog,
-  EditCompraTrigger,
-  type CompraRow,
-} from "./compra-form-dialog";
+import type { CompraRow } from "./compra-form-dialog";
 import { CompraActionsMenu } from "./compra-actions-menu";
+import type { AssinaturaRow } from "./assinatura-form-dialog";
 import {
-  AssinaturaFormDialog,
-  EditAssinaturaTrigger,
-  type AssinaturaRow,
-} from "./assinatura-form-dialog";
+  CartaoDetalheDialogs,
+  EditarAssinatura,
+  EditarCompra,
+  NovaAssinatura,
+  NovaCompra,
+} from "./cartao-detalhe-dialogs";
 import { AssinaturaActionsMenu } from "./assinatura-actions-menu";
 
 const BANDEIRA_LABEL: Record<string, string> = {
@@ -128,316 +127,293 @@ export default async function CartaoDetailPage({
   );
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
-      <div>
-        <Button
-          variant="ghost"
-          size="sm"
-          nativeButton={false}
-          render={
-            <Link href="/cartoes">
-              <ArrowLeftIcon className="size-4" strokeWidth={2.75} />
-              Voltar
-            </Link>
-          }
-        />
-      </div>
-
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <BancoIcone
-            icone={banco?.icone ?? null}
-            corFallback={banco?.cor}
-            nomeFallback={banco?.nome ?? label}
-            size={56}
+    <CartaoDetalheDialogs
+      cartaoId={cartao.id}
+      diaFechamento={cartao.dia_fechamento}
+      diaVencimento={cartao.dia_vencimento}
+      categorias={categorias}
+      membros={membros}
+    >
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:p-8">
+        <div>
+          <Button
+            variant="ghost"
+            size="sm"
+            nativeButton={false}
+            render={
+              <Link href="/cartoes">
+                <ArrowLeftIcon className="size-4" strokeWidth={2.75} />
+                Voltar
+              </Link>
+            }
           />
-          <div>
-            <h2 className="font-heading text-3xl leading-tight md:text-4xl">
-              {label}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {cartao.bandeira ? BANDEIRA_LABEL[cartao.bandeira] : ""}
-              {cartao.bandeira ? " · " : ""}
-              Fecha dia {cartao.dia_fechamento} · Vence dia {cartao.dia_vencimento}
+        </div>
+
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <BancoIcone
+              icone={banco?.icone ?? null}
+              corFallback={banco?.cor}
+              nomeFallback={banco?.nome ?? label}
+              size={56}
+            />
+            <div>
+              <h2 className="font-heading text-3xl leading-tight md:text-4xl">
+                {label}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {cartao.bandeira ? BANDEIRA_LABEL[cartao.bandeira] : ""}
+                {cartao.bandeira ? " · " : ""}
+                Fecha dia {cartao.dia_fechamento} · Vence dia {cartao.dia_vencimento}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <MonthSwitcher mes={mes} />
+            <NovaAssinatura />
+            <NovaCompra />
+          </div>
+        </header>
+
+        <Card>
+          <div className="flex flex-col gap-3 p-6">
+            <p className="text-[11px] uppercase tracking-widest text-primary">
+              Fatura de {mes.label}
+            </p>
+            <p
+              className="font-heading tabular-nums"
+              style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1 }}
+            >
+              {formatBRL(fatura.total)}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {(() => {
+                const nC = fatura.parcelas.length;
+                const nA = fatura.assinaturas.length;
+                if (nC === 0 && nA === 0)
+                  return "Nenhum lançamento nesta fatura.";
+                const partes: string[] = [];
+                if (nC > 0)
+                  partes.push(`${nC} ${nC === 1 ? "compra" : "compras"}`);
+                if (nA > 0)
+                  partes.push(
+                    `${nA} ${nA === 1 ? "assinatura" : "assinaturas"}`,
+                  );
+                return `${partes.join(" · ")} · vence dia ${cartao.dia_vencimento}`;
+              })()}
             </p>
           </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <MonthSwitcher mes={mes} />
-          <AssinaturaFormDialog
-            cartaoId={cartao.id}
-            categorias={categorias}
-            membros={membros}
-          />
-          <CompraFormDialog
-            cartaoId={cartao.id}
-            diaFechamento={cartao.dia_fechamento}
-            diaVencimento={cartao.dia_vencimento}
-            categorias={categorias}
-            membros={membros}
-          />
-        </div>
-      </header>
+        </Card>
 
-      <Card>
-        <div className="flex flex-col gap-3 p-6">
-          <p className="text-[11px] uppercase tracking-widest text-primary">
-            Fatura de {mes.label}
-          </p>
-          <p
-            className="font-heading tabular-nums"
-            style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1 }}
-          >
-            {formatBRL(fatura.total)}
-          </p>
-          <p className="text-sm text-muted-foreground">
-            {(() => {
-              const nC = fatura.parcelas.length;
-              const nA = fatura.assinaturas.length;
-              if (nC === 0 && nA === 0)
-                return "Nenhum lançamento nesta fatura.";
-              const partes: string[] = [];
-              if (nC > 0)
-                partes.push(`${nC} ${nC === 1 ? "compra" : "compras"}`);
-              if (nA > 0)
-                partes.push(
-                  `${nA} ${nA === 1 ? "assinatura" : "assinaturas"}`,
-                );
-              return `${partes.join(" · ")} · vence dia ${cartao.dia_vencimento}`;
-            })()}
-          </p>
-        </div>
-      </Card>
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between px-1">
+            <h3 className="font-heading text-lg">Compras da fatura</h3>
+            <p className="text-xs text-muted-foreground">
+              {comprasDoMes.length}{" "}
+              {comprasDoMes.length === 1 ? "na fatura" : "na fatura"} ·{" "}
+              {compras.length} no cartão
+            </p>
+          </div>
+          {compras.length === 0 ? (
+            <Card>
+              <div className="flex flex-col items-center gap-3 p-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma compra registrada neste cartão ainda.
+                </p>
+                <NovaCompra />
+              </div>
+            </Card>
+          ) : comprasDoMes.length === 0 ? (
+            <Card>
+              <div className="flex flex-col items-center gap-3 p-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma compra cai na fatura de {mes.label}.
+                </p>
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <ul className="flex flex-col divide-y divide-border/60">
+                {comprasDoMes.map(({ compra: c, info }) => {
+                  const primeira = mesPrimeiraParcela(c.data_compra, cartao);
+                  const valores = valoresParcelas(
+                    Number(c.valor_total),
+                    c.parcelas,
+                  );
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between px-1">
-          <h3 className="font-heading text-lg">Compras da fatura</h3>
-          <p className="text-xs text-muted-foreground">
-            {comprasDoMes.length}{" "}
-            {comprasDoMes.length === 1 ? "na fatura" : "na fatura"} ·{" "}
-            {compras.length} no cartão
-          </p>
-        </div>
-        {compras.length === 0 ? (
-          <Card>
-            <div className="flex flex-col items-center gap-3 p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhuma compra registrada neste cartão ainda.
-              </p>
-              <CompraFormDialog
-                cartaoId={cartao.id}
-                diaFechamento={cartao.dia_fechamento}
-                diaVencimento={cartao.dia_vencimento}
-                categorias={categorias}
-                membros={membros}
-              />
-            </div>
-          </Card>
-        ) : comprasDoMes.length === 0 ? (
-          <Card>
-            <div className="flex flex-col items-center gap-3 p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhuma compra cai na fatura de {mes.label}.
-              </p>
-            </div>
-          </Card>
-        ) : (
-          <Card>
-            <ul className="flex flex-col divide-y divide-border/60">
-              {comprasDoMes.map(({ compra: c, info }) => {
-                const primeira = mesPrimeiraParcela(c.data_compra, cartao);
-                const valores = valoresParcelas(
-                  Number(c.valor_total),
-                  c.parcelas,
-                );
+                  const totalMesesUltima = primeira.mes + c.parcelas - 1;
+                  const anoUltima =
+                    primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
+                  const mesUltimaNum = ((totalMesesUltima - 1) % 12) + 1;
+                  const ultimaLabel = `${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][mesUltimaNum-1]}/${String(anoUltima).slice(2)}`;
 
-                const totalMesesUltima = primeira.mes + c.parcelas - 1;
-                const anoUltima =
-                  primeira.ano + Math.floor((totalMesesUltima - 1) / 12);
-                const mesUltimaNum = ((totalMesesUltima - 1) % 12) + 1;
-                const ultimaLabel = `${["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][mesUltimaNum-1]}/${String(anoUltima).slice(2)}`;
+                  const restantes = c.parcelas - info.numero;
+                  const valorRestante = Number(
+                    valores.slice(info.numero).reduce((s, v) => s + v, 0),
+                  );
 
-                const restantes = c.parcelas - info.numero;
-                const valorRestante = Number(
-                  valores.slice(info.numero).reduce((s, v) => s + v, 0),
-                );
-
-                return (
-                  <li
-                    key={c.id}
-                    className="flex flex-wrap items-center gap-3 p-5"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{c.descricao}</p>
-                        {c.categoria && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {c.categoria}
-                          </Badge>
-                        )}
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex flex-wrap items-center gap-3 p-5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{c.descricao}</p>
+                          {c.categoria && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {c.categoria}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDataBR(c.data_compra)} · Total{" "}
+                          <span className="tabular-nums">
+                            {formatBRL(c.valor_total)}
+                          </span>
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDataBR(c.data_compra)} · Total{" "}
-                        <span className="tabular-nums">
-                          {formatBRL(c.valor_total)}
+
+                      {c.parcelas === 1 ? (
+                        <div className="text-right">
+                          <p className="text-sm font-medium tabular-nums">
+                            {formatBRL(c.valor_total)}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            à vista
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-right text-xs sm:grid-cols-4">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Parcela
+                            </p>
+                            <p className="font-medium tabular-nums">
+                              {info.numero}/{c.parcelas}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Valor da parcela
+                            </p>
+                            <p className="font-medium tabular-nums">
+                              {formatBRL(info.valor)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Falta pagar
+                            </p>
+                            <p className="font-medium tabular-nums">
+                              {restantes > 0
+                                ? formatBRL(valorRestante)
+                                : "R$ 0,00"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                              Última em
+                            </p>
+                            <p className="font-medium">{ultimaLabel}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2">
+                        <EditarCompra linha={c} />
+                        <CompraActionsMenu
+                          id={c.id}
+                          cartaoId={cartao.id}
+                          descricao={c.descricao}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div className="flex items-baseline justify-between px-1">
+            <h3 className="font-heading text-lg">Assinaturas</h3>
+            <p className="text-xs text-muted-foreground">
+              {assinaturas.length}{" "}
+              {assinaturas.length === 1 ? "cadastrada" : "cadastradas"}
+            </p>
+          </div>
+          {assinaturas.length === 0 ? (
+            <Card>
+              <div className="flex flex-col items-center gap-3 p-8 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma assinatura recorrente cadastrada.
+                </p>
+                <NovaAssinatura />
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <ul className="flex flex-col divide-y divide-border/60">
+                {assinaturas.map((a) => {
+                  const ativaHoje = assinaturaAtivaNoMes(
+                    a as AssinaturaCartaoInfo,
+                    mes,
+                  );
+                  return (
+                    <li
+                      key={a.id}
+                      className={`flex flex-wrap items-center gap-3 p-5 ${
+                        ativaHoje ? "" : "opacity-60"
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{a.descricao}</p>
+                          {a.categoria && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {a.categoria}
+                            </Badge>
+                          )}
+                          {!a.ativa && (
+                            <Badge variant="neutral" className="text-[10px]">
+                              pausada
+                            </Badge>
+                          )}
+                          {a.fim_vigencia && (
+                            <Badge variant="neutral" className="text-[10px]">
+                              até {formatDataBR(a.fim_vigencia)}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Ativa desde {formatDataBR(a.inicio_vigencia)}
+                        </p>
+                      </div>
+                      <p className="text-sm font-medium tabular-nums">
+                        {formatBRL(a.valor_mensal)}
+                        <span className="text-xs text-muted-foreground">
+                          {" "}
+                          /mês
                         </span>
                       </p>
-                    </div>
-
-                    {c.parcelas === 1 ? (
-                      <div className="text-right">
-                        <p className="text-sm font-medium tabular-nums">
-                          {formatBRL(c.valor_total)}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground">
-                          à vista
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-right text-xs sm:grid-cols-4">
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Parcela
-                          </p>
-                          <p className="font-medium tabular-nums">
-                            {info.numero}/{c.parcelas}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Valor da parcela
-                          </p>
-                          <p className="font-medium tabular-nums">
-                            {formatBRL(info.valor)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Falta pagar
-                          </p>
-                          <p className="font-medium tabular-nums">
-                            {restantes > 0
-                              ? formatBRL(valorRestante)
-                              : "R$ 0,00"}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                            Última em
-                          </p>
-                          <p className="font-medium">{ultimaLabel}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2">
-                      <EditCompraTrigger
-                        compra={c}
-                        diaFechamento={cartao.dia_fechamento}
-                        diaVencimento={cartao.dia_vencimento}
-                        categorias={categorias}
-                        membros={membros}
-                      />
-                      <CompraActionsMenu
-                        id={c.id}
+                      <EditarAssinatura linha={a} />
+                      <AssinaturaActionsMenu
+                        id={a.id}
                         cartaoId={cartao.id}
-                        descricao={c.descricao}
+                        descricao={a.descricao}
+                        ativa={a.ativa}
+                        ativaHoje={ativaHoje}
                       />
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between px-1">
-          <h3 className="font-heading text-lg">Assinaturas</h3>
-          <p className="text-xs text-muted-foreground">
-            {assinaturas.length}{" "}
-            {assinaturas.length === 1 ? "cadastrada" : "cadastradas"}
-          </p>
-        </div>
-        {assinaturas.length === 0 ? (
-          <Card>
-            <div className="flex flex-col items-center gap-3 p-8 text-center">
-              <p className="text-sm text-muted-foreground">
-                Nenhuma assinatura recorrente cadastrada.
-              </p>
-              <AssinaturaFormDialog
-                cartaoId={cartao.id}
-                categorias={categorias}
-                membros={membros}
-              />
-            </div>
-          </Card>
-        ) : (
-          <Card>
-            <ul className="flex flex-col divide-y divide-border/60">
-              {assinaturas.map((a) => {
-                const ativaHoje = assinaturaAtivaNoMes(
-                  a as AssinaturaCartaoInfo,
-                  mes,
-                );
-                return (
-                  <li
-                    key={a.id}
-                    className={`flex flex-wrap items-center gap-3 p-5 ${
-                      ativaHoje ? "" : "opacity-60"
-                    }`}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-medium">{a.descricao}</p>
-                        {a.categoria && (
-                          <Badge variant="secondary" className="text-[10px]">
-                            {a.categoria}
-                          </Badge>
-                        )}
-                        {!a.ativa && (
-                          <Badge variant="neutral" className="text-[10px]">
-                            pausada
-                          </Badge>
-                        )}
-                        {a.fim_vigencia && (
-                          <Badge variant="neutral" className="text-[10px]">
-                            até {formatDataBR(a.fim_vigencia)}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Ativa desde {formatDataBR(a.inicio_vigencia)}
-                      </p>
-                    </div>
-                    <p className="text-sm font-medium tabular-nums">
-                      {formatBRL(a.valor_mensal)}
-                      <span className="text-xs text-muted-foreground">
-                        {" "}
-                        /mês
-                      </span>
-                    </p>
-                    <EditAssinaturaTrigger
-                      assinatura={a}
-                      cartaoId={cartao.id}
-                      categorias={categorias}
-                      membros={membros}
-                    />
-                    <AssinaturaActionsMenu
-                      id={a.id}
-                      cartaoId={cartao.id}
-                      descricao={a.descricao}
-                      ativa={a.ativa}
-                      ativaHoje={ativaHoje}
-                    />
-                  </li>
-                );
-              })}
-            </ul>
-          </Card>
-        )}
-      </section>
-    </div>
-  );
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          )}
+        </section>
+      </div>
+    </CartaoDetalheDialogs>
+ );
 }

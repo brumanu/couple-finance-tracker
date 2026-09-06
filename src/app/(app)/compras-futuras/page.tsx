@@ -15,13 +15,14 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { QUEM_CASAL, type MembroOpcao } from "@/lib/membros";
 import type { CategoriaOpcao } from "@/lib/categorias";
+import type { CompraFuturaRow } from "./compra-futura-form-dialog";
 import {
-  CompraFuturaFormDialog,
-  EditCompraFuturaTrigger,
-  type CompraFuturaRow,
-} from "./compra-futura-form-dialog";
+  CompraFuturaDialogs,
+  EditarCompraFutura,
+  NovaCompraFutura,
+} from "./compra-futura-dialogs";
 import { CompraFuturaActionsMenu } from "./compra-futura-actions-menu";
-import { CompreiDialog } from "./comprei-dialog";
+import { CompreiBotao } from "./comprei-botao";
 
 /** Mesma janela de projeção do dashboard: mês atual + 5 seguintes. */
 const MESES_PROJECAO = 6;
@@ -78,129 +79,153 @@ export default async function ComprasFuturasPage() {
   const membroById = new Map(membros.map((m) => [m.id, m] as const));
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
-            Quero comprar
-          </h2>
-          <p className="mt-1.5 max-w-[56ch] text-[15px] text-neutral-700">
-            O que vocês querem comprar um dia. Nada aqui entra nas contas do
-            mês — só quando você marcar como comprado.
-          </p>
-        </div>
-        <CompraFuturaFormDialog categorias={categorias} membros={membros} />
-      </header>
-
-      {itens.length === 0 ? (
-        <Card>
-          <div className="flex flex-col items-center gap-3 p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              A lista está vazia. Anote aquele desejo antes que esqueça.
+    <CompraFuturaDialogs categorias={categorias} membros={membros}>
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
+        <header className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-3xl leading-tight md:text-[34px]">
+              Quero comprar
+            </h2>
+            <p className="mt-1.5 max-w-[56ch] text-[15px] text-neutral-700">
+              O que vocês querem comprar um dia. Nada aqui entra nas contas do
+              mês — só quando você marcar como comprado.
             </p>
-            <CompraFuturaFormDialog categorias={categorias} membros={membros} />
           </div>
-        </Card>
-      ) : (
-        <>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <ResumoCard
-              label="Total estimado"
-              valor={formatBRL(totalEstimado)}
-              hint={
-                semValor > 0
-                  ? `${semValor} ${semValor === 1 ? "item sem valor" : "itens sem valor"}`
-                  : "todos com valor"
-              }
-              destaque
-            />
-            <ResumoCard
-              label="Na lista"
-              valor={String(abertos.length)}
-              hint={abertos.length === 1 ? "item" : "itens"}
-            />
-            <ResumoCard
-              label="Já comprados"
-              valor={String(comprados.length)}
-              hint={comprados.length === 1 ? "item" : "itens"}
-            />
-          </div>
+          <NovaCompraFutura />
+        </header>
 
-          {totalEstimado > 0 && (
-            <div
-              className={`flex items-center gap-4 rounded-[26px] px-5 py-4 ${
-                sobraMedia > 0
-                  ? "bg-card"
-                  : "border border-accent-300 bg-accent-100"
-              }`}
-            >
+        {itens.length === 0 ? (
+          <Card>
+            <div className="flex flex-col items-center gap-3 p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                A lista está vazia. Anote aquele desejo antes que esqueça.
+              </p>
+              <NovaCompraFutura />
+            </div>
+          </Card>
+        ) : (
+          <>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <ResumoCard
+                label="Total estimado"
+                valor={formatBRL(totalEstimado)}
+                hint={
+                  semValor > 0
+                    ? `${semValor} ${semValor === 1 ? "item sem valor" : "itens sem valor"}`
+                    : "todos com valor"
+                }
+                destaque
+              />
+              <ResumoCard
+                label="Na lista"
+                valor={String(abertos.length)}
+                hint={abertos.length === 1 ? "item" : "itens"}
+              />
+              <ResumoCard
+                label="Já comprados"
+                valor={String(comprados.length)}
+                hint={comprados.length === 1 ? "item" : "itens"}
+              />
+            </div>
+
+            {totalEstimado > 0 && (
               <div
-                className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
+                className={`flex items-center gap-4 rounded-[26px] px-5 py-4 ${
                   sobraMedia > 0
-                    ? "bg-sage-300 text-sage-800"
-                    : "bg-primary text-primary-foreground"
+                    ? "bg-card"
+                    : "border border-accent-300 bg-accent-100"
                 }`}
               >
-                <PiggyBankIcon className="size-5" strokeWidth={2.75} />
-              </div>
-              <div className="min-w-0 flex-1">
-                {sobraMedia > 0 ? (
-                  <>
-                    <p className="text-[15px] font-semibold">
-                      Sobram {formatBRL(sobraMedia)} por mês, na média
-                    </p>
-                    <p className="text-[13px] text-neutral-700">
-                      Nesse ritmo, a lista inteira sai em{" "}
-                      {mesesParaComprarTudo === 1
-                        ? "cerca de 1 mês"
-                        : `cerca de ${mesesParaComprarTudo} meses`}
-                      {semValor > 0 &&
-                        ` — sem contar ${semValor === 1 ? "o item" : `os ${semValor} itens`} sem valor`}
-                      .
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-[15px] font-semibold text-accent-800">
-                      Sem sobra no orçamento
-                    </p>
-                    <p className="text-[13px] text-accent-800/85">
-                      A média dos próximos {MESES_PROJECAO} meses fecha em{" "}
-                      {formatBRL(sobraMedia)}. A lista precisa esperar ou o
-                      orçamento precisa mudar.
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {GRUPOS.map((g) => {
-            const doGrupo = abertos.filter((i) => i.prioridade === g.prioridade);
-            if (doGrupo.length === 0) return null;
-            const totalGrupo = doGrupo.reduce(
-              (s, i) =>
-                s + (i.valor_estimado != null ? Number(i.valor_estimado) : 0),
-              0,
-            );
-            return (
-              <section key={g.prioridade} className="flex flex-col gap-3">
-                <div className="flex items-baseline justify-between px-1">
-                  <h3 className="flex items-center gap-2 font-heading text-[20px]">
-                    <span
-                      className={`size-2.5 rounded-full ${g.cor}`}
-                      aria-hidden
-                    />
-                    {g.titulo}
-                  </h3>
-                  <span className="text-[13px] tabular-nums text-neutral-700">
-                    {doGrupo.length}{" "}
-                    {doGrupo.length === 1 ? "item" : "itens"}
-                    {totalGrupo > 0 && ` · ${formatBRL(totalGrupo)}`}
-                  </span>
+                <div
+                  className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
+                    sobraMedia > 0
+                      ? "bg-sage-300 text-sage-800"
+                      : "bg-primary text-primary-foreground"
+                  }`}
+                >
+                  <PiggyBankIcon className="size-5" strokeWidth={2.75} />
                 </div>
+                <div className="min-w-0 flex-1">
+                  {sobraMedia > 0 ? (
+                    <>
+                      <p className="text-[15px] font-semibold">
+                        Sobram {formatBRL(sobraMedia)} por mês, na média
+                      </p>
+                      <p className="text-[13px] text-neutral-700">
+                        Nesse ritmo, a lista inteira sai em{" "}
+                        {mesesParaComprarTudo === 1
+                          ? "cerca de 1 mês"
+                          : `cerca de ${mesesParaComprarTudo} meses`}
+                        {semValor > 0 &&
+                          ` — sem contar ${semValor === 1 ? "o item" : `os ${semValor} itens`} sem valor`}
+                        .
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-[15px] font-semibold text-accent-800">
+                        Sem sobra no orçamento
+                      </p>
+                      <p className="text-[13px] text-accent-800/85">
+                        A média dos próximos {MESES_PROJECAO} meses fecha em{" "}
+                        {formatBRL(sobraMedia)}. A lista precisa esperar ou o
+                        orçamento precisa mudar.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {GRUPOS.map((g) => {
+              const doGrupo = abertos.filter((i) => i.prioridade === g.prioridade);
+              if (doGrupo.length === 0) return null;
+              const totalGrupo = doGrupo.reduce(
+                (s, i) =>
+                  s + (i.valor_estimado != null ? Number(i.valor_estimado) : 0),
+                0,
+              );
+              return (
+                <section key={g.prioridade} className="flex flex-col gap-3">
+                  <div className="flex items-baseline justify-between px-1">
+                    <h3 className="flex items-center gap-2 font-heading text-[20px]">
+                      <span
+                        className={`size-2.5 rounded-full ${g.cor}`}
+                        aria-hidden
+                      />
+                      {g.titulo}
+                    </h3>
+                    <span className="text-[13px] tabular-nums text-neutral-700">
+                      {doGrupo.length}{" "}
+                      {doGrupo.length === 1 ? "item" : "itens"}
+                      {totalGrupo > 0 && ` · ${formatBRL(totalGrupo)}`}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-2.5">
+                    {doGrupo.map((item) => (
+                      <ItemLinha
+                        key={item.id}
+                        item={item}
+                        categoria={
+                          item.categoria_id
+                            ? categoriaById.get(item.categoria_id)
+                            : undefined
+                        }
+                        membroById={membroById}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+
+            {comprados.length > 0 && (
+              <section className="flex flex-col gap-3">
+                <h3 className="px-1 font-heading text-[20px] text-neutral-700">
+                  Já comprados
+                </h3>
                 <div className="flex flex-col gap-2.5">
-                  {doGrupo.map((item) => (
+                  {comprados.map((item) => (
                     <ItemLinha
                       key={item.id}
                       item={item}
@@ -210,41 +235,15 @@ export default async function ComprasFuturasPage() {
                           : undefined
                       }
                       membroById={membroById}
-                      categorias={categorias}
-                      membros={membros}
                     />
                   ))}
                 </div>
               </section>
-            );
-          })}
-
-          {comprados.length > 0 && (
-            <section className="flex flex-col gap-3">
-              <h3 className="px-1 font-heading text-[20px] text-neutral-700">
-                Já comprados
-              </h3>
-              <div className="flex flex-col gap-2.5">
-                {comprados.map((item) => (
-                  <ItemLinha
-                    key={item.id}
-                    item={item}
-                    categoria={
-                      item.categoria_id
-                        ? categoriaById.get(item.categoria_id)
-                        : undefined
-                    }
-                    membroById={membroById}
-                    categorias={categorias}
-                    membros={membros}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-        </>
-      )}
-    </div>
+            )}
+          </>
+        )}
+      </div>
+    </CompraFuturaDialogs>
   );
 }
 
@@ -252,14 +251,10 @@ function ItemLinha({
   item,
   categoria,
   membroById,
-  categorias,
-  membros,
 }: {
   item: CompraFuturaRow;
   categoria: CategoriaOpcao | undefined;
   membroById: Map<string, MembroOpcao>;
-  categorias: CategoriaOpcao[];
-  membros: MembroOpcao[];
 }) {
   const comprado = Boolean(item.comprado_em);
   const valor = item.valor_estimado != null ? Number(item.valor_estimado) : null;
@@ -353,17 +348,13 @@ function ItemLinha({
 
       <div className="flex shrink-0 items-center gap-1">
         {!comprado && (
-          <CompreiDialog
+          <CompreiBotao
             id={item.id}
             descricao={item.descricao}
             valorEstimado={valor}
           />
         )}
-        <EditCompraFuturaTrigger
-          item={item}
-          categorias={categorias}
-          membros={membros}
-        />
+        <EditarCompraFutura linha={item} />
         <CompraFuturaActionsMenu
           id={item.id}
           descricao={item.descricao}

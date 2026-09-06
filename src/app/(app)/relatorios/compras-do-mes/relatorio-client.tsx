@@ -16,25 +16,14 @@ import { Label } from "@/components/ui/label";
 import { formatBRL } from "@/lib/format";
 import type { CategoriaOpcao } from "@/lib/categorias";
 import { QUEM_CASAL, type MembroOpcao } from "@/lib/membros";
-import {
-  EditDespesaTrigger,
-  type DespesaRow,
-} from "../../despesas/despesa-form-dialog";
+import type { DespesaRow } from "../../despesas/despesa-form-dialog";
+import { EditarLinha } from "./editar-linha";
 import { DespesaActionsMenu } from "../../despesas/despesa-actions-menu";
-import {
-  EditRecorrenteTrigger,
-  type RecorrenteRow,
-} from "../../recorrentes/recorrente-form-dialog";
+import type { RecorrenteRow } from "../../recorrentes/recorrente-form-dialog";
 import { RecorrenteActionsMenu } from "../../recorrentes/recorrente-actions-menu";
-import {
-  EditCompraTrigger,
-  type CompraRow,
-} from "../../cartoes/[id]/compra-form-dialog";
+import type { CompraRow } from "../../cartoes/[id]/compra-form-dialog";
 import { CompraActionsMenu } from "../../cartoes/[id]/compra-actions-menu";
-import {
-  EditAssinaturaTrigger,
-  type AssinaturaRow,
-} from "../../cartoes/[id]/assinatura-form-dialog";
+import type { AssinaturaRow } from "../../cartoes/[id]/assinatura-form-dialog";
 import { AssinaturaActionsMenu } from "../../cartoes/[id]/assinatura-actions-menu";
 
 export type LinhaCompra =
@@ -638,11 +627,7 @@ function LinhaAcoes({
     case "despesa":
       return (
         <>
-          <EditDespesaTrigger
-            despesa={linha.despesa}
-            categorias={categorias}
-            membros={membros}
-          />
+          <EditarLinha linha={linha} categorias={categorias} membros={membros} />
           <DespesaActionsMenu
             id={linha.despesa.id}
             descricao={linha.despesa.descricao}
@@ -652,11 +637,7 @@ function LinhaAcoes({
     case "conta_fixa":
       return (
         <>
-          <EditRecorrenteTrigger
-            recorrente={linha.recorrente}
-            categorias={categorias}
-            membros={membros}
-          />
+          <EditarLinha linha={linha} categorias={categorias} membros={membros} />
           <RecorrenteActionsMenu
             id={linha.recorrente.id}
             ativa={linha.recorrente.ativa}
@@ -667,13 +648,7 @@ function LinhaAcoes({
     case "compra_cartao":
       return (
         <>
-          <EditCompraTrigger
-            compra={linha.compra}
-            diaFechamento={linha.diaFechamento}
-            diaVencimento={linha.diaVencimento}
-            categorias={categorias}
-            membros={membros}
-          />
+          <EditarLinha linha={linha} categorias={categorias} membros={membros} />
           <CompraActionsMenu
             id={linha.compra.id}
             cartaoId={linha.compra.cartao_id}
@@ -684,12 +659,7 @@ function LinhaAcoes({
     case "assinatura":
       return (
         <>
-          <EditAssinaturaTrigger
-            assinatura={linha.assinatura}
-            cartaoId={linha.assinatura.cartao_id}
-            categorias={categorias}
-            membros={membros}
-          />
+          <EditarLinha linha={linha} categorias={categorias} membros={membros} />
           <AssinaturaActionsMenu
             id={linha.assinatura.id}
             cartaoId={linha.assinatura.cartao_id}

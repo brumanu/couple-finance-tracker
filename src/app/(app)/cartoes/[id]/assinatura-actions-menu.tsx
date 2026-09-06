@@ -1,22 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { PowerIcon, StopCircleIcon } from "lucide-react";
 import {
-  MoreVerticalIcon,
-  TrashIcon,
-  PowerIcon,
-  StopCircleIcon,
-} from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+  EntityActionsMenu,
+  itemExcluir,
+  type ItemMenu,
+} from "@/components/entity-actions-menu";
 import {
   cancelarAssinatura,
   deleteAssinatura,
@@ -38,86 +27,38 @@ export function AssinaturaActionsMenu({
   ativa,
   ativaHoje,
 }: Props) {
-  const [pending, startTransition] = useTransition();
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmCancelar, setConfirmCancelar] = useState(false);
+  const itens: ItemMenu[] = [
+    {
+      rotulo: ativa ? "Desativar" : "Ativar",
+      icone: PowerIcon,
+      acao: () => toggleAssinaturaAtiva(id, cartaoId, !ativa),
+      sucesso: ativa ? "Assinatura desativada." : "Assinatura ativada.",
+    },
+  ];
 
-  const onToggle = () => {
-    startTransition(async () => {
-      const result = await toggleAssinaturaAtiva(id, cartaoId, !ativa);
-      if (result?.error) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success(ativa ? "Assinatura desativada." : "Assinatura ativada.");
+  // "Encerrar hoje" só faz sentido enquanto a vigência ainda está correndo.
+  if (ativaHoje) {
+    itens.push({
+      rotulo: "Encerrar hoje",
+      icone: StopCircleIcon,
+      acao: () => cancelarAssinatura(id, cartaoId),
+      sucesso: "Assinatura encerrada.",
+      confirmar: {
+        titulo: "Encerrar assinatura",
+        descricao: `Encerrar "${descricao}" hoje? Vai aparecer nas próximas faturas apenas até este mês.`,
+        rotuloConfirmar: "Encerrar",
+      },
     });
-  };
+  }
 
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Mais opções"
-              disabled={pending}
-            >
-              <MoreVerticalIcon className="size-4" strokeWidth={2.75} />
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={onToggle}>
-            <PowerIcon className="size-4" />
-            {ativa ? "Desativar" : "Ativar"}
-          </DropdownMenuItem>
-          {ativaHoje && (
-            <DropdownMenuItem onClick={() => setConfirmCancelar(true)}>
-              <StopCircleIcon className="size-4" />
-              Encerrar hoje
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setConfirmDelete(true)}
-            className="text-primary focus:text-primary"
-          >
-            <TrashIcon className="size-4" />
-            Excluir
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <ConfirmDialog
-        open={confirmCancelar}
-        onOpenChange={setConfirmCancelar}
-        title="Encerrar assinatura"
-        description={`Encerrar "${descricao}" hoje? Vai aparecer nas próximas faturas apenas até este mês.`}
-        confirmLabel="Encerrar"
-        onConfirm={async () => {
-          const result = await cancelarAssinatura(id, cartaoId);
-          if (result?.error) {
-            toast.error(result.error);
-            return;
-          }
-          toast.success("Assinatura encerrada.");
-        }}
-      />
-      <ConfirmDialog
-        open={confirmDelete}
-        onOpenChange={setConfirmDelete}
-        title="Excluir assinatura"
-        description={`Excluir "${descricao}"? Some do histórico do cartão.`}
-        onConfirm={async () => {
-          const result = await deleteAssinatura(id, cartaoId);
-          if (result?.error) {
-            toast.error(result.error);
-            return;
-          }
-          toast.success("Assinatura excluída.");
-        }}
-      />
-    </>
+  itens.push(
+    itemExcluir({
+      titulo: "Excluir assinatura",
+      descricao: `Excluir "${descricao}"? Some do histórico do cartão.`,
+      acao: () => deleteAssinatura(id, cartaoId),
+      sucesso: "Assinatura excluída.",
+    }),
   );
+
+  return <EntityActionsMenu itens={itens} />;
 }

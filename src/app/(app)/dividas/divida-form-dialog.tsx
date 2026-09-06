@@ -1,20 +1,14 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
-import { PlusIcon, PencilIcon } from "lucide-react";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { useMemo } from "react";
+import { PencilIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  useFormDialog,
+  type PropsDialogControlado,
+} from "@/lib/form-dialog";
+import { CampoForm, FormDialogShell } from "@/components/form-dialog-shell";
 import { createDivida, updateDivida, type DividaFormState } from "./actions";
 
 export type DividaRow = {
@@ -23,30 +17,12 @@ export type DividaRow = {
   valor_total: number | string;
 };
 
-type Props = {
+type Props = PropsDialogControlado & {
   divida?: DividaRow;
-  trigger?: React.ReactElement;
 };
 
-const INITIAL_STATE: DividaFormState = {};
-
-export function DividaFormDialog({ divida, trigger }: Props) {
-  const [open, setOpen] = useState(false);
+export function DividaFormDialog({ divida, trigger, defaultOpen, onClose }: Props) {
   const isEdit = Boolean(divida);
-  const action = isEdit ? updateDivida.bind(null, divida!.id) : createDivida;
-  // Fecha/notifica dentro da própria action em vez de um useEffect que
-  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
-  const [state, formAction, pending] = useActionState(
-    async (prev: DividaFormState, formData: FormData) => {
-      const resultado = await action(prev, formData);
-      if (resultado.ok) {
-        setOpen(false);
-        toast.success(isEdit ? "Dívida atualizada." : "Dívida cadastrada.");
-      }
-      return resultado;
-    },
-    INITIAL_STATE,
-  );
 
   const defaults = useMemo(
     () => ({
@@ -59,81 +35,42 @@ export function DividaFormDialog({ divida, trigger }: Props) {
     [divida?.id, divida?.descricao, divida?.valor_total],
   );
 
+  const ctrl = useFormDialog<DividaFormState>({
+    action: isEdit ? updateDivida.bind(null, divida!.id) : createDivida,
+    sucesso: isEdit ? "Dívida atualizada." : "Dívida cadastrada.",
+    defaultOpen,
+    onClose,
+  });
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger ? (
-        <DialogTrigger render={trigger} />
-      ) : (
-        <DialogTrigger
-          render={
-            <Button size="sm">
-              <PlusIcon className="size-4" strokeWidth={2.75} />
-              Nova dívida
-            </Button>
-          }
+    <FormDialogShell
+      ctrl={ctrl}
+      trigger={trigger}
+      rotuloNovo="Nova dívida"
+      titulo={isEdit ? "Editar dívida" : "Nova dívida"}
+      descricao="Cadastre o total devido. Vai adicionando pagamentos parciais depois pra ir zerando."
+    >
+      <CampoForm htmlFor="descricao" rotulo="Descrição">
+        <Input
+          id="descricao"
+          name="descricao"
+          required
+          defaultValue={defaults.descricao}
+          placeholder="Ex: Empréstimo com João, Cartão atrasado…"
         />
-      )}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Editar dívida" : "Nova dívida"}
-          </DialogTitle>
-          <DialogDescription>
-            Cadastre o total devido. Vai adicionando pagamentos parciais
-            depois pra ir zerando.
-          </DialogDescription>
-        </DialogHeader>
+      </CampoForm>
 
-        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="descricao" className="text-xs text-muted-foreground">
-              Descrição
-            </Label>
-            <Input
-              id="descricao"
-              name="descricao"
-              required
-              defaultValue={defaults.descricao}
-              placeholder="Ex: Empréstimo com João, Cartão atrasado…"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="valor_total" className="text-xs text-muted-foreground">
-              Valor total (R$)
-            </Label>
-            <Input
-              id="valor_total"
-              name="valor_total"
-              required
-              inputMode="decimal"
-              defaultValue={defaults.valor_total}
-              placeholder="Ex: 2500,00"
-            />
-          </div>
-
-          {state.error && (
-            <p className="text-sm text-primary" role="alert">
-              {state.error}
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <CampoForm htmlFor="valor_total" rotulo="Valor total (R$)">
+        <Input
+          id="valor_total"
+          name="valor_total"
+          required
+          inputMode="decimal"
+          defaultValue={defaults.valor_total}
+          placeholder="Ex: 2500,00"
+        />
+      </CampoForm>
+    </FormDialogShell>
   );
 }
 

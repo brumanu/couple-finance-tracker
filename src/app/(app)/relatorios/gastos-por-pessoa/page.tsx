@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
-import { createClient } from "@/lib/supabase/server";
+import { dadosDoMes } from "@/lib/gastos-do-mes";
 import { getMembrosCasal } from "@/lib/membros-server";
 import { QUEM_CASAL } from "@/lib/membros";
 import { Button } from "@/components/ui/button";
@@ -21,43 +21,9 @@ type LancamentoRow = {
   quem_gastou: string | null;
 };
 
-type RecorrenteRow = {
-  id: string;
-  descricao: string;
-  valor_previsto: number | string;
-  inicio_vigencia: string;
-  fim_vigencia: string | null;
-  ativa: boolean;
-  quem_gastou: string | null;
-};
 
-type CompraRow = {
-  id: string;
-  cartao_id: string;
-  descricao: string;
-  valor_total: number | string;
-  data_compra: string;
-  parcelas: number;
-  parcelas_ja_pagas: number | null;
-  quem_gastou: string | null;
-};
 
-type AssinaturaRow = {
-  id: string;
-  cartao_id: string;
-  descricao: string;
-  valor_mensal: number | string;
-  inicio_vigencia: string;
-  fim_vigencia: string | null;
-  ativa: boolean;
-  quem_gastou: string | null;
-};
 
-type CartaoRow = {
-  id: string;
-  dia_fechamento: number;
-  dia_vencimento: number;
-};
 
 // Chave usada no Map de agregação pra itens sem `quem_gastou` definido
 // (null/""). Não é um valor real de `quem_gastou` — só uma sentinela
@@ -74,10 +40,6 @@ type GrupoAgg = {
   total: number;
 };
 
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
 function novoGrupo(id: string, nome: string): GrupoAgg {
   return {
     id,
@@ -93,59 +55,17 @@ function novoGrupo(id: string, nome: string): GrupoAgg {
 export default async function RelatorioGastosPorPessoaPage({
   searchParams,
 }: PageProps<"/relatorios/gastos-por-pessoa">) {
-  const supabase = await createClient();
-
   const sp = await searchParams;
   const mesParam = typeof sp.mes === "string" ? sp.mes : undefined;
   const mes = parseMesParam(mesParam);
 
-  // Mesmo cutoff usado no relatório de gastos-por-categoria: uma compra
-  // feita há mais de 60 meses (máximo de parcelas) antes do mês alvo não
-  // pode ter parcela ativa nesse mês.
-  const cutoffDate = new Date(mes.ano, mes.mes - 1 - 60, 1);
-  const comprasCutoff = `${cutoffDate.getFullYear()}-${pad2(cutoffDate.getMonth() + 1)}-01`;
+  const [, membros, dados] = await Promise.all([
+    requireSession(),
+    getMembrosCasal(),
+    dadosDoMes(mes),
+  ]);
 
-  const [, membros, lancRes, contasRes, comprasRes, assinRes, cartoesRes] =
-    await Promise.all([
-      requireSession(),
-      getMembrosCasal(),
-      supabase
-        .from("lancamentos")
-        .select(
-          "id, tipo, valor, data_referencia, data_pagamento, conta_recorrente_id, quem_gastou",
-        )
-        .in("tipo", ["despesa_avulsa", "conta_fixa"])
-        .gte("data_referencia", mes.primeiroDia)
-        .lte("data_referencia", mes.ultimoDia),
-      supabase
-        .from("contas_recorrentes")
-        .select(
-          "id, descricao, valor_previsto, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
-        )
-        .eq("ativa", true)
-        .lte("inicio_vigencia", mes.ultimoDia)
-        .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
-      supabase
-        .from("compras_cartao")
-        .select(
-          "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, quem_gastou",
-        )
-        .gte("data_compra", comprasCutoff)
-        .lte("data_compra", mes.ultimoDia),
-      supabase
-        .from("assinaturas_cartao")
-        .select(
-          "id, cartao_id, descricao, valor_mensal, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
-        )
-        .eq("ativa", true),
-      supabase.from("cartoes").select("id, dia_fechamento, dia_vencimento"),
-    ]);
-
-  const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
-  const contas = (contasRes.data ?? []) as RecorrenteRow[];
-  const compras = (comprasRes.data ?? []) as CompraRow[];
-  const assinaturas = (assinRes.data ?? []) as AssinaturaRow[];
-  const cartoes = (cartoesRes.data ?? []) as CartaoRow[];
+  const { lancamentos, contas, compras, assinaturas, cartoes } = dados;
 
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
 

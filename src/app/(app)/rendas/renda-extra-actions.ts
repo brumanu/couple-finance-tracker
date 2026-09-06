@@ -1,46 +1,44 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseBRLInput } from "@/lib/format";
 import { resolverCategoria } from "@/lib/categorias-server";
+import { campo, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  revalidar,
+  type EstadoForm,
+  type SessaoDaAcao,
+} from "@/lib/acoes";
 
-export type RendaExtraFormState = { error?: string; ok?: boolean };
+export type RendaExtraFormState = EstadoForm;
 
-type ParsedRendaExtra = {
-  descricao: string;
-  valor: number;
-  data_pagamento: string;
-  data_referencia: string; // primeiro dia do mês da data
-  quinzena: 15 | 30;
+const ESQUEMA = {
+  descricao: campo.texto("Descrição"),
+  valor: campo.dinheiro("Valor"),
+  data: campo.data("Data"),
+  quinzena: campo.umDeNumero("Quinzena", [15, 30] as const),
+  categoria_id: campo.cru(),
 };
 
-function parseFormData(
-  formData: FormData,
-): { dados: ParsedRendaExtra; categoria_id_raw: string } | string {
-  const descricao = String(formData.get("descricao") ?? "").trim();
-  const valorRaw = String(formData.get("valor") ?? "").trim();
-  const data = String(formData.get("data") ?? "").trim();
-  const categoria_id_raw = String(formData.get("categoria_id") ?? "").trim();
+const ROTAS = ["/rendas", "/"];
 
-  if (!descricao) return "Descrição é obrigatória.";
-  const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor <= 0) return "Valor deve ser maior que zero.";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return "Data inválida.";
+/** Campos do formulário no formato da tabela `lancamentos`. */
+async function montarLinha(supabase: SessaoDaAcao, formData: FormData) {
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return dados;
 
-  const quinzena = Number(formData.get("quinzena"));
-  if (quinzena !== 15 && quinzena !== 30) return "Quinzena inválida.";
-  const data_referencia = `${data.slice(0, 7)}-01`;
+  const categoria = await resolverCategoria(supabase, dados.categoria_id);
+  if (typeof categoria === "string") return categoria;
 
   return {
-    categoria_id_raw,
-    dados: {
-      descricao,
-      valor,
-      data_pagamento: data,
-      data_referencia,
-      quinzena: quinzena as 15 | 30,
-    },
+    descricao: dados.descricao,
+    valor: dados.valor,
+    data_pagamento: dados.data,
+    // O mês de referência é sempre o dia 1 do mês da data de pagamento.
+    data_referencia: `${dados.data.slice(0, 7)}-01`,
+    quinzena: dados.quinzena,
+    ...categoria,
   };
 }
 
@@ -48,40 +46,18 @@ export async function createRendaExtra(
   _prev: RendaExtraFormState,
   formData: FormData,
 ): Promise<RendaExtraFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const linha = await montarLinha(sessao.supabase, formData);
+  if (typeof linha === "string") return { error: linha };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
+  const { error } = await sessao.supabase
+    .from("lancamentos")
+    .insert({ tipo: "renda_extra", ...linha });
+  if (error) return { error: erroAmigavel(error) };
 
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
-
-  const { error } = await supabase.from("lancamentos").insert({
-    casal_id: profile.casal_id,
-    tipo: "renda_extra",
-    criado_por: user.id,
-    ...parsed.dados,
-    ...categoriaResolved,
-  });
-  if (error) return { error: error.message };
-
-  revalidatePath("/rendas");
-  revalidatePath("/");
+  revalidar(...ROTAS);
   return { ok: true };
 }
 
@@ -90,33 +66,25 @@ export async function updateRendaExtra(
   _prev: RendaExtraFormState,
   formData: FormData,
 ): Promise<RendaExtraFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
-
   const supabase = await createClient();
-  const categoriaResolved = await resolverCategoria(
-    supabase,
-    parsed.categoria_id_raw,
-  );
-  if (typeof categoriaResolved === "string")
-    return { error: categoriaResolved };
+
+  const linha = await montarLinha(supabase, formData);
+  if (typeof linha === "string") return { error: linha };
 
   const { error } = await supabase
     .from("lancamentos")
-    .update({ ...parsed.dados, ...categoriaResolved })
+    .update(linha)
     .eq("id", id)
     .eq("tipo", "renda_extra");
-  if (error) return { error: error.message };
+  if (error) return { error: erroAmigavel(error) };
 
-  revalidatePath("/rendas");
-  revalidatePath("/");
+  revalidar(...ROTAS);
   return { ok: true };
 }
 
 export async function deleteRendaExtra(id: string) {
   const supabase = await createClient();
   const { error } = await supabase.from("lancamentos").delete().eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath("/rendas");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...ROTAS);
 }

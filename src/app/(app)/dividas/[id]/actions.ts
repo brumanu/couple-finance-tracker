@@ -1,64 +1,47 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseBRLInput } from "@/lib/format";
+import { campo, opcional, parseForm } from "@/lib/parse-form";
+import {
+  clienteAutenticado,
+  erroAmigavel,
+  revalidar,
+  type EstadoForm,
+} from "@/lib/acoes";
 
-export type PagamentoDividaFormState = { error?: string; ok?: boolean };
+export type PagamentoDividaFormState = EstadoForm;
 
-type Parsed = {
-  divida_id: string;
-  valor: number;
-  data_pagamento: string;
-  observacao: string | null;
+const ESQUEMA = {
+  divida_id: campo.texto("Dívida"),
+  valor: campo.dinheiro("Valor"),
+  data_pagamento: campo.data("Data"),
+  observacao: opcional(campo.texto("Observação")),
 };
 
-function parseFormData(formData: FormData): Parsed | string {
-  const divida_id = String(formData.get("divida_id") ?? "").trim();
-  const valorRaw = String(formData.get("valor") ?? "").trim();
-  const data_pagamento = String(formData.get("data_pagamento") ?? "").trim();
-  const observacao =
-    String(formData.get("observacao") ?? "").trim() || null;
-
-  if (!divida_id) return "Dívida inválida.";
-  const valor = parseBRLInput(valorRaw);
-  if (valor === null || valor <= 0)
-    return "O valor precisa ser maior que zero.";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data_pagamento)) return "Data inválida.";
-
-  return { divida_id, valor, data_pagamento, observacao };
-}
+const rotas = (dividaId: string) => [
+  `/dividas/${dividaId}`,
+  "/dividas",
+  "/",
+];
 
 export async function createPagamento(
   _prev: PagamentoDividaFormState,
   formData: FormData,
 ): Promise<PagamentoDividaFormState> {
-  const parsed = parseFormData(formData);
-  if (typeof parsed === "string") return { error: parsed };
+  const dados = parseForm(formData, ESQUEMA);
+  if (typeof dados === "string") return { error: dados };
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Não autenticado." };
+  const sessao = await clienteAutenticado();
+  if ("erro" in sessao) return { error: sessao.erro };
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("casal_id")
-    .eq("id", user.id)
-    .maybeSingle();
-  if (!profile) return { error: "Profile não encontrado." };
+  // `casal_id` e `criado_por` vêm dos defaults da coluna (migration 0014);
+  // a trigger `assert_mesmo_casal` garante que a dívida é do casal.
+  const { error } = await sessao.supabase
+    .from("pagamentos_divida")
+    .insert(dados);
+  if (error) return { error: erroAmigavel(error) };
 
-  const { error } = await supabase.from("pagamentos_divida").insert({
-    casal_id: profile.casal_id,
-    criado_por: user.id,
-    ...parsed,
-  });
-  if (error) return { error: error.message };
-
-  revalidatePath(`/dividas/${parsed.divida_id}`);
-  revalidatePath("/dividas");
-  revalidatePath("/");
+  revalidar(...rotas(dados.divida_id));
   return { ok: true };
 }
 
@@ -68,8 +51,6 @@ export async function deletePagamento(id: string, dividaId: string) {
     .from("pagamentos_divida")
     .delete()
     .eq("id", id);
-  if (error) return { error: error.message };
-  revalidatePath(`/dividas/${dividaId}`);
-  revalidatePath("/dividas");
-  revalidatePath("/");
+  if (error) return { error: erroAmigavel(error) };
+  revalidar(...rotas(dividaId));
 }

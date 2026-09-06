@@ -1,17 +1,7 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { RepeatIcon, PencilIcon } from "lucide-react";
-import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,7 +10,11 @@ import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
-import { useResetAoAbrir } from "@/lib/form-dialog";
+import {
+  useFormDialog,
+  type PropsDialogControlado,
+} from "@/lib/form-dialog";
+import { CampoForm, FormDialogShell } from "@/components/form-dialog-shell";
 import {
   createAssinatura,
   updateAssinatura,
@@ -40,45 +34,23 @@ export type AssinaturaRow = {
   quem_gastou: string | null;
 };
 
-type Props = {
+type Props = PropsDialogControlado & {
   cartaoId: string;
   assinatura?: AssinaturaRow;
-  trigger?: React.ReactElement;
   categorias?: CategoriaOpcao[];
   membros?: MembroOpcao[];
 };
-
-const INITIAL_STATE: AssinaturaFormState = {};
-
-const todayISO = hojeISO;
 
 export function AssinaturaFormDialog({
   cartaoId,
   assinatura,
   trigger,
+  defaultOpen,
+  onClose,
   categorias = [],
   membros = [],
 }: Props) {
-  const [open, setOpen] = useState(false);
   const isEdit = Boolean(assinatura);
-  const action = isEdit
-    ? updateAssinatura.bind(null, assinatura!.id)
-    : createAssinatura;
-  // Fecha/notifica dentro da própria action em vez de um useEffect que
-  // observa `state`: aqui já estamos numa transição, não num efeito pós-render.
-  const [state, formAction, pending] = useActionState(
-    async (prev: AssinaturaFormState, formData: FormData) => {
-      const resultado = await action(prev, formData);
-      if (resultado.ok) {
-        setOpen(false);
-        toast.success(
-          isEdit ? "Assinatura atualizada." : "Assinatura cadastrada.",
-        );
-      }
-      return resultado;
-    },
-    INITIAL_STATE,
-  );
 
   const defaults = useMemo(
     () => ({
@@ -88,7 +60,7 @@ export function AssinaturaFormDialog({
           ? Number(assinatura.valor_mensal).toFixed(2).replace(".", ",")
           : "",
       categoriaId: assinatura?.categoria_id ?? NENHUMA_CATEGORIA,
-      inicio_vigencia: assinatura?.inicio_vigencia ?? todayISO(),
+      inicio_vigencia: assinatura?.inicio_vigencia ?? hojeISO(),
       fim_vigencia: assinatura?.fim_vigencia ?? "",
       ativa: assinatura?.ativa ?? true,
       quemGastou: assinatura?.quem_gastou ?? NENHUM_QUEM,
@@ -108,165 +80,110 @@ export function AssinaturaFormDialog({
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
 
-  useResetAoAbrir(open, () => {
-    setCategoriaId(defaults.categoriaId);
-    setQuemGastou(defaults.quemGastou);
+  const ctrl = useFormDialog<AssinaturaFormState>({
+    action: isEdit
+      ? updateAssinatura.bind(null, assinatura!.id)
+      : createAssinatura,
+    sucesso: isEdit ? "Assinatura atualizada." : "Assinatura cadastrada.",
+    defaultOpen,
+    onClose,
+    reset: () => {
+      setCategoriaId(defaults.categoriaId);
+      setQuemGastou(defaults.quemGastou);
+    },
   });
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      {trigger ? (
-        <DialogTrigger render={trigger} />
-      ) : (
-        <DialogTrigger
-          render={
-            <Button size="sm" variant="outline">
-              <RepeatIcon className="size-4" strokeWidth={2.75} />
-              Nova assinatura
-            </Button>
-          }
+    <FormDialogShell
+      ctrl={ctrl}
+      trigger={
+        // `?? ` engoliria o `null` que o provider da lista passa; aqui só o
+        // ausente (undefined) cai no botão padrão.
+        trigger === undefined ? (
+          <Button size="sm" variant="outline">
+            <RepeatIcon className="size-4" strokeWidth={2.75} />
+            Nova assinatura
+          </Button>
+        ) : (
+          trigger
+        )
+      }
+      titulo={isEdit ? "Editar assinatura" : "Nova assinatura"}
+      descricao="Cobrança que repete todo mês no cartão. Netflix, Spotify, mensalidades e por aí vai."
+    >
+      <input type="hidden" name="cartao_id" value={cartaoId} />
+
+      <CampoForm htmlFor="descricao" rotulo="Descrição">
+        <Input
+          id="descricao"
+          name="descricao"
+          required
+          defaultValue={defaults.descricao}
+          placeholder="Ex: Netflix, Spotify, ChatGPT…"
         />
-      )}
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Editar assinatura" : "Nova assinatura"}
-          </DialogTitle>
-          <DialogDescription>
-            Cobrança que repete todo mês no cartão. Netflix, Spotify,
-            mensalidades e por aí vai.
-          </DialogDescription>
-        </DialogHeader>
+      </CampoForm>
 
-        <form key={open ? "open" : "closed"} action={formAction} className="flex flex-col gap-4">
-          <input type="hidden" name="cartao_id" value={cartaoId} />
+      <div className="grid grid-cols-2 gap-3">
+        <CampoForm htmlFor="valor_mensal" rotulo="Valor mensal (R$)">
+          <Input
+            id="valor_mensal"
+            name="valor_mensal"
+            required
+            inputMode="decimal"
+            defaultValue={defaults.valor_mensal}
+            placeholder="Ex: 55,90"
+          />
+        </CampoForm>
+        <CampoForm htmlFor="categoria_id" rotulo="Categoria (opcional)">
+          <CategoriaSelectField
+            categorias={categorias}
+            value={categoriaId}
+            onValueChange={setCategoriaId}
+          />
+        </CampoForm>
+      </div>
 
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="descricao" className="text-xs text-muted-foreground">
-              Descrição
-            </Label>
-            <Input
-              id="descricao"
-              name="descricao"
-              required
-              defaultValue={defaults.descricao}
-              placeholder="Ex: Netflix, Spotify, ChatGPT…"
-            />
-          </div>
+      <CampoForm htmlFor="quem_gastou" rotulo="Quem gastou (opcional)">
+        <QuemGastouSelectField
+          membros={membros}
+          value={quemGastou}
+          onValueChange={setQuemGastou}
+        />
+      </CampoForm>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="valor_mensal"
-                className="text-xs text-muted-foreground"
-              >
-                Valor mensal (R$)
-              </Label>
-              <Input
-                id="valor_mensal"
-                name="valor_mensal"
-                required
-                inputMode="decimal"
-                defaultValue={defaults.valor_mensal}
-                placeholder="Ex: 55,90"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="categoria_id"
-                className="text-xs text-muted-foreground"
-              >
-                Categoria (opcional)
-              </Label>
-              <CategoriaSelectField
-                categorias={categorias}
-                value={categoriaId}
-                onValueChange={setCategoriaId}
-              />
-            </div>
-          </div>
+      <div className="grid grid-cols-2 gap-3">
+        <CampoForm htmlFor="inicio_vigencia" rotulo="Ativa desde">
+          <Input
+            id="inicio_vigencia"
+            name="inicio_vigencia"
+            type="date"
+            required
+            defaultValue={defaults.inicio_vigencia}
+          />
+        </CampoForm>
+        <CampoForm htmlFor="fim_vigencia" rotulo="Encerra em (opcional)">
+          <Input
+            id="fim_vigencia"
+            name="fim_vigencia"
+            type="date"
+            defaultValue={defaults.fim_vigencia}
+          />
+        </CampoForm>
+      </div>
 
-          <div className="flex flex-col gap-2">
-            <Label
-              htmlFor="quem_gastou"
-              className="text-xs text-muted-foreground"
-            >
-              Quem gastou (opcional)
-            </Label>
-            <QuemGastouSelectField
-              membros={membros}
-              value={quemGastou}
-              onValueChange={setQuemGastou}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="inicio_vigencia"
-                className="text-xs text-muted-foreground"
-              >
-                Ativa desde
-              </Label>
-              <Input
-                id="inicio_vigencia"
-                name="inicio_vigencia"
-                type="date"
-                required
-                defaultValue={defaults.inicio_vigencia}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label
-                htmlFor="fim_vigencia"
-                className="text-xs text-muted-foreground"
-              >
-                Encerra em (opcional)
-              </Label>
-              <Input
-                id="fim_vigencia"
-                name="fim_vigencia"
-                type="date"
-                defaultValue={defaults.fim_vigencia}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="ativa"
-              name="ativa"
-              defaultChecked={defaults.ativa}
-              className="size-4 rounded border-input"
-            />
-            <Label htmlFor="ativa" className="cursor-pointer">
-              Assinatura ativa (entra na fatura enquanto vigente)
-            </Label>
-          </div>
-
-          {state.error && (
-            <p className="text-sm text-primary" role="alert">
-              {state.error}
-            </p>
-          )}
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-              disabled={pending}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : "Salvar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <div className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          id="ativa"
+          name="ativa"
+          defaultChecked={defaults.ativa}
+          className="size-4 rounded border-input"
+        />
+        <Label htmlFor="ativa" className="cursor-pointer">
+          Assinatura ativa (entra na fatura enquanto vigente)
+        </Label>
+      </div>
+    </FormDialogShell>
   );
 }
 

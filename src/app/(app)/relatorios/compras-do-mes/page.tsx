@@ -3,6 +3,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
+import { dadosDoMes, type LancamentoDoMes } from "@/lib/gastos-do-mes";
 import { getMembrosCasal } from "@/lib/membros-server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,44 +11,17 @@ import { parseMesParam } from "@/lib/mes";
 import { parcelaNoMes, assinaturaAtivaNoMes } from "@/lib/cartao-calc";
 import { MonthSwitcher } from "../../month-switcher";
 import type { DespesaRow } from "../../despesas/despesa-form-dialog";
-import type { RecorrenteRow } from "../../recorrentes/recorrente-form-dialog";
-import type { CompraRow } from "../../cartoes/[id]/compra-form-dialog";
-import type { AssinaturaRow } from "../../cartoes/[id]/assinatura-form-dialog";
 import {
   RelatorioComprasDoMesClient,
   type LinhaCompra,
 } from "./relatorio-client";
 
-type LancamentoRow = {
-  id: string;
-  tipo: string;
-  descricao: string;
-  valor: number | string;
-  data_referencia: string;
-  data_pagamento: string | null;
-  quinzena: number | null;
-  categoria: string | null;
-  categoria_id: string | null;
-  conta_recorrente_id: string | null;
-  quem_gastou: string | null;
-};
 
-type CartaoRow = {
-  id: string;
-  banco_id: string;
-  apelido: string | null;
-  dia_fechamento: number;
-  dia_vencimento: number;
-};
 
 type BancoRow = {
   id: string;
   nome: string;
 };
-
-function pad2(n: number): string {
-  return String(n).padStart(2, "0");
-}
 
 export default async function RelatorioComprasDoMesPage({
   searchParams,
@@ -58,65 +32,16 @@ export default async function RelatorioComprasDoMesPage({
   const mesParam = typeof sp.mes === "string" ? sp.mes : undefined;
   const mes = parseMesParam(mesParam);
 
-  // Cutoff pra compras_cartao: uma compra feita há mais de 60 meses (máximo
-  // de parcelas) antes do mês alvo não pode ter parcela ativa nesse mês.
-  const cutoffDate = new Date(mes.ano, mes.mes - 1 - 60, 1);
-  const comprasCutoff = `${cutoffDate.getFullYear()}-${pad2(cutoffDate.getMonth() + 1)}-01`;
-
-  const [
-    ,
-    lancRes,
-    contasRes,
-    comprasRes,
-    assinRes,
-    cartoesRes,
-    bancosRes,
-    categorias,
-    membros,
-  ] = await Promise.all([
+  const [, dados, bancosRes, categorias, membros] = await Promise.all([
     requireSession(),
-    supabase
-      .from("lancamentos")
-      .select(
-        "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, categoria_id, conta_recorrente_id, quem_gastou",
-      )
-      .in("tipo", ["despesa_avulsa", "conta_fixa"])
-      .gte("data_referencia", mes.primeiroDia)
-      .lte("data_referencia", mes.ultimoDia),
-    supabase
-      .from("contas_recorrentes")
-      .select(
-        "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, ativa, quem_gastou",
-      )
-      .eq("ativa", true)
-      .lte("inicio_vigencia", mes.ultimoDia)
-      .or(`fim_vigencia.is.null,fim_vigencia.gte.${mes.primeiroDia}`),
-    supabase
-      .from("compras_cartao")
-      .select(
-        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id, quem_gastou",
-      )
-      .gte("data_compra", comprasCutoff)
-      .lte("data_compra", mes.ultimoDia),
-    supabase
-      .from("assinaturas_cartao")
-      .select(
-        "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa, quem_gastou",
-      )
-      .eq("ativa", true),
-    supabase
-      .from("cartoes")
-      .select("id, banco_id, apelido, dia_fechamento, dia_vencimento"),
+    dadosDoMes(mes),
+    // Só esta tela mostra o nome do banco em cada linha.
     supabase.from("bancos").select("id, nome"),
     getCategorias(),
     getMembrosCasal(),
   ]);
 
-  const lancamentos = (lancRes.data ?? []) as LancamentoRow[];
-  const contas = (contasRes.data ?? []) as RecorrenteRow[];
-  const compras = (comprasRes.data ?? []) as CompraRow[];
-  const assinaturas = (assinRes.data ?? []) as AssinaturaRow[];
-  const cartoes = (cartoesRes.data ?? []) as CartaoRow[];
+  const { lancamentos, contas, compras, assinaturas, cartoes } = dados;
   const bancos = (bancosRes.data ?? []) as BancoRow[];
   const cartaoById = new Map(cartoes.map((c) => [c.id, c] as const));
   const bancoById = new Map(bancos.map((b) => [b.id, b] as const));
@@ -167,7 +92,7 @@ export default async function RelatorioComprasDoMesPage({
   }
 
   // Contas fixas vigentes no mês: paga (usa o lançamento) ou prevista.
-  const pagosMes = new Map<string, LancamentoRow>();
+  const pagosMes = new Map<string, LancamentoDoMes>();
   for (const l of lancamentos) {
     if (l.tipo === "conta_fixa" && l.conta_recorrente_id) {
       pagosMes.set(l.conta_recorrente_id, l);
