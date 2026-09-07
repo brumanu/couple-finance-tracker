@@ -17,6 +17,7 @@ import {
   useFormDialog,
   type PropsDialogControlado,
 } from "@/lib/form-dialog";
+import { chaveDoMes, mesAtual } from "@/lib/mes";
 import { CampoForm, FormDialogShell } from "@/components/form-dialog-shell";
 import { createRenda, updateRenda, type RendaFormState } from "./actions";
 
@@ -25,6 +26,8 @@ export type RendaRow = {
   descricao: string;
   valor_previsto: number | string;
   dia_recebimento: number;
+  inicio_vigencia: string;
+  fim_vigencia: string | null;
   ativa: boolean;
 };
 
@@ -43,6 +46,12 @@ export function RendaFormDialog({ renda, trigger, defaultOpen, onClose }: Props)
           ? Number(renda.valor_previsto).toFixed(2).replace(".", ",")
           : "",
       dia_recebimento: String(renda?.dia_recebimento ?? "15"),
+      // Renda nova começa a valer no mês corrente; sem isso ela voltaria a
+      // reescrever todo o histórico, que é justamente o que a vigência evita.
+      inicio_vigencia: renda?.inicio_vigencia
+        ? chaveDoMes(renda.inicio_vigencia)
+        : mesAtual().chave,
+      fim_vigencia: renda?.fim_vigencia ? chaveDoMes(renda.fim_vigencia) : "",
       ativa: renda?.ativa ?? true,
     }),
     [
@@ -50,6 +59,8 @@ export function RendaFormDialog({ renda, trigger, defaultOpen, onClose }: Props)
       renda?.descricao,
       renda?.valor_previsto,
       renda?.dia_recebimento,
+      renda?.inicio_vigencia,
+      renda?.fim_vigencia,
       renda?.ativa,
     ],
   );
@@ -68,7 +79,7 @@ export function RendaFormDialog({ renda, trigger, defaultOpen, onClose }: Props)
       trigger={trigger}
       rotuloNovo="Nova renda"
       titulo={isEdit ? "Editar renda" : "Nova renda"}
-      descricao="Cadastre uma renda que entra na quinzena do dia 15 ou do dia 30."
+      descricao="Cadastre uma renda que entra na quinzena do dia 15 ou do dia 30, a partir do mês em que ela começa."
     >
       <CampoForm htmlFor="descricao" rotulo="Descrição">
         <Input
@@ -102,6 +113,31 @@ export function RendaFormDialog({ renda, trigger, defaultOpen, onClose }: Props)
           </SelectContent>
         </Select>
       </CampoForm>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <CampoForm htmlFor="inicio_vigencia" rotulo="Vale a partir de">
+          <Input
+            id="inicio_vigencia"
+            name="inicio_vigencia"
+            type="month"
+            required
+            defaultValue={defaults.inicio_vigencia}
+          />
+        </CampoForm>
+
+        <CampoForm htmlFor="fim_vigencia" rotulo="Encerra em (opcional)">
+          <Input
+            id="fim_vigencia"
+            name="fim_vigencia"
+            type="month"
+            defaultValue={defaults.fim_vigencia}
+          />
+        </CampoForm>
+      </div>
+      <p className="-mt-1 text-[13px] text-muted-foreground">
+        A renda só entra nos meses dentro desse período. Deixe o fim em branco
+        enquanto ela não tiver data para acabar.
+      </p>
 
       <div className="flex items-center gap-2">
         <input

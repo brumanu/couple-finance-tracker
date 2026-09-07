@@ -1,7 +1,7 @@
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
-import { parseMesParam } from "@/lib/mes";
+import { parseMesParam, vigenteNoMes } from "@/lib/mes";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format";
@@ -28,10 +28,31 @@ const DIAS_SEMANA = [
   "Sábado",
 ];
 
+const MESES_CURTOS = [
+  "jan",
+  "fev",
+  "mar",
+  "abr",
+  "mai",
+  "jun",
+  "jul",
+  "ago",
+  "set",
+  "out",
+  "nov",
+  "dez",
+];
+
 function formatDataLonga(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   return `${DIAS_SEMANA[date.getDay()]}, ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
+}
+
+/** "2026-10-31" → "out/2026", pro rodapé do card da renda. */
+function labelDoMes(iso: string): string {
+  const [ano, mes] = iso.split("-");
+  return `${MESES_CURTOS[Number(mes) - 1]}/${ano}`;
 }
 
 export default async function RendasPage({
@@ -49,7 +70,9 @@ export default async function RendasPage({
       getCategorias(),
       supabase
         .from("rendas")
-        .select("id, descricao, valor_previsto, dia_recebimento, ativa")
+        .select(
+          "id, descricao, valor_previsto, dia_recebimento, inicio_vigencia, fim_vigencia, ativa",
+        )
         .order("dia_recebimento", { ascending: true })
         .order("descricao", { ascending: true }),
       supabase
@@ -63,7 +86,11 @@ export default async function RendasPage({
         .order("data_pagamento", { ascending: false }),
     ]);
 
-  const lista = (rendas ?? []) as RendaRow[];
+  // A lista acompanha o seletor de mês: uma renda que começa em outubro não
+  // aparece — nem soma — em setembro, e uma encerrada some dos meses
+  // seguintes sem sumir do histórico.
+  const todas = (rendas ?? []) as RendaRow[];
+  const lista = todas.filter((r) => vigenteNoMes(r, mes));
   const total15 = lista
     .filter((r) => r.ativa && r.dia_recebimento === 15)
     .reduce((sum, r) => sum + Number(r.valor_previsto), 0);
@@ -97,7 +124,8 @@ export default async function RendasPage({
               Rendas
             </h2>
             <p className="mt-1.5 max-w-[60ch] text-[15px] text-neutral-700">
-              O que entra todo mês: adiantamento no dia 15, salário no dia 30.
+              O que entra em {mes.label}: adiantamento no dia 15, salário no dia
+              30.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -111,7 +139,7 @@ export default async function RendasPage({
           <div className="flex flex-wrap items-center gap-8 rounded-[28px] bg-card p-7 md:gap-11 md:p-8">
             <div className="min-w-[220px]">
               <p className="text-[11px] uppercase tracking-widest text-accent-700">
-                Entra todo mês (fixo)
+                Entra em {mes.label} (fixo)
               </p>
               <p
                 className="mt-2 font-heading tabular-nums"
@@ -184,7 +212,9 @@ export default async function RendasPage({
           <Card>
             <div className="flex flex-col items-center gap-3 p-8 text-center">
               <p className="text-sm text-muted-foreground">
-                Nenhuma renda cadastrada ainda.
+                {todas.length === 0
+                  ? "Nenhuma renda cadastrada ainda."
+                  : `Nenhuma renda fixa vigente em ${mes.label}.`}
               </p>
               <NovaRenda />
             </div>
@@ -298,6 +328,7 @@ function ColunaRendas({
                 </div>
                 <p className="text-[13px] text-neutral-700">
                   Todo dia {r.dia_recebimento}
+                  {r.fim_vigencia ? ` · até ${labelDoMes(r.fim_vigencia)}` : ""}
                 </p>
               </div>
               <span className="whitespace-nowrap font-heading text-[17px] tabular-nums">
