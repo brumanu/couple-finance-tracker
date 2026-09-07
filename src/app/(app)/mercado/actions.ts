@@ -55,7 +55,7 @@ async function listaAberta(
 /**
  * Abre a lista da próxima ida ao mercado.
  *
- * O índice único parcial da migration 0015 garante uma lista aberta por
+ * O índice único parcial da migration 0016 garante uma lista aberta por
  * casal, então dois toques simultâneos (ou os dois celulares ao mesmo tempo)
  * dão 23505 no segundo. Nesse caso não é erro: alguém já abriu, e a resposta
  * certa é devolver a lista que existe.

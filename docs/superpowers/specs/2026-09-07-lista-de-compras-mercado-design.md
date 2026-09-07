@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-07
 **Status:** aprovado, pronto pro plano de implementação
-**Migration alvo:** `0015_lista_mercado.sql`
+**Migration alvo:** `0016_lista_mercado.sql`
 
 ---
 
@@ -453,7 +453,7 @@ despesa em `/despesas` e a lista nova com os itens mantidos.
 **Novos:**
 
 ```
-supabase/migrations/0015_lista_mercado.sql
+supabase/migrations/0016_lista_mercado.sql
 src/app/(app)/mercado/page.tsx
 src/app/(app)/mercado/loading.tsx
 src/app/(app)/mercado/actions.ts

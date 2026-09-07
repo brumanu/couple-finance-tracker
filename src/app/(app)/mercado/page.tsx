@@ -109,7 +109,7 @@ async function getPadroesDoFechamento(
 export default async function MercadoPage() {
   const supabase = await createClient();
 
-  // O índice único parcial da 0015 garante no máximo uma lista aberta por
+  // O índice único parcial da 0016 garante no máximo uma lista aberta por
   // casal — por isso esta página nunca precisa perguntar "qual lista?".
   const [, listaRes] = await Promise.all([
     requireSession(),
