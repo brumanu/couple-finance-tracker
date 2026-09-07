@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
@@ -27,6 +28,12 @@ type Props = {
 
 export function MobileFab({ cartoes, categorias, membros }: Props) {
   const [carregado, setCarregado] = useState(false);
+  const pathname = usePathname();
+
+  // Em /mercado o rodapé já é ocupado pelo campo de adicionar item, que fica
+  // fixo acima do teclado. Dois botões disputando o mesmo canto da tela — um
+  // deles cobrindo o outro — é pior que não ter o atalho ali.
+  if (pathname.startsWith("/mercado")) return null;
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+env(safe-area-inset-bottom))] z-40 flex justify-end pr-4 md:hidden">
