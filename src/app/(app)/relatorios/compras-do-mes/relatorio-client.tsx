@@ -266,6 +266,10 @@ export function RelatorioComprasDoMesClient({
 
   const grandTotal = linhas.reduce((s, l) => s + l.valor, 0);
   const totalFiltrado = filtradas.reduce((s, l) => s + l.valor, 0);
+  const percentualDoMes =
+    grandTotal > 0 ? (totalFiltrado / grandTotal) * 100 : 0;
+  const mediaPorCompra =
+    filtradas.length > 0 ? totalFiltrado / filtradas.length : 0;
 
   const algumFiltroAtivo = categoriaId !== TODOS || quem !== TODOS;
   const limparFiltros = () => {
@@ -276,6 +280,23 @@ export function RelatorioComprasDoMesClient({
   const categoriaSelecionada = categoriaOptions.find(
     (c) => c.id === categoriaId,
   );
+
+  // Com filtro ativo os cards de resumo passam a falar do recorte, não do mês
+  // inteiro: escolher uma categoria é justamente perguntar quanto ela pesa.
+  const rotuloRecorte = [
+    categoriaId === SEM_CATEGORIA
+      ? "Sem categoria"
+      : (categoriaSelecionada?.nome ?? null),
+    quem === SEM_QUEM
+      ? "sem responsável"
+      : quem === QUEM_CASAL
+        ? "Casal"
+        : quem !== TODOS
+          ? (membroById.get(quem)?.nome ?? null)
+          : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <>
@@ -449,31 +470,48 @@ export function RelatorioComprasDoMesClient({
             {linhas.length !== filtradas.length
               ? ` de ${linhas.length} no total`
               : ""}
-            {algumFiltroAtivo ? (
-              <>
-                {" "}
-                somando{" "}
-                <strong className="text-foreground tabular-nums">
-                  {formatBRL(totalFiltrado)}
-                </strong>
-              </>
-            ) : null}
             .
           </p>
         </div>
       </Card>
 
       <div className="grid gap-3 md:grid-cols-2">
-        <ResumoCard
-          label={`Total em ${mesLabel}`}
-          valor={formatBRL(grandTotal)}
-          destaque
-        />
-        <ResumoCard
-          label="Lançamentos no mês"
-          valor={String(linhas.length)}
-          hint={linhas.length === 1 ? "item" : "itens"}
-        />
+        {algumFiltroAtivo ? (
+          <>
+            <ResumoCard
+              label={`Total em ${rotuloRecorte}`}
+              valor={formatBRL(totalFiltrado)}
+              hint={`${percentualDoMes.toFixed(0)}% dos ${formatBRL(
+                grandTotal,
+              )} do mês`}
+              destaque
+            />
+            <ResumoCard
+              label={`Compras em ${rotuloRecorte}`}
+              valor={String(filtradas.length)}
+              hint={
+                filtradas.length > 0
+                  ? `de ${linhas.length} no mês · média de ${formatBRL(
+                      mediaPorCompra,
+                    )}`
+                  : `de ${linhas.length} no mês`
+              }
+            />
+          </>
+        ) : (
+          <>
+            <ResumoCard
+              label={`Total em ${mesLabel}`}
+              valor={formatBRL(grandTotal)}
+              destaque
+            />
+            <ResumoCard
+              label="Lançamentos no mês"
+              valor={String(linhas.length)}
+              hint={linhas.length === 1 ? "item" : "itens"}
+            />
+          </>
+        )}
       </div>
 
       {filtradas.length === 0 ? (
@@ -557,6 +595,22 @@ export function RelatorioComprasDoMesClient({
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t-2 border-border bg-muted/40">
+                <tr>
+                  <td
+                    colSpan={6}
+                    className="px-4 py-3 text-xs uppercase tracking-widest text-muted-foreground"
+                  >
+                    {algumFiltroAtivo ? rotuloRecorte : "Total do mês"} ·{" "}
+                    {filtradas.length}{" "}
+                    {filtradas.length === 1 ? "compra" : "compras"}
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums font-medium text-primary">
+                    {formatBRL(totalFiltrado)}
+                  </td>
+                  <td />
+                </tr>
+              </tfoot>
             </table>
           </div>
 
@@ -608,6 +662,17 @@ export function RelatorioComprasDoMesClient({
               </li>
             ))}
           </ul>
+
+          <div className="flex items-center justify-between gap-3 border-t-2 border-border bg-muted/40 px-4 py-3 lg:hidden">
+            <span className="text-xs uppercase tracking-widest text-muted-foreground">
+              {algumFiltroAtivo ? rotuloRecorte : "Total do mês"} ·{" "}
+              {filtradas.length}{" "}
+              {filtradas.length === 1 ? "compra" : "compras"}
+            </span>
+            <span className="whitespace-nowrap tabular-nums text-sm font-medium text-primary">
+              {formatBRL(totalFiltrado)}
+            </span>
+          </div>
         </Card>
       )}
     </>
