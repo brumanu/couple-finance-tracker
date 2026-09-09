@@ -3,6 +3,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
+import { categoriasDaLinha } from "@/lib/categorias-extras";
 import { dadosDoMes, type LancamentoDoMes } from "@/lib/gastos-do-mes";
 import { getMembrosCasal } from "@/lib/membros-server";
 import { Button } from "@/components/ui/button";
@@ -76,12 +77,14 @@ export default async function RelatorioComprasDoMesPage({
       quinzena: l.quinzena,
       categoria: l.categoria,
       categoria_id: l.categoria_id,
+      categorias_extras: l.categorias_extras,
       quem_gastou: l.quem_gastou,
     };
     linhas.push({
       id: `despesa-${l.id}`,
       tipo: "despesa",
       categoriaId: l.categoria_id,
+      categoriaIds: categoriasDaLinha(l),
       categoriaNome: nomeCategoria(l.categoria_id),
       descricao: l.descricao,
       origem: "Despesa avulsa",
@@ -107,6 +110,9 @@ export default async function RelatorioComprasDoMesPage({
       id: `conta-${c.id}`,
       tipo: "conta_fixa",
       categoriaId,
+      // Conta fixa não participa das categorias extras: é definição
+      // recorrente, onde uma categoria basta.
+      categoriaIds: categoriaId ? [categoriaId] : [],
       categoriaNome: nomeCategoria(categoriaId),
       descricao: c.descricao,
       origem: pago ? "Conta fixa · paga" : "Conta fixa · prevista",
@@ -138,6 +144,7 @@ export default async function RelatorioComprasDoMesPage({
       id: `compra-${compra.id}`,
       tipo: "compra_cartao",
       categoriaId: compra.categoria_id,
+      categoriaIds: categoriasDaLinha(compra),
       categoriaNome: nomeCategoria(compra.categoria_id),
       descricao: compra.descricao,
       origem:
@@ -173,6 +180,7 @@ export default async function RelatorioComprasDoMesPage({
       id: `assin-${a.id}`,
       tipo: "assinatura",
       categoriaId: a.categoria_id,
+      categoriaIds: a.categoria_id ? [a.categoria_id] : [],
       categoriaNome: nomeCategoria(a.categoria_id),
       descricao: a.descricao,
       origem: "Assinatura",
@@ -184,10 +192,11 @@ export default async function RelatorioComprasDoMesPage({
     });
   }
 
-  const categoriaIdsPresentes = new Set(
-    linhas.map((l) => l.categoriaId).filter((x): x is string => Boolean(x)),
-  );
-  const temSemCategoria = linhas.some((l) => !l.categoriaId);
+  // O filtro oferece toda categoria que aparece no mês, principal ou extra —
+  // senão marcar "Farmácia" não acharia a compra do mercado que também levou
+  // remédio, que é justamente o caso que as extras existem pra resolver.
+  const categoriaIdsPresentes = new Set(linhas.flatMap((l) => l.categoriaIds));
+  const temSemCategoria = linhas.some((l) => l.categoriaIds.length === 0);
   const categoriaOptions = categorias.filter((c) =>
     categoriaIdsPresentes.has(c.id),
   );

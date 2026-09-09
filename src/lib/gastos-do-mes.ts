@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { MesRef } from "@/lib/mes";
+import type { ExtraDeCategoria } from "@/lib/categorias-extras";
 
 /**
  * As cinco consultas que todo relatório de gasto mensal faz.
@@ -18,6 +19,13 @@ import type { MesRef } from "@/lib/mes";
  * união do que os relatórios usam — assim ninguém precisa lembrar de
  * acrescentar coluna ao adicionar um campo numa tela.
  *
+ * As categorias extras (migration 0017) vêm embutidas, não numa consulta à
+ * parte: existe FK de `categorias_extras` pras duas tabelas, então o
+ * PostgREST resolve o join sozinho e o custo é um left join numa tabela que
+ * só tem linha pra lançamento que ganhou categoria adicional. Uma segunda ida
+ * ao banco sairia mais cara do que isso, e teria que ser em série — os ids só
+ * existem depois da primeira.
+ *
  * Só cobre os relatórios de UM mês com filtro de vigência. `fluxo-mensal`,
  * `categoria-por-mes`, `renda-x-despesa` e `comprometimento-futuro` varrem
  * faixas de vários meses com recortes próprios e continuam com as suas
@@ -25,13 +33,13 @@ import type { MesRef } from "@/lib/mes";
  */
 
 const COLUNAS_LANCAMENTOS =
-  "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, categoria_id, conta_recorrente_id, quem_gastou";
+  "id, tipo, descricao, valor, data_referencia, data_pagamento, quinzena, categoria, categoria_id, conta_recorrente_id, quem_gastou, categorias_extras(categoria_id)";
 
 const COLUNAS_CONTAS =
   "id, descricao, valor_previsto, quinzena, dia_vencimento, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa, quem_gastou";
 
 const COLUNAS_COMPRAS =
-  "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id, quem_gastou";
+  "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id, quem_gastou, categorias_extras(categoria_id)";
 
 const COLUNAS_ASSINATURAS =
   "id, cartao_id, descricao, valor_mensal, categoria, categoria_id, inicio_vigencia, fim_vigencia, ativa, quem_gastou";
@@ -49,6 +57,7 @@ export type LancamentoDoMes = {
   quinzena: number | null;
   categoria: string | null;
   categoria_id: string | null;
+  categorias_extras: ExtraDeCategoria[] | null;
   conta_recorrente_id: string | null;
   quem_gastou: string | null;
 };
@@ -78,6 +87,7 @@ export type CompraDoMes = {
   parcelas_ja_pagas: number | null;
   categoria: string | null;
   categoria_id: string | null;
+  categorias_extras: ExtraDeCategoria[] | null;
   quem_gastou: string | null;
 };
 

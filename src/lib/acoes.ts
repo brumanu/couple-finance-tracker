@@ -4,6 +4,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { resolverCategoria } from "@/lib/categorias-server";
 import { resolverQuemGastou } from "@/lib/membros-server";
+import { CAMPO_CATEGORIAS_EXTRAS } from "@/lib/categorias-extras";
 
 /**
  * Peças comuns das Server Actions.
@@ -62,7 +63,7 @@ export const clienteAutenticado = cache(
  */
 export function erroAmigavel(
   error: PostgrestError,
-  mensagens?: Partial<Record<"23505" | "23503" | "23514", string>>,
+  mensagens?: Partial<Record<"23505" | "23503" | "23514" | "42501", string>>,
 ): string {
   const especifica = mensagens?.[error.code as keyof typeof mensagens];
   if (especifica) return especifica;
@@ -129,3 +130,76 @@ export async function resolverClassificacao(
   if (typeof quem === "string") return quem;
   return { ...categoria, ...quem };
 }
+
+/**
+ * Lê as categorias extras do formulário, já sem a principal.
+ *
+ * A principal é filtrada aqui e não no banco porque não existe constraint
+ * capaz de dizer "esta linha não pode repetir uma coluna da linha pai". Se
+ * ela passasse, a categoria apareceria duas vezes no chip da lista.
+ */
+export function lerCategoriasExtras(
+  formData: FormData,
+  principal: string | null,
+): string[] {
+  const brutos = formData
+    .getAll(CAMPO_CATEGORIAS_EXTRAS)
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+  const unicos = new Set(brutos);
+  if (principal) unicos.delete(principal);
+  return [...unicos];
+}
+
+/** Qual lançamento recebe as extras — exatamente um dos dois. */
+export type AlvoDeExtras =
+  | { lancamento_id: string }
+  | { compra_cartao_id: string };
+
+/**
+ * Deixa as extras de um lançamento iguais à lista recebida.
+ *
+ * Insere antes de apagar, de propósito. Na ordem inversa, uma falha no meio
+ * deixaria o lançamento sem nenhuma extra — perda de dado que o usuário não
+ * pediu. Nesta ordem, o pior caso é sobrar uma extra a mais, e salvar de novo
+ * converge. O `ignoreDuplicates` faz o insert ser idempotente, então
+ * reprocessar nunca esbarra na unique.
+ */
+export async function sincronizarCategoriasExtras(
+  supabase: SessaoDaAcao,
+  alvo: AlvoDeExtras,
+  ids: string[],
+): Promise<string | null> {
+  const coluna =
+    "lancamento_id" in alvo ? "lancamento_id" : "compra_cartao_id";
+  const alvoId =
+    "lancamento_id" in alvo ? alvo.lancamento_id : alvo.compra_cartao_id;
+
+  if (ids.length > 0) {
+    const { error } = await supabase.from("categorias_extras").upsert(
+      ids.map((categoria_id) => ({ ...alvo, categoria_id })),
+      { onConflict: `${coluna},categoria_id`, ignoreDuplicates: true },
+    );
+    if (error) return erroAmigavel(error, ERROS_EXTRAS);
+  }
+
+  let apagar = supabase
+    .from("categorias_extras")
+    .delete()
+    .eq(coluna, alvoId);
+  // Sem `ids`, apaga todas — o usuário desmarcou o campo inteiro.
+  if (ids.length > 0) {
+    apagar = apagar.not("categoria_id", "in", `(${ids.join(",")})`);
+  }
+  const { error } = await apagar;
+  if (error) return erroAmigavel(error, ERROS_EXTRAS);
+
+  return null;
+}
+
+const ERROS_EXTRAS = {
+  "23503":
+    "Uma das categorias escolhidas não existe mais. Reabra o formulário e escolha de novo.",
+  "42501":
+    "Não foi possível salvar as categorias extras: o banco de dados está desatualizado (falta a migration 0017).",
+} as const;

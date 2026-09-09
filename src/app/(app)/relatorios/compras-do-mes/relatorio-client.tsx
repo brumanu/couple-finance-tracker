@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { CategoriasMultiSelect } from "@/components/categorias-multi-select";
+import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/format";
 import type { CategoriaOpcao } from "@/lib/categorias";
 import { QUEM_CASAL, type MembroOpcao } from "@/lib/membros";
@@ -31,6 +33,12 @@ export type LinhaCompra =
       id: string;
       tipo: "despesa";
       categoriaId: string | null;
+      /**
+       * Principal + extras, principal primeiro. É este conjunto que o filtro
+       * usa — `categoriaId` sozinho não acha a compra cuja segunda
+       * categoria é a marcada.
+       */
+      categoriaIds: string[];
       categoriaNome: string | null;
       descricao: string;
       origem: string;
@@ -42,6 +50,12 @@ export type LinhaCompra =
       id: string;
       tipo: "conta_fixa";
       categoriaId: string | null;
+      /**
+       * Principal + extras, principal primeiro. É este conjunto que o filtro
+       * usa — `categoriaId` sozinho não acha a compra cuja segunda
+       * categoria é a marcada.
+       */
+      categoriaIds: string[];
       categoriaNome: string | null;
       descricao: string;
       origem: string;
@@ -53,6 +67,12 @@ export type LinhaCompra =
       id: string;
       tipo: "compra_cartao";
       categoriaId: string | null;
+      /**
+       * Principal + extras, principal primeiro. É este conjunto que o filtro
+       * usa — `categoriaId` sozinho não acha a compra cuja segunda
+       * categoria é a marcada.
+       */
+      categoriaIds: string[];
       categoriaNome: string | null;
       descricao: string;
       origem: string;
@@ -67,6 +87,12 @@ export type LinhaCompra =
       id: string;
       tipo: "assinatura";
       categoriaId: string | null;
+      /**
+       * Principal + extras, principal primeiro. É este conjunto que o filtro
+       * usa — `categoriaId` sozinho não acha a compra cuja segunda
+       * categoria é a marcada.
+       */
+      categoriaIds: string[];
       categoriaNome: string | null;
       descricao: string;
       origem: string;
@@ -80,6 +106,13 @@ export type LinhaCompra =
 const TODOS = "__todos__";
 const SEM_CATEGORIA = "__sem_cat__";
 const SEM_QUEM = "__sem_quem__";
+
+type ModoCategoria = "qualquer" | "todas";
+
+const MODOS: { valor: ModoCategoria; rotulo: string }[] = [
+  { valor: "qualquer", rotulo: "Pelo menos uma" },
+  { valor: "todas", rotulo: "Todas elas" },
+];
 
 type SortKey = "valor_desc" | "valor_asc" | "data_desc" | "data_asc";
 
@@ -98,18 +131,9 @@ function formatDataBR(iso: string | null): string {
 
 function CategoriaChip({
   categoria,
-  nome,
 }: {
-  categoria: CategoriaOpcao | undefined;
-  nome: string | null;
+  categoria: CategoriaOpcao;
 }) {
-  if (!categoria) {
-    return (
-      <span className="text-xs text-muted-foreground">
-        {nome ?? "Sem categoria"}
-      </span>
-    );
-  }
   return (
     <span className="inline-flex items-center gap-1.5 text-xs">
       <span
@@ -120,6 +144,42 @@ function CategoriaChip({
         {categoria.emoji ?? categoria.nome[0]?.toUpperCase() ?? "?"}
       </span>
       <span className="text-muted-foreground">{categoria.nome}</span>
+    </span>
+  );
+}
+
+/**
+ * As categorias da linha, principal primeiro.
+ *
+ * `categoriaNome` é o texto livre que sobrou de antes da tabela de
+ * categorias (migration 0007 deixou a coluna como fallback de exibição): só
+ * aparece quando a linha não tem nenhum id.
+ */
+function CategoriasDaLinha({
+  ids,
+  nome,
+  categoriaById,
+}: {
+  ids: string[];
+  nome: string | null;
+  categoriaById: Map<string, CategoriaOpcao>;
+}) {
+  const categorias = ids
+    .map((id) => categoriaById.get(id))
+    .filter((c): c is CategoriaOpcao => Boolean(c));
+
+  if (categorias.length === 0) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        {nome ?? "Sem categoria"}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      {categorias.map((c) => (
+        <CategoriaChip key={c.id} categoria={c} />
+      ))}
     </span>
   );
 }
@@ -203,7 +263,8 @@ export function RelatorioComprasDoMesClient({
   mesLabel,
   membros,
 }: Props) {
-  const [categoriaId, setCategoriaId] = useState<string>(TODOS);
+  const [categoriasSel, setCategoriasSel] = useState<string[]>([]);
+  const [modo, setModo] = useState<ModoCategoria>("qualquer");
   const [quem, setQuem] = useState<string>(TODOS);
   const [sort, setSort] = useState<SortKey>("data_desc");
 
@@ -235,10 +296,21 @@ export function RelatorioComprasDoMesClient({
 
   const filtradas = useMemo(() => {
     let arr = linhas;
-    if (categoriaId !== TODOS) {
-      if (categoriaId === SEM_CATEGORIA)
-        arr = arr.filter((l) => !l.categoriaId);
-      else arr = arr.filter((l) => l.categoriaId === categoriaId);
+    if (categoriasSel.length > 0) {
+      const querSemCategoria = categoriasSel.includes(SEM_CATEGORIA);
+      const idsReais = categoriasSel.filter((v) => v !== SEM_CATEGORIA);
+      arr = arr.filter((l) => {
+        const daLinha = l.categoriaIds;
+        if (modo === "todas") {
+          // "Sem categoria" junto com uma categoria de verdade não casa com
+          // nada, e é isso mesmo: nenhuma linha é as duas coisas ao mesmo
+          // tempo. O contador logo abaixo mostra zero, que é a resposta certa.
+          if (querSemCategoria && daLinha.length > 0) return false;
+          return idsReais.every((id) => daLinha.includes(id));
+        }
+        if (querSemCategoria && daLinha.length === 0) return true;
+        return idsReais.some((id) => daLinha.includes(id));
+      });
     }
     if (quem !== TODOS) {
       if (quem === SEM_QUEM) arr = arr.filter((l) => !quemGastouDe(l));
@@ -262,90 +334,78 @@ export function RelatorioComprasDoMesClient({
         break;
     }
     return sorted;
-  }, [linhas, categoriaId, quem, sort]);
+  }, [linhas, categoriasSel, modo, quem, sort]);
 
   const grandTotal = linhas.reduce((s, l) => s + l.valor, 0);
   const totalFiltrado = filtradas.reduce((s, l) => s + l.valor, 0);
 
-  const algumFiltroAtivo = categoriaId !== TODOS || quem !== TODOS;
+  const algumFiltroAtivo = categoriasSel.length > 0 || quem !== TODOS;
   const limparFiltros = () => {
-    setCategoriaId(TODOS);
+    setCategoriasSel([]);
+    setModo("qualquer");
     setQuem(TODOS);
   };
-
-  const categoriaSelecionada = categoriaOptions.find(
-    (c) => c.id === categoriaId,
-  );
 
   return (
     <>
       <Card>
         <div className="flex flex-col gap-3 p-4 md:p-5">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
+            <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
               <Label
                 htmlFor="f-categoria"
                 className="text-[10px] uppercase tracking-widest text-muted-foreground"
               >
                 Categoria
               </Label>
-              <Select
-                value={categoriaId}
-                onValueChange={(v) => v && setCategoriaId(v)}
-              >
-                <SelectTrigger id="f-categoria" className="w-full">
-                  <SelectValue>
-                    {categoriaId === SEM_CATEGORIA ? (
-                      <span className="text-muted-foreground">
-                        Sem categoria
-                      </span>
-                    ) : categoriaSelecionada ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{
-                            backgroundColor: categoriaSelecionada.cor,
-                            color: "#fff",
-                          }}
-                          aria-hidden
-                        >
-                          {categoriaSelecionada.emoji ??
-                            categoriaSelecionada.nome[0]?.toUpperCase() ??
-                            "?"}
-                        </span>
-                        <span>{categoriaSelecionada.nome}</span>
-                      </span>
-                    ) : (
-                      <span>Todas as categorias</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS}>Todas as categorias</SelectItem>
-                  {temSemCategoria && (
-                    <SelectItem value={SEM_CATEGORIA}>
-                      <span className="text-muted-foreground">
-                        Sem categoria
-                      </span>
-                    </SelectItem>
-                  )}
-                  {categoriaOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{ backgroundColor: c.cor, color: "#fff" }}
-                          aria-hidden
-                        >
-                          {c.emoji ?? c.nome[0]?.toUpperCase() ?? "?"}
-                        </span>
-                        <span>{c.nome}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CategoriasMultiSelect
+                id="f-categoria"
+                categorias={categoriaOptions}
+                value={categoriasSel}
+                onValueChange={setCategoriasSel}
+                opcaoEspecial={
+                  temSemCategoria
+                    ? { valor: SEM_CATEGORIA, rotulo: "Sem categoria" }
+                    : undefined
+                }
+                placeholder="Todas as categorias"
+              />
             </div>
+
+            {/*
+              Com uma categoria só marcada os dois modos dão o mesmo
+              resultado, então o controle não aparece — só ocuparia espaço e
+              faria perguntar pra que serve.
+            */}
+            {categoriasSel.length > 1 && (
+              <div className="flex min-w-[200px] flex-col gap-1.5">
+                <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  O lançamento precisa ter
+                </Label>
+                <div
+                  role="group"
+                  aria-label="Como combinar as categorias marcadas"
+                  className="flex h-9 items-center gap-0.5 rounded-full border border-input bg-card p-0.5"
+                >
+                  {MODOS.map((m) => (
+                    <button
+                      key={m.valor}
+                      type="button"
+                      aria-pressed={modo === m.valor}
+                      onClick={() => setModo(m.valor)}
+                      className={cn(
+                        "h-full flex-1 whitespace-nowrap rounded-full px-3 text-xs transition-colors",
+                        modo === m.valor
+                          ? "bg-primary text-primary-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {m.rotulo}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex min-w-[180px] flex-col gap-1.5">
               <Label
@@ -516,13 +576,10 @@ export function RelatorioComprasDoMesClient({
                       <span className="font-medium">{l.descricao}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <CategoriaChip
-                        categoria={
-                          l.categoriaId
-                            ? categoriaById.get(l.categoriaId)
-                            : undefined
-                        }
+                      <CategoriasDaLinha
+                        ids={l.categoriaIds}
                         nome={l.categoriaNome}
+                        categoriaById={categoriaById}
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -569,13 +626,10 @@ export function RelatorioComprasDoMesClient({
                       {l.descricao}
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                      <CategoriaChip
-                        categoria={
-                          l.categoriaId
-                            ? categoriaById.get(l.categoriaId)
-                            : undefined
-                        }
+                      <CategoriasDaLinha
+                        ids={l.categoriaIds}
                         nome={l.categoriaNome}
+                        categoriaById={categoriaById}
                       />
                       <span className="text-xs text-muted-foreground">
                         · {formatDataBR(l.data)}

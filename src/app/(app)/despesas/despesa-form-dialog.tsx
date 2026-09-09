@@ -17,6 +17,12 @@ import { BancoIcone } from "@/lib/bancos-icones";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
 import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
 import { CategoriaSelectField } from "@/components/categoria-select";
+import { CategoriasMultiSelect } from "@/components/categorias-multi-select";
+import {
+  CAMPO_CATEGORIAS_EXTRAS,
+  idsDeExtras,
+  type ExtraDeCategoria,
+} from "@/lib/categorias-extras";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
 import {
@@ -46,6 +52,8 @@ export type DespesaRow = {
   quinzena: number | null;
   categoria: string | null;
   categoria_id: string | null;
+  /** Categorias adicionais (migration 0017) — vêm embutidas no select. */
+  categorias_extras?: ExtraDeCategoria[] | null;
   quem_gastou: string | null;
 };
 
@@ -80,6 +88,7 @@ export function DespesaFormDialog({
       data,
       quinzena: String(despesa?.quinzena ?? inferQuinzena(data)),
       categoriaId: despesa?.categoria_id ?? NENHUMA_CATEGORIA,
+      extras: idsDeExtras(despesa),
       quemGastou: despesa?.quem_gastou ?? NENHUM_QUEM,
     };
   }, [
@@ -89,6 +98,7 @@ export function DespesaFormDialog({
     despesa?.data_pagamento,
     despesa?.quinzena,
     despesa?.categoria_id,
+    despesa?.categorias_extras,
     despesa?.quem_gastou,
   ]);
 
@@ -97,7 +107,16 @@ export function DespesaFormDialog({
   const [parcelada, setParcelada] = useState(false);
   const [parcelasRaw, setParcelasRaw] = useState("2");
   const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
+  const [extras, setExtras] = useState<string[]>(defaults.extras);
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
+
+  // Extra é categoria ADICIONAL: sem uma principal ela não tem o que
+  // complementar, e o lançamento ficaria exibindo categorias na lista
+  // enquanto conta como "sem categoria" nos relatórios de soma.
+  function onCategoriaChange(nova: string) {
+    setCategoriaId(nova);
+    if (nova === NENHUMA_CATEGORIA) setExtras([]);
+  }
 
   const ctrl = useFormDialog<DespesaFormState>({
     action: isEdit ? updateDespesa.bind(null, despesa!.id) : createDespesa,
@@ -108,6 +127,7 @@ export function DespesaFormDialog({
     reset: () => {
       campos.reset();
       setCategoriaId(defaults.categoriaId);
+      setExtras(defaults.extras);
       setQuemGastou(defaults.quemGastou);
       // Cartão/parcelamento só existem no cadastro — na edição a despesa já
       // nasceu avulsa e não pode virar compra de cartão.
@@ -134,7 +154,23 @@ export function DespesaFormDialog({
         <CategoriaSelectField
           categorias={categorias}
           value={categoriaId}
-          onValueChange={setCategoriaId}
+          onValueChange={onCategoriaChange}
+        />
+      </CampoForm>
+      <CampoForm htmlFor="categorias_extras" rotulo="Outras categorias (opcional)">
+        <CategoriasMultiSelect
+          id="categorias_extras"
+          nomeCampo={CAMPO_CATEGORIAS_EXTRAS}
+          categorias={categorias}
+          excluir={categoriaId}
+          value={extras}
+          onValueChange={setExtras}
+          disabled={categoriaId === NENHUMA_CATEGORIA}
+          placeholder={
+            categoriaId === NENHUMA_CATEGORIA
+              ? "Escolha uma categoria primeiro"
+              : "Nenhuma"
+          }
         />
       </CampoForm>
       <CampoForm htmlFor="quem_gastou" rotulo="Quem gastou (opcional)">

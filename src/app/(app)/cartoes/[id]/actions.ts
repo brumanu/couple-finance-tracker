@@ -5,8 +5,10 @@ import { campo, parseForm } from "@/lib/parse-form";
 import {
   clienteAutenticado,
   erroAmigavel,
+  lerCategoriasExtras,
   resolverClassificacao,
   revalidar,
+  sincronizarCategoriasExtras,
   type EstadoForm,
   type SessaoDaAcao,
 } from "@/lib/acoes";
@@ -86,10 +88,21 @@ export async function createCompra(
   const linha = await montarLinha(sessao.supabase, formData);
   if (typeof linha === "string") return { error: linha };
 
-  const { error } = await sessao.supabase
+  // O `select("id")` existe porque as categorias extras são gravadas numa
+  // tabela separada e precisam do id que o banco acabou de gerar.
+  const { data, error } = await sessao.supabase
     .from("compras_cartao")
-    .insert(linha);
+    .insert(linha)
+    .select("id")
+    .single();
   if (error) return { error: erroAmigavel(error) };
+
+  const erroExtras = await sincronizarCategoriasExtras(
+    sessao.supabase,
+    { compra_cartao_id: data.id },
+    lerCategoriasExtras(formData, linha.categoria_id),
+  );
+  if (erroExtras) return { error: erroExtras };
 
   revalidar(...rotas(linha.cartao_id));
   return { ok: true };
@@ -110,6 +123,13 @@ export async function updateCompra(
     .update(linha)
     .eq("id", id);
   if (error) return { error: erroAmigavel(error) };
+
+  const erroExtras = await sincronizarCategoriasExtras(
+    supabase,
+    { compra_cartao_id: id },
+    lerCategoriasExtras(formData, linha.categoria_id),
+  );
+  if (erroExtras) return { error: erroExtras };
 
   revalidar(...rotas(linha.cartao_id));
   return { ok: true };

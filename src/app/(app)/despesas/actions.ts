@@ -5,8 +5,10 @@ import { campo, parseForm } from "@/lib/parse-form";
 import {
   clienteAutenticado,
   erroAmigavel,
+  lerCategoriasExtras,
   resolverClassificacao,
   revalidar,
+  sincronizarCategoriasExtras,
   type EstadoForm,
 } from "@/lib/acoes";
 
@@ -100,12 +102,25 @@ export async function createDespesa(
   );
   if (typeof classificacao === "string") return { error: classificacao };
 
+  const extras = lerCategoriasExtras(formData, classificacao.categoria_id);
+
   // `casal_id` e `criado_por` vêm dos defaults da coluna (migration 0014).
+  // O `select("id")` é o que permite gravar as extras logo em seguida: elas
+  // moram noutra tabela e precisam do id recém-gerado.
   if (entrada.tipo === "compra_cartao") {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("compras_cartao")
-      .insert({ ...entrada.linha, ...classificacao });
+      .insert({ ...entrada.linha, ...classificacao })
+      .select("id")
+      .single();
     if (error) return { error: erroAmigavel(error) };
+
+    const erroExtras = await sincronizarCategoriasExtras(
+      supabase,
+      { compra_cartao_id: data.id },
+      extras,
+    );
+    if (erroExtras) return { error: erroExtras };
 
     revalidar(
       ...ROTAS_DESPESA,
@@ -115,10 +130,19 @@ export async function createDespesa(
     return { ok: true };
   }
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from("lancamentos")
-    .insert({ tipo: "despesa_avulsa", ...entrada.linha, ...classificacao });
+    .insert({ tipo: "despesa_avulsa", ...entrada.linha, ...classificacao })
+    .select("id")
+    .single();
   if (error) return { error: erroAmigavel(error) };
+
+  const erroExtras = await sincronizarCategoriasExtras(
+    supabase,
+    { lancamento_id: data.id },
+    extras,
+  );
+  if (erroExtras) return { error: erroExtras };
 
   revalidar(...ROTAS_DESPESA);
   return { ok: true };
@@ -155,6 +179,13 @@ export async function updateDespesa(
     .eq("id", id)
     .eq("tipo", "despesa_avulsa");
   if (error) return { error: erroAmigavel(error) };
+
+  const erroExtras = await sincronizarCategoriasExtras(
+    supabase,
+    { lancamento_id: id },
+    lerCategoriasExtras(formData, classificacao.categoria_id),
+  );
+  if (erroExtras) return { error: erroExtras };
 
   revalidar(...ROTAS_DESPESA);
   return { ok: true };

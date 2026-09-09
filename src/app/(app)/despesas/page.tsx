@@ -52,7 +52,7 @@ export default async function DespesasPage({
     supabase
       .from("lancamentos")
       .select(
-        "id, descricao, valor, data_pagamento, data_referencia, quinzena, categoria, categoria_id, quem_gastou",
+        "id, descricao, valor, data_pagamento, data_referencia, quinzena, categoria, categoria_id, quem_gastou, categorias_extras(categoria_id)",
       )
       .eq("tipo", "despesa_avulsa")
       .gte("data_referencia", mes.primeiroDia)
