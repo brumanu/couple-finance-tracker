@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import type { ItemMercado } from "@/lib/mercado";
 import { ListaCliente } from "./lista-cliente";
 import { NovaListaBotao } from "./nova-lista-botao";
+import { CopiaOffline } from "./copia-offline";
 import type { PadroesDoFechamento } from "./finalizar-dialog";
 
 export const metadata: Metadata = { title: "Mercado" };
@@ -154,6 +155,7 @@ export default async function MercadoPage() {
     return (
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 md:gap-7 md:p-8">
         {cabecalho}
+        <CopiaOffline chave="sem-lista" />
         <div className="flex flex-col items-center gap-4 rounded-[26px] border border-dashed border-border/70 px-6 py-14 text-center">
           <ShoppingBasketIcon
             className="size-10 text-muted-foreground"
@@ -200,6 +202,7 @@ export default async function MercadoPage() {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       {cabecalho}
+      <CopiaOffline chave={lista.id} />
       <ListaCliente
         listaId={lista.id}
         itensIniciais={itens}

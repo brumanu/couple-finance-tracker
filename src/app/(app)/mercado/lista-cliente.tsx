@@ -39,6 +39,10 @@ import {
   salvarFila,
   separarFila,
 } from "@/lib/mercado-fila";
+import {
+  copiaOfflineSalvaEm,
+  guardarCopiaDoMercado,
+} from "@/lib/mercado-offline";
 import { sincronizarItens, type ItemParaSalvar } from "./actions";
 import { ItemLinha } from "./item-linha";
 import { ItemDetalheSheet } from "./item-detalhe-sheet";
@@ -133,6 +137,11 @@ export function ListaCliente({
   // ------------------------------------------------------------------
 
   const flush = useCallback(async (): Promise<{ error?: string }> => {
+    // Na cópia offline a fila só acumula: quem envia é a página nova, depois
+    // que a cópia recarregar (ver copia-offline.tsx). O estado já está
+    // "pendente" — quem enfileirou (ou adotou a fila guardada) marcou.
+    if (copiaOfflineSalvaEm()) return { error: "Sem conexão." };
+
     const snapshot = filaRef.current;
     const { paraSalvar, paraRemover } = separarFila(snapshot);
     if (paraSalvar.length === 0 && paraRemover.length === 0) return {};
@@ -146,7 +155,11 @@ export function ListaCliente({
     }
 
     setEstado("salvando");
-    const resultado = await sincronizarItens(listaId, linhas, paraRemover);
+    // Sem rede a server action nem chega a responder: a chamada rejeita.
+    // Sem o catch o indicador ficava preso em "salvando…".
+    const resultado = await sincronizarItens(listaId, linhas, paraRemover).catch(
+      () => ({ error: "Sem conexão." }),
+    );
 
     if (resultado.error) {
       setEstado("pendente");
@@ -159,6 +172,9 @@ export function ListaCliente({
     const restante = removerEnviados(filaRef.current, snapshot);
     setFila(restante);
     setEstado(Object.keys(restante).length > 0 ? "pendente" : "salvo");
+    // A cópia offline tem que bater com o servidor: o que acabou de subir
+    // saiu da fila e só existe lá agora.
+    guardarCopiaDoMercado();
     return {};
   }, [listaId, setFila]);
 
@@ -209,6 +225,9 @@ export function ListaCliente({
 
     function aoVoltar() {
       if (document.visibilityState !== "visible") return;
+      // Na cópia não há servidor pra consultar; um refresh que falha faria o
+      // Next recarregar a página inteira.
+      if (copiaOfflineSalvaEm()) return;
       if (Object.keys(filaRef.current).length > 0) void flush();
       else router.refresh();
     }
@@ -384,6 +403,10 @@ export function ListaCliente({
   // ------------------------------------------------------------------
 
   async function abrirFechamento() {
+    if (copiaOfflineSalvaEm()) {
+      toast.error("Finalizar a compra precisa de internet — a lista fica guardada até lá.");
+      return;
+    }
     setAbrindoFechamento(true);
     // Único ponto do fluxo que bloqueia o usuário, e é de propósito: lançar
     // despesa a partir de um estado que o servidor não conhece gera número

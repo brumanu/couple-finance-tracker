@@ -17,6 +17,7 @@ import { ThemeToggle } from "./theme-toggle";
 import { useSearch } from "@/components/search/search-provider";
 import { PushToggleButton } from "@/components/push/push-toggle-button";
 import { useSidebar } from "./sidebar-provider";
+import { limparCopiaDoMercado } from "@/lib/mercado-offline";
 
 type Props = {
   nomeUsuario: string;
@@ -237,7 +238,9 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
           </div>
           <PushToggleButton />
           <ThemeToggle />
-          <form action={signOut}>
+          {/* A cópia offline do Mercado tem a lista e o nome do casal: não
+              pode sobrar no aparelho depois de sair. */}
+          <form action={signOut} onSubmit={limparCopiaDoMercado}>
             <button
               type="submit"
               aria-label="Sair"

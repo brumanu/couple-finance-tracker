@@ -59,8 +59,16 @@
       }
       h1 { margin: 20px 0 8px; font-size: 24px; line-height: 1.2; }
       p { margin: 0; font-size: 16px; line-height: 1.5; color: var(--muted); }
-      button {
+      .acoes {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 12px;
         margin-top: 24px;
+      }
+      button, .secundario {
+        display: inline-flex;
+        align-items: center;
         min-height: 48px;
         padding: 0 28px;
         border: 0;
@@ -69,10 +77,18 @@
         color: var(--on-accent);
         font: inherit;
         font-weight: 600;
+        text-decoration: none;
         cursor: pointer;
       }
-      button:active { opacity: 0.85; }
-      button:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+      .secundario {
+        background: transparent;
+        color: var(--text);
+        box-shadow: inset 0 0 0 1.5px var(--muted);
+      }
+      [hidden] { display: none !important; }
+      .nota { margin-top: 12px; font-size: 14px; }
+      button:active, .secundario:active { opacity: 0.85; }
+      button:focus-visible, .secundario:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
     </style>
   </head>
   <body>
@@ -83,11 +99,37 @@
         O Financeiro precisa de internet pra mostrar as contas. Assim que o
         sinal voltar, a página abre sozinha.
       </p>
-      <button type="button" onclick="location.reload()">Tentar de novo</button>
+      <div class="acoes">
+        <button type="button" onclick="location.reload()">Tentar de novo</button>
+        <a id="mercado" class="secundario" href="/mercado" hidden>Abrir a lista do mercado</a>
+      </div>
+      <p id="mercado-quando" class="nota" hidden></p>
     </main>
     <script>
       // Volta sozinho quando a conexão retorna — no mercado o sinal vai e vem.
       addEventListener("online", function () { location.reload(); });
+
+      // O app abre no Início, que não tem cópia. Se o Mercado tem (sw.js),
+      // o caminho até ela começa aqui. Nomes repetidos de sw.js.
+      if (window.caches) {
+        caches
+          .match("/mercado", { cacheName: "mercado-offline" })
+          .then(function (copia) {
+            if (!copia) return;
+            document.getElementById("mercado").hidden = false;
+            var quando = new Date(copia.headers.get("x-copia-em") || "");
+            if (isNaN(quando.getTime())) return;
+            var nota = document.getElementById("mercado-quando");
+            nota.textContent =
+              "Lista salva em " +
+              quando.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) +
+              " às " +
+              quando.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) +
+              ".";
+            nota.hidden = false;
+          })
+          .catch(function () {});
+      }
     </script>
   </body>
 </html>

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LimparCopiaOffline } from "@/components/pwa/limpar-copia-offline";
 import { signIn } from "./actions";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -26,6 +27,7 @@ export default async function LoginPage({
 
   return (
     <main className="flex flex-1 items-center justify-center p-6">
+      <LimparCopiaOffline />
       <div className="w-full max-w-[430px]">
         <div className="flex flex-col gap-6 rounded-[32px] bg-card px-8 py-9 shadow-organic-lg">
           <div>
