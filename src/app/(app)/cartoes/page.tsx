@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRightIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -17,6 +18,8 @@ import { BancoIcone } from "@/lib/bancos-icones";
 import type { BancoOption, CartaoRow } from "./cartao-form-dialog";
 import { CartaoDialogs, EditarCartao, NovoCartao } from "./cartao-dialogs";
 import { CartaoActionsMenu } from "./cartao-actions-menu";
+
+export const metadata: Metadata = { title: "Cartões" };
 
 const BANDEIRA_LABEL: Record<string, string> = {
   visa: "Visa",

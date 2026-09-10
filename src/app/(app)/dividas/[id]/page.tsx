@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftIcon, CheckCircle2Icon } from "lucide-react";
@@ -11,6 +12,8 @@ import { PagamentoBotao } from "./pagamento-botao";
 import { PagamentoActionsMenu } from "./pagamento-actions-menu";
 import { DividaDialogs, EditarDivida } from "../divida-dialogs";
 import { DividaActionsMenu } from "../divida-actions-menu";
+
+export const metadata: Metadata = { title: "Dívida" };
 
 type PagamentoRow = {
   id: string;

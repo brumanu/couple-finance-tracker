@@ -60,14 +60,19 @@ export function criarDialogDeLista<TRow extends { id: string }>(opcoes: {
   function Provider({
     children,
     render,
+    abrirNovoAoMontar = false,
   }: {
     children: React.ReactNode;
     /** `linha` é `null` quando o usuário clicou em cadastrar. */
     render: (linha: TRow | null, fechar: () => void) => React.ReactNode;
+    /** Já monta com o cadastro aberto — atalho do app (`?nova=1`). */
+    abrirNovoAoMontar?: boolean;
   }) {
     // `{ linha }` embrulhado num objeto pra distinguir "nenhum dialog aberto"
     // (null) de "aberto em modo cadastro" (linha null).
-    const [alvo, setAlvo] = useState<{ linha: TRow | null } | null>(null);
+    const [alvo, setAlvo] = useState<{ linha: TRow | null } | null>(() =>
+      abrirNovoAoMontar ? { linha: null } : null,
+    );
 
     // Estável entre renders: sem isso todo botão da lista re-renderizaria a
     // cada abertura do dialog.

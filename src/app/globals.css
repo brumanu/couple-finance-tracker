@@ -242,6 +242,14 @@
   }
   html {
     font-family: var(--font-body), system-ui, sans-serif;
+    /* O flash cinza padrão do Android no toque, trocado por um tom da marca.
+       Botões e itens de navegação têm estado :active próprio e dispensam. */
+    -webkit-tap-highlight-color: color-mix(in srgb, var(--organic-accent) 14%, transparent);
+  }
+  button,
+  [role="button"],
+  nav a {
+    -webkit-tap-highlight-color: transparent;
   }
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading), system-ui, serif;
@@ -255,6 +263,41 @@
   }
   ::selection {
     background: color-mix(in srgb, var(--organic-accent) 30%, transparent);
+  }
+}
+
+/* Altura que o bottom-nav ocupa no rodapé do celular. Quem gruda no rodapé
+   (o campo do mercado) usa isso pra ficar acima dele, e não atrás. Com o
+   teclado aberto o bottom-nav some (ver TecladoVirtual), então vira zero. */
+:root {
+  --altura-barra-inferior: calc(83px + env(safe-area-inset-bottom));
+}
+@media (min-width: 48rem) {
+  :root {
+    --altura-barra-inferior: 0px;
+  }
+}
+html[data-teclado="aberto"] {
+  --altura-barra-inferior: 0px;
+}
+html[data-teclado="aberto"] .some-com-teclado {
+  display: none;
+}
+
+/* Quem pediu menos movimento no sistema não vê drawer deslizando nem dialog
+   dando zoom. O spinner fica de fora: ele é informação, não enfeite. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .animate-spin {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 

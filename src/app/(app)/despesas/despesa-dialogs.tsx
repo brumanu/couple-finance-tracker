@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
 import type { CategoriaOpcao } from "@/lib/categorias";
@@ -23,15 +24,29 @@ export function DespesaDialogs({
   cartoes,
   categorias,
   membros,
+  abrirNovo = false,
   children,
 }: {
   cartoes: CartaoOpcao[];
   categorias: CategoriaOpcao[];
   membros: MembroOpcao[];
+  /** Veio do atalho "Lançar despesa" do ícone do app (`?nova=1`). */
+  abrirNovo?: boolean;
   children: React.ReactNode;
 }) {
+  // Tira o `?nova=1` da URL assim que o formulário abre: senão recarregar a
+  // página ou voltar pra ela no histórico abriria o cadastro de novo.
+  // replaceState (e não router.replace) pra não refazer as consultas.
+  useEffect(() => {
+    if (!abrirNovo) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("nova");
+    window.history.replaceState(null, "", url);
+  }, [abrirNovo]);
+
   return (
     <Provider
+      abrirNovoAoMontar={abrirNovo}
       render={(despesa, fechar) => (
         <Formulario
           key={despesa?.id ?? "nova"}

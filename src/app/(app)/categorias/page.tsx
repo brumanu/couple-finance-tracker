@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
@@ -8,6 +9,8 @@ import {
   NovaCategoria,
 } from "./categoria-dialogs";
 import { CategoriaActionsMenu } from "./categoria-actions-menu";
+
+export const metadata: Metadata = { title: "Categorias" };
 
 export default async function CategoriasPage() {
   const supabase = await createClient();

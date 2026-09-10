@@ -12,6 +12,8 @@ import { SearchProvider } from "@/components/search/search-provider";
 import { SidebarProvider } from "@/components/nav/sidebar-provider";
 import { GlobalSearchMount } from "@/components/search/global-search-mount";
 import { SwRegister } from "@/components/push/sw-register";
+import { TecladoVirtual } from "@/components/pwa/teclado-virtual";
+import { AtualizarAoVoltar } from "@/components/pwa/atualizar-ao-voltar";
 
 /**
  * Cartões, categorias e membros existem só pra alimentar o dialog do FAB,
@@ -36,7 +38,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <SearchProvider>
       <SidebarProvider>
-        <div className="flex min-h-screen w-full">
+        <div className="flex min-h-dvh w-full">
           <Sidebar
             nomeUsuario={session.nome}
             emailUsuario={session.email}
@@ -58,6 +60,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <Toaster />
           <GlobalSearchMount />
           <SwRegister />
+          <TecladoVirtual />
+          <AtualizarAoVoltar />
         </div>
       </SidebarProvider>
     </SearchProvider>

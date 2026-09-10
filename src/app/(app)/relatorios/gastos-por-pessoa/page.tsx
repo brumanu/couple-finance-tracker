@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -10,6 +11,8 @@ import { parseMesParam } from "@/lib/mes";
 import { parcelaNoMes, assinaturaAtivaNoMes } from "@/lib/cartao-calc";
 import { formatBRL } from "@/lib/format";
 import { MonthSwitcher } from "../../month-switcher";
+
+export const metadata: Metadata = { title: "Gastos por pessoa" };
 
 type LancamentoRow = {
   id: string;

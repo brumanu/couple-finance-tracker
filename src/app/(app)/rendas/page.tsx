@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
@@ -17,6 +18,8 @@ import {
   RendaDialogs,
 } from "./renda-dialogs";
 import { RendaExtraActionsMenu } from "./renda-extra-actions-menu";
+
+export const metadata: Metadata = { title: "Rendas" };
 
 const DIAS_SEMANA = [
   "Domingo",

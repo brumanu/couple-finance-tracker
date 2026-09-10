@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -8,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { mesAtual, mesAnterior, type MesRef } from "@/lib/mes";
 import { parcelaNoMes, assinaturaAtivaNoMes } from "@/lib/cartao-calc";
 import { formatBRL } from "@/lib/format";
+
+export const metadata: Metadata = { title: "Categoria mês a mês" };
 
 type LancamentoRow = {
   id: string;

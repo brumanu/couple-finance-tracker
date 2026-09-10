@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -7,6 +8,8 @@ import { Card } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format";
 import { mesAtual, mesAnterior, type MesRef } from "@/lib/mes";
 import { parcelaNoMes, assinaturaAtivaNoMes } from "@/lib/cartao-calc";
+
+export const metadata: Metadata = { title: "Fluxo mensal" };
 
 type LancamentoRow = {
   id: string;

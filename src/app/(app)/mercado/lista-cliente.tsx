@@ -478,9 +478,11 @@ export function ListaCliente({
         O campo de adicionar fica colado no rodapé: no mercado a pessoa lembra
         de coisa no meio do corredor, e rolar até o fim da lista pra digitar
         seria hostil. `sticky` em vez de `fixed` pra não brigar com o
-        bottom-nav nem com o teclado virtual.
+        teclado virtual. Gruda acima do bottom-nav (que é fixed e z-40 — com
+        bottom-0 o campo ficava escondido atrás dele) e desce até o rodapé
+        quando o teclado abre e o bottom-nav some.
       */}
-      <div className="sticky bottom-0 -mx-4 mt-4 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
+      <div className="sticky bottom-(--altura-barra-inferior) -mx-4 mt-4 border-t border-border/60 bg-background/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
         <CampoAdicionarItem
           historico={historico}
           naLista={nomes}

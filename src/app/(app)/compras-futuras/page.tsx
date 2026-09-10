@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   ExternalLinkIcon,
   PiggyBankIcon,
@@ -23,6 +24,8 @@ import {
 } from "./compra-futura-dialogs";
 import { CompraFuturaActionsMenu } from "./compra-futura-actions-menu";
 import { CompreiBotao } from "./comprei-botao";
+
+export const metadata: Metadata = { title: "Quero comprar" };
 
 /** Mesma janela de projeção do dashboard: mês atual + 5 seguintes. */
 const MESES_PROJECAO = 6;

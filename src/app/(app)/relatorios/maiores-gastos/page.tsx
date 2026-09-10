@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -12,6 +13,8 @@ import {
   RelatorioMaioresGastosClient,
   type LinhaGasto,
 } from "./relatorio-client";
+
+export const metadata: Metadata = { title: "Maiores gastos" };
 
 type LancamentoRow = {
   id: string;

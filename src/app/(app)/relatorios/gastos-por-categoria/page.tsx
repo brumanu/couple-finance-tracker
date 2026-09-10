@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -13,6 +14,8 @@ import {
   type LinhaTransacao,
   type CategoriaResumo,
 } from "./relatorio-client";
+
+export const metadata: Metadata = { title: "Gastos por categoria" };
 
 export default async function RelatorioGastosPorCategoriaPage({
   searchParams,

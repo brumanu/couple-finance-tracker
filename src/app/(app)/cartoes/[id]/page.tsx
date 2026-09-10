@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftIcon } from "lucide-react";
@@ -32,6 +33,8 @@ import {
   NovaCompra,
 } from "./cartao-detalhe-dialogs";
 import { AssinaturaActionsMenu } from "./assinatura-actions-menu";
+
+export const metadata: Metadata = { title: "Fatura do cartão" };
 
 const BANDEIRA_LABEL: Record<string, string> = {
   visa: "Visa",

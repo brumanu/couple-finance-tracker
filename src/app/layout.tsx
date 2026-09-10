@@ -1,7 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Figtree, Caprasimo } from "next/font/google";
 import "./globals.css";
 import { ThemeInitScript } from "@/components/nav/theme-init";
+import { COR_BARRA_STATUS } from "@/lib/tema";
 
 const figtree = Figtree({
   variable: "--font-body",
@@ -16,8 +17,13 @@ const caprasimo = Caprasimo({
 });
 
 export const metadata: Metadata = {
-  title: "Financeiro do Casal",
-  description: "Controle financeiro quinzenal — Bruno & Esposa",
+  // Cada página exporta só o próprio nome; é o que aparece na janela do app
+  // no desktop, no histórico e no seletor de abas.
+  title: {
+    default: "Financeiro do Casal",
+    template: "%s — Financeiro",
+  },
+  description: "Controle financeiro quinzenal do casal",
   applicationName: "Financeiro",
   appleWebApp: {
     capable: true,
@@ -27,16 +33,23 @@ export const metadata: Metadata = {
   formatDetection: { telephone: false },
 };
 
-export const viewport = {
+export const viewport: Viewport = {
+  // Seguem o tema do sistema; o tema escolhido no app passa na frente pelo
+  // theme-init (ver src/lib/tema.ts).
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#c67139" },
-    { media: "(prefers-color-scheme: dark)", color: "#1c1714" },
+    { media: "(prefers-color-scheme: light)", color: COR_BARRA_STATUS.light },
+    { media: "(prefers-color-scheme: dark)", color: COR_BARRA_STATUS.dark },
   ],
   width: "device-width",
   initialScale: 1,
   // Sem isso env(safe-area-inset-*) é sempre 0 no iOS em modo standalone, e a
   // barra de gestos do iPhone cobre os rótulos do bottom-nav.
-  viewportFit: "cover" as const,
+  viewportFit: "cover",
+  // No Android o teclado encolhe a página em vez de cobri-la: o que é sticky
+  // no rodapé (o campo do mercado) fica logo acima do teclado. O bottom-nav,
+  // que subiria junto, some enquanto se digita (TecladoVirtual). O iOS
+  // ignora a chave e segue cobrindo.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon, ChevronRightIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { formatBRL } from "@/lib/format";
+
+export const metadata: Metadata = { title: "Compras anteriores" };
 
 /** Quantas compras a tela lista. Além disso vira arqueologia, não consulta. */
 const LIMITE = 50;

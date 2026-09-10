@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth";
 import { CalculadoraSalario } from "./calculadora";
+
+export const metadata: Metadata = { title: "Salário líquido" };
 
 export default async function SalarioLiquidoPage() {
   await requireSession();

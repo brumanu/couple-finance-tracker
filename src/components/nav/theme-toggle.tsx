@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { SunIcon, MoonIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { COR_BARRA_STATUS, ID_META_TEMA } from "@/lib/tema";
 
 type Theme = "light" | "dark";
 
@@ -40,7 +41,21 @@ function aplicarTema(novo: Theme): void {
   const el = document.documentElement;
   if (novo === "dark") el.classList.add("dark");
   else el.classList.remove("dark");
+  aplicarCorBarraStatus(novo);
   for (const l of listeners) l();
+}
+
+// Mesmo mecanismo do theme-init: um meta sem media no topo do <head> vence os
+// do layout, que seguem o tema do sistema.
+function aplicarCorBarraStatus(tema: Theme): void {
+  let meta = document.getElementById(ID_META_TEMA) as HTMLMetaElement | null;
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.id = ID_META_TEMA;
+    document.head.prepend(meta);
+  }
+  meta.content = COR_BARRA_STATUS[tema];
 }
 
 type Props = {

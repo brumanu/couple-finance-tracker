@@ -36,7 +36,7 @@ export function MobileFab({ cartoes, categorias, membros }: Props) {
   if (pathname.startsWith("/mercado")) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(88px+env(safe-area-inset-bottom))] z-40 flex justify-end pr-4 md:hidden">
+    <div className="some-com-teclado pointer-events-none fixed inset-x-0 bottom-[calc(88px+env(safe-area-inset-bottom))] z-40 flex justify-end pr-4 md:hidden">
       {carregado ? (
         <DespesaFormDialog
           cartoes={cartoes}

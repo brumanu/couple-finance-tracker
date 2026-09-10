@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -15,6 +16,8 @@ import {
   type LinhaAssinatura,
   type CartaoOpcaoRel,
 } from "./relatorio-client";
+
+export const metadata: Metadata = { title: "Assinaturas dos cartões" };
 
 type AssinaturaRow = {
   id: string;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCartoesParaSelecao } from "@/lib/cartoes-selection";
@@ -14,6 +15,8 @@ import {
   NovaDespesa,
 } from "./despesa-dialogs";
 import { DespesaActionsMenu } from "./despesa-actions-menu";
+
+export const metadata: Metadata = { title: "Despesas" };
 
 const DIAS_SEMANA = [
   "Domingo",
@@ -94,6 +97,7 @@ export default async function DespesasPage({
       cartoes={cartoes}
       categorias={categorias}
       membros={membros}
+      abrirNovo={params.nova === "1"}
     >
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 p-4 md:gap-7 md:p-8">
       <header className="flex flex-wrap items-end justify-between gap-3">

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   AlertTriangleIcon,
@@ -32,6 +33,8 @@ import { MonthSwitcher } from "./month-switcher";
 import { PagarConta, PagarFatura } from "./pagar/pagar-botoes";
 import { DesmarcarButton } from "./pagar/desmarcar-button";
 import { DespesaDialogs, NovaDespesa } from "./despesas/despesa-dialogs";
+
+export const metadata: Metadata = { title: "Início" };
 
 type RendaRow = {
   descricao: string;

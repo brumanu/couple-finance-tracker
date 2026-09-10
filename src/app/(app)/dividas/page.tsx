@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRightIcon, CheckCircle2Icon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -9,6 +10,8 @@ import { formatBRL } from "@/lib/format";
 import type { DividaRow } from "./divida-form-dialog";
 import { DividaDialogs, EditarDivida, NovaDivida } from "./divida-dialogs";
 import { DividaActionsMenu } from "./divida-actions-menu";
+
+export const metadata: Metadata = { title: "Dívidas" };
 
 export default async function DividasPage() {
   const supabase = await createClient();

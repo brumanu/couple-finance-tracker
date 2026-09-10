@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeftIcon, CheckIcon, PackageXIcon } from "lucide-react";
@@ -6,6 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatBRL } from "@/lib/format";
+
+export const metadata: Metadata = { title: "Compra do mercado" };
 
 function formatData(iso: string): string {
   const [ano, mes, dia] = iso.split("-");

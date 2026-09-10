@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { HistoryIcon, ShoppingBasketIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -10,6 +11,8 @@ import type { ItemMercado } from "@/lib/mercado";
 import { ListaCliente } from "./lista-cliente";
 import { NovaListaBotao } from "./nova-lista-botao";
 import type { PadroesDoFechamento } from "./finalizar-dialog";
+
+export const metadata: Metadata = { title: "Mercado" };
 
 /**
  * Quantos itens do histórico alimentam o autocomplete. Sobe tudo de uma vez

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -12,6 +13,8 @@ import {
   type CompraCartaoInfo,
   type AssinaturaCartaoInfo,
 } from "@/lib/cartao-calc";
+
+export const metadata: Metadata = { title: "Comprometimento futuro" };
 
 type CompraRow = {
   id: string;

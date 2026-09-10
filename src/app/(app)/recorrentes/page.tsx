@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
@@ -12,6 +13,8 @@ import {
   RecorrenteDialogs,
 } from "./recorrente-dialogs";
 import { RecorrenteActionsMenu } from "./recorrente-actions-menu";
+
+export const metadata: Metadata = { title: "Contas fixas" };
 
 // Cartão / crédito = accent; demais = sage; pausadas caem para neutral
 function categoriaVariant(

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangleIcon, BuildingIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
@@ -18,6 +19,8 @@ import {
   type NotaMeiRow,
 } from "./nota-form-dialog";
 import { NotaMeiActionsMenu } from "./nota-actions-menu";
+
+export const metadata: Metadata = { title: "Faturamento MEI" };
 
 const MESES_ABREV = [
   "jan",

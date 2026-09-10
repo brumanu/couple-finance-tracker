@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ShieldIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -5,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signIn } from "./actions";
+
+export const metadata: Metadata = { title: "Entrar" };
 
 export default async function LoginPage({
   searchParams,

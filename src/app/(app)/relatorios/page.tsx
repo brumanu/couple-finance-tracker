@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import {
   CreditCardIcon,
@@ -13,6 +14,8 @@ import {
   Grid3x3Icon,
 } from "lucide-react";
 import { requireSession } from "@/lib/auth";
+
+export const metadata: Metadata = { title: "Relatórios" };
 
 type Relatorio = {
   href: string;

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
@@ -5,6 +6,8 @@ import { BancoIcone } from "@/lib/bancos-icones";
 import type { BancoRow } from "./banco-form-dialog";
 import { BancoDialogs, EditarBanco, NovoBanco } from "./banco-dialogs";
 import { BancoActionsMenu } from "./banco-actions-menu";
+
+export const metadata: Metadata = { title: "Bancos" };
 
 export default async function BancosPage() {
   const supabase = await createClient();
