@@ -5,20 +5,16 @@ import { XIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { FiltroCategorias } from "@/components/filtro-categorias";
+import { passaNoFiltroDeCategorias } from "@/lib/categorias-extras";
 import { formatBRL } from "@/lib/format";
 import type { CategoriaOpcao } from "@/lib/categorias";
 
 export type LinhaGasto = {
   id: string;
   categoriaId: string | null;
+  /** Principal e extras — é por elas que o filtro procura. */
+  categoriaIds: string[];
   categoriaNome: string | null;
   descricao: string;
   origem: string;
@@ -26,8 +22,6 @@ export type LinhaGasto = {
   valor: number;
 };
 
-const TODOS = "__todos__";
-const SEM_CATEGORIA = "__sem_cat__";
 const TOP_N = 20;
 
 function formatDataBR(iso: string | null): string {
@@ -79,19 +73,22 @@ export function RelatorioMaioresGastosClient({
   temSemCategoria,
   mesLabel,
 }: Props) {
-  const [categoriaId, setCategoriaId] = useState<string>(TODOS);
+  const [categoriasSel, setCategoriasSel] = useState<string[]>([]);
+
 
   const categoriaById = useMemo(
     () => new Map(todasCategorias.map((c) => [c.id, c] as const)),
     [todasCategorias],
   );
 
-  const filtradas = useMemo(() => {
-    if (categoriaId === TODOS) return linhas;
-    if (categoriaId === SEM_CATEGORIA)
-      return linhas.filter((l) => !l.categoriaId);
-    return linhas.filter((l) => l.categoriaId === categoriaId);
-  }, [linhas, categoriaId]);
+  // Principal ou extra: aqui se procura compra, não se soma categoria.
+  const filtradas = useMemo(
+    () =>
+      linhas.filter((l) =>
+        passaNoFiltroDeCategorias(categoriasSel, l.categoriaIds),
+      ),
+    [linhas, categoriasSel],
+  );
 
   const ordenadas = useMemo(
     () => [...filtradas].sort((a, b) => b.valor - a.valor),
@@ -107,82 +104,20 @@ export function RelatorioMaioresGastosClient({
   const maior = topN[0];
   const maiorValor = maior?.valor ?? 0;
 
-  const algumFiltroAtivo = categoriaId !== TODOS;
-  const limparFiltros = () => setCategoriaId(TODOS);
-
-  const categoriaSelecionada = categoriaOptions.find(
-    (c) => c.id === categoriaId,
-  );
+  const algumFiltroAtivo = categoriasSel.length > 0;
+  const limparFiltros = () => setCategoriasSel([]);
 
   return (
     <>
       <Card>
         <div className="flex flex-col gap-3 p-4 md:p-5">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-              <Label
-                htmlFor="f-categoria"
-                className="text-[10px] uppercase tracking-widest text-muted-foreground"
-              >
-                Categoria
-              </Label>
-              <Select
-                value={categoriaId}
-                onValueChange={(v) => v && setCategoriaId(v)}
-              >
-                <SelectTrigger id="f-categoria" className="w-full">
-                  <SelectValue>
-                    {categoriaId === SEM_CATEGORIA ? (
-                      <span className="text-muted-foreground">
-                        Sem categoria
-                      </span>
-                    ) : categoriaSelecionada ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{
-                            backgroundColor: categoriaSelecionada.cor,
-                            color: "#fff",
-                          }}
-                          aria-hidden
-                        >
-                          {categoriaSelecionada.emoji ??
-                            categoriaSelecionada.nome[0]?.toUpperCase() ??
-                            "?"}
-                        </span>
-                        <span>{categoriaSelecionada.nome}</span>
-                      </span>
-                    ) : (
-                      <span>Todas as categorias</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS}>Todas as categorias</SelectItem>
-                  {temSemCategoria && (
-                    <SelectItem value={SEM_CATEGORIA}>
-                      <span className="text-muted-foreground">
-                        Sem categoria
-                      </span>
-                    </SelectItem>
-                  )}
-                  {categoriaOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{ backgroundColor: c.cor, color: "#fff" }}
-                          aria-hidden
-                        >
-                          {c.emoji ?? c.nome[0]?.toUpperCase() ?? "?"}
-                        </span>
-                        <span>{c.nome}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FiltroCategorias
+              categorias={categoriaOptions}
+              value={categoriasSel}
+              onValueChange={setCategoriasSel}
+              temSemCategoria={temSemCategoria}
+            />
 
             {algumFiltroAtivo && (
               <Button

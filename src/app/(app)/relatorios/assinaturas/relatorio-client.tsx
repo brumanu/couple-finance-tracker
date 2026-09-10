@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { BancoIcone } from "@/lib/bancos-icones";
 import { formatBRL } from "@/lib/format";
 import type { CategoriaOpcao } from "@/lib/categorias";
+import { FiltroCategorias } from "@/components/filtro-categorias";
+import { passaNoFiltroDeCategorias } from "@/lib/categorias-extras";
 
 export type LinhaAssinatura = {
   id: string;
@@ -43,7 +45,6 @@ export type CartaoOpcaoRel = {
 };
 
 const TODOS = "__todos__";
-const SEM_CATEGORIA = "__sem_cat__";
 
 type SortKey = "descricao_asc" | "valor_desc" | "valor_asc" | "inicio_desc";
 
@@ -73,18 +74,20 @@ export function RelatorioAssinaturasClient({
   mesLabel,
 }: Props) {
   const [cartaoId, setCartaoId] = useState<string>(TODOS);
-  const [categoriaId, setCategoriaId] = useState<string>(TODOS);
+  const [categoriasSel, setCategoriasSel] = useState<string[]>([]);
   const [status, setStatus] = useState<string>(TODOS);
   const [sort, setSort] = useState<SortKey>("valor_desc");
 
   const filtradas = useMemo(() => {
     let arr = linhas;
     if (cartaoId !== TODOS) arr = arr.filter((l) => l.cartaoId === cartaoId);
-    if (categoriaId !== TODOS) {
-      if (categoriaId === SEM_CATEGORIA)
-        arr = arr.filter((l) => !l.categoriaId);
-      else arr = arr.filter((l) => l.categoriaId === categoriaId);
-    }
+    // Assinatura tem uma categoria só — a principal é tudo que há.
+    arr = arr.filter((l) =>
+      passaNoFiltroDeCategorias(
+        categoriasSel,
+        l.categoriaId ? [l.categoriaId] : [],
+      ),
+    );
     if (status !== TODOS) arr = arr.filter((l) => l.status === status);
 
     const sorted = [...arr];
@@ -104,7 +107,7 @@ export function RelatorioAssinaturasClient({
         break;
     }
     return sorted;
-  }, [linhas, cartaoId, categoriaId, status, sort]);
+  }, [linhas, cartaoId, categoriasSel, status, sort]);
 
   const totalAssinaturas = filtradas.length;
   const ativasNoMes = filtradas.filter((l) => l.contaNoMes);
@@ -112,18 +115,15 @@ export function RelatorioAssinaturasClient({
   const totalAnual = totalMensal * 12;
 
   const algumFiltroAtivo =
-    cartaoId !== TODOS || categoriaId !== TODOS || status !== TODOS;
+    cartaoId !== TODOS || categoriasSel.length > 0 || status !== TODOS;
 
   const limparFiltros = () => {
     setCartaoId(TODOS);
-    setCategoriaId(TODOS);
+    setCategoriasSel([]);
     setStatus(TODOS);
   };
 
   const cartaoSelecionado = cartaoOptions.find((c) => c.id === cartaoId);
-  const categoriaSelecionada = categoriaOptions.find(
-    (c) => c.id === categoriaId,
-  );
 
   return (
     <>
@@ -179,68 +179,12 @@ export function RelatorioAssinaturasClient({
               </Select>
             </div>
 
-            <div className="flex min-w-[180px] flex-1 flex-col gap-1.5">
-              <Label
-                htmlFor="f-categoria"
-                className="text-[10px] uppercase tracking-widest text-muted-foreground"
-              >
-                Categoria
-              </Label>
-              <Select
-                value={categoriaId}
-                onValueChange={(v) => v && setCategoriaId(v)}
-              >
-                <SelectTrigger id="f-categoria" className="w-full">
-                  <SelectValue>
-                    {categoriaId === SEM_CATEGORIA ? (
-                      <span className="text-muted-foreground">
-                        Sem categoria
-                      </span>
-                    ) : categoriaSelecionada ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{
-                            backgroundColor: categoriaSelecionada.cor,
-                            color: "#fff",
-                          }}
-                          aria-hidden
-                        >
-                          {categoriaSelecionada.emoji ??
-                            categoriaSelecionada.nome[0]?.toUpperCase() ??
-                            "?"}
-                        </span>
-                        <span>{categoriaSelecionada.nome}</span>
-                      </span>
-                    ) : (
-                      <span>Todas as categorias</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS}>Todas as categorias</SelectItem>
-                  <SelectItem value={SEM_CATEGORIA}>
-                    <span className="text-muted-foreground">
-                      Sem categoria
-                    </span>
-                  </SelectItem>
-                  {categoriaOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{ backgroundColor: c.cor, color: "#fff" }}
-                          aria-hidden
-                        >
-                          {c.emoji ?? c.nome[0]?.toUpperCase() ?? "?"}
-                        </span>
-                        <span>{c.nome}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FiltroCategorias
+              categorias={categoriaOptions}
+              value={categoriasSel}
+              onValueChange={setCategoriasSel}
+              temSemCategoria={linhas.some((l) => !l.categoriaId)}
+            />
 
             <div className="flex min-w-[150px] flex-col gap-1.5">
               <Label

@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { dadosDoMes } from "@/lib/gastos-do-mes";
 import { getCategorias } from "@/lib/categorias-server";
+import { categoriasDaLinha } from "@/lib/categorias-extras";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { parseMesParam } from "@/lib/mes";
@@ -28,10 +29,6 @@ type LancamentoRow = {
   categoria_id: string | null;
   conta_recorrente_id: string | null;
 };
-
-
-
-
 
 export default async function RelatorioMaioresGastosPage({
   searchParams,
@@ -62,6 +59,7 @@ export default async function RelatorioMaioresGastosPage({
     linhas.push({
       id: `despesa-${l.id}`,
       categoriaId: l.categoria_id,
+      categoriaIds: categoriasDaLinha(l),
       categoriaNome: nomeCategoria(l.categoria_id),
       descricao: l.descricao,
       origem: "Despesa avulsa",
@@ -85,6 +83,7 @@ export default async function RelatorioMaioresGastosPage({
     linhas.push({
       id: `conta-${c.id}`,
       categoriaId,
+      categoriaIds: categoriaId ? [categoriaId] : [],
       categoriaNome: nomeCategoria(categoriaId),
       descricao: c.descricao,
       origem: pago ? "Conta fixa · paga" : "Conta fixa · prevista",
@@ -114,6 +113,7 @@ export default async function RelatorioMaioresGastosPage({
     linhas.push({
       id: `compra-${compra.id}`,
       categoriaId: compra.categoria_id,
+      categoriaIds: categoriasDaLinha(compra),
       categoriaNome: nomeCategoria(compra.categoria_id),
       descricao: compra.descricao,
       origem:
@@ -144,6 +144,7 @@ export default async function RelatorioMaioresGastosPage({
     linhas.push({
       id: `assin-${a.id}`,
       categoriaId: a.categoria_id,
+      categoriaIds: a.categoria_id ? [a.categoria_id] : [],
       categoriaNome: nomeCategoria(a.categoria_id),
       descricao: a.descricao,
       origem: "Assinatura",
@@ -152,9 +153,9 @@ export default async function RelatorioMaioresGastosPage({
     });
   }
 
-  const categoriaIdsPresentes = new Set(
-    linhas.map((l) => l.categoriaId).filter((x): x is string => Boolean(x)),
-  );
+  // Inclui as extras: filtrar por Lazer tem que ser possível mesmo quando
+  // Lazer só aparece como categoria adicional de alguma compra.
+  const categoriaIdsPresentes = new Set(linhas.flatMap((l) => l.categoriaIds));
   const temSemCategoria = linhas.some((l) => !l.categoriaId);
   const categoriaOptions = categorias.filter((c) =>
     categoriaIdsPresentes.has(c.id),

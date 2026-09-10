@@ -15,13 +15,12 @@ import {
 import { hojeISO } from "@/lib/mes";
 import { BancoIcone } from "@/lib/bancos-icones";
 import type { CartaoOpcao } from "@/lib/cartoes-selection";
-import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
-import { CategoriaSelectField } from "@/components/categoria-select";
-import { CategoriasMultiSelect } from "@/components/categorias-multi-select";
+import type { CategoriaOpcao } from "@/lib/categorias";
+import { CategoriasComPrincipal } from "@/components/categorias-com-principal";
 import {
-  CAMPO_CATEGORIAS_EXTRAS,
-  idsDeExtras,
+  selecaoDaLinha,
   type ExtraDeCategoria,
+  type SelecaoCategorias,
 } from "@/lib/categorias-extras";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
@@ -87,8 +86,7 @@ export function DespesaFormDialog({
           : "",
       data,
       quinzena: String(despesa?.quinzena ?? inferQuinzena(data)),
-      categoriaId: despesa?.categoria_id ?? NENHUMA_CATEGORIA,
-      extras: idsDeExtras(despesa),
+      categorias: selecaoDaLinha(despesa),
       quemGastou: despesa?.quem_gastou ?? NENHUM_QUEM,
     };
   }, [
@@ -106,17 +104,10 @@ export function DespesaFormDialog({
   const [cartaoId, setCartaoId] = useState<string>(NENHUM);
   const [parcelada, setParcelada] = useState(false);
   const [parcelasRaw, setParcelasRaw] = useState("2");
-  const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
-  const [extras, setExtras] = useState<string[]>(defaults.extras);
+  const [selCategorias, setSelCategorias] = useState<SelecaoCategorias>(
+    defaults.categorias,
+  );
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
-
-  // Extra é categoria ADICIONAL: sem uma principal ela não tem o que
-  // complementar, e o lançamento ficaria exibindo categorias na lista
-  // enquanto conta como "sem categoria" nos relatórios de soma.
-  function onCategoriaChange(nova: string) {
-    setCategoriaId(nova);
-    if (nova === NENHUMA_CATEGORIA) setExtras([]);
-  }
 
   const ctrl = useFormDialog<DespesaFormState>({
     action: isEdit ? updateDespesa.bind(null, despesa!.id) : createDespesa,
@@ -126,8 +117,7 @@ export function DespesaFormDialog({
     aoSalvar: isEdit ? undefined : playCoinSound,
     reset: () => {
       campos.reset();
-      setCategoriaId(defaults.categoriaId);
-      setExtras(defaults.extras);
+      setSelCategorias(defaults.categorias);
       setQuemGastou(defaults.quemGastou);
       // Cartão/parcelamento só existem no cadastro — na edição a despesa já
       // nasceu avulsa e não pode virar compra de cartão.
@@ -148,39 +138,25 @@ export function DespesaFormDialog({
   const usaCartao = cartaoId !== NENHUM;
   const cartaoSelecionado = cartoes.find((c) => c.id === cartaoId);
 
-  const camposClassificacao = (
-    <>
-      <CampoForm htmlFor="categoria_id" rotulo="Categoria">
-        <CategoriaSelectField
-          categorias={categorias}
-          value={categoriaId}
-          onValueChange={onCategoriaChange}
-        />
-      </CampoForm>
-      <CampoForm htmlFor="categorias_extras" rotulo="Outras categorias (opcional)">
-        <CategoriasMultiSelect
-          id="categorias_extras"
-          nomeCampo={CAMPO_CATEGORIAS_EXTRAS}
-          categorias={categorias}
-          excluir={categoriaId}
-          value={extras}
-          onValueChange={setExtras}
-          disabled={categoriaId === NENHUMA_CATEGORIA}
-          placeholder={
-            categoriaId === NENHUMA_CATEGORIA
-              ? "Escolha uma categoria primeiro"
-              : "Nenhuma"
-          }
-        />
-      </CampoForm>
-      <CampoForm htmlFor="quem_gastou" rotulo="Quem gastou (opcional)">
-        <QuemGastouSelectField
-          membros={membros}
-          value={quemGastou}
-          onValueChange={setQuemGastou}
-        />
-      </CampoForm>
-    </>
+  // Categorias sempre na largura toda: em meia coluna o nome da principal
+  // era cortado assim que havia uma extra ao lado.
+  const campoCategorias = (
+    <CampoForm htmlFor="categorias" rotulo="Categorias" className="col-span-2">
+      <CategoriasComPrincipal
+        categorias={categorias}
+        value={selCategorias}
+        onValueChange={setSelCategorias}
+      />
+    </CampoForm>
+  );
+  const campoQuemGastou = (
+    <CampoForm htmlFor="quem_gastou" rotulo="Quem gastou (opcional)">
+      <QuemGastouSelectField
+        membros={membros}
+        value={quemGastou}
+        onValueChange={setQuemGastou}
+      />
+    </CampoForm>
   );
 
   return (
@@ -309,11 +285,15 @@ export function DespesaFormDialog({
       )}
 
       {usaCartao ? (
-        <div className="flex flex-col gap-4">{camposClassificacao}</div>
+        <div className="flex flex-col gap-4">
+          {campoCategorias}
+          {campoQuemGastou}
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
           <CampoQuinzena campos={campos} />
-          {camposClassificacao}
+          {campoQuemGastou}
+          {campoCategorias}
         </div>
       )}
     </FormDialogShell>

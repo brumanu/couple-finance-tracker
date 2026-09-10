@@ -11,16 +11,9 @@ import { cn } from "@/lib/utils";
 import type { CategoriaOpcao } from "@/lib/categorias";
 
 /**
- * Escolha de várias categorias de uma vez.
- *
- * Serve a dois usos que parecem diferentes mas têm a mesma mecânica:
- *
- *  - nos formulários, o campo "Outras categorias", que emite um
- *    `<input hidden>` por id escolhido (`nomeCampo`) — vários inputs de mesmo
- *    nome em vez de uma string com separador, pra que o servidor leia com
- *    `getAll` sem ter que escapar nada;
- *  - no filtro do relatório, onde não há formulário e o estado fica só no
- *    cliente (`nomeCampo` ausente).
+ * Escolha de várias categorias de uma vez — o modo padrão do filtro de
+ * categoria dos relatórios (ver FiltroCategorias). Nos formulários quem faz
+ * isso é CategoriasComPrincipal, que também marca a principal.
  *
  * Usa `DropdownMenuCheckboxItem` e não o `Select`: o Select do Base UI é de
  * escolha única e fecha ao clicar, o que obrigaria a reabrir o menu a cada
@@ -56,10 +49,6 @@ type Props = {
   categorias: CategoriaOpcao[];
   value: string[];
   onValueChange: (ids: string[]) => void;
-  /** Emite um `<input hidden>` por id com este nome. Só o formulário usa. */
-  nomeCampo?: string;
-  /** Some da lista — no formulário é a categoria principal, já escolhida. */
-  excluir?: string | null;
   /**
    * Item fora do cadastro de categorias, no topo da lista. O filtro do
    * relatório usa pra "Sem categoria".
@@ -74,20 +63,11 @@ export function CategoriasMultiSelect({
   categorias,
   value,
   onValueChange,
-  nomeCampo,
-  excluir,
   opcaoEspecial,
   placeholder = "Nenhuma",
   disabled,
 }: Props) {
-  const disponiveis = excluir
-    ? categorias.filter((c) => c.id !== excluir)
-    : categorias;
-
-  // Marcada mas fora da lista visível: acontece quando a categoria vira a
-  // principal com o dialog aberto. Fica fora do resumo pra não mostrar uma
-  // seleção que o usuário não consegue desmarcar.
-  const marcadas = disponiveis.filter((c) => value.includes(c.id));
+  const marcadas = categorias.filter((c) => value.includes(c.id));
   const especialMarcada =
     opcaoEspecial != null && value.includes(opcaoEspecial.valor);
 
@@ -103,14 +83,9 @@ export function CategoriasMultiSelect({
 
   return (
     <>
-      {nomeCampo &&
-        marcadas.map((c) => (
-          <input key={c.id} type="hidden" name={nomeCampo} value={c.id} />
-        ))}
-
       <DropdownMenu>
         <DropdownMenuTrigger
-          disabled={disabled || (disponiveis.length === 0 && !opcaoEspecial)}
+          disabled={disabled || (categorias.length === 0 && !opcaoEspecial)}
           className={MESMA_ALTURA_DO_SELECT}
           id={id}
         >
@@ -152,7 +127,7 @@ export function CategoriasMultiSelect({
               </span>
             </DropdownMenuCheckboxItem>
           )}
-          {disponiveis.map((c) => (
+          {categorias.map((c) => (
             <DropdownMenuCheckboxItem
               key={c.id}
               checked={value.includes(c.id)}

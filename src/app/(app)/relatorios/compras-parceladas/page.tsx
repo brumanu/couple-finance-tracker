@@ -4,6 +4,10 @@ import { ArrowLeftIcon } from "lucide-react";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { getCategorias } from "@/lib/categorias-server";
+import {
+  categoriasDaLinha,
+  type ExtraDeCategoria,
+} from "@/lib/categorias-extras";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { parseMesParam } from "@/lib/mes";
@@ -32,6 +36,7 @@ type CompraRow = {
   parcelas_ja_pagas: number | null;
   categoria: string | null;
   categoria_id: string | null;
+  categorias_extras: ExtraDeCategoria[] | null;
 };
 
 type CartaoRow = {
@@ -91,7 +96,7 @@ export default async function RelatorioComprasParceladasPage({
     supabase
       .from("compras_cartao")
       .select(
-        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id",
+        "id, cartao_id, descricao, valor_total, data_compra, parcelas, parcelas_ja_pagas, categoria, categoria_id, categorias_extras(categoria_id)",
       )
       .gt("parcelas", 1)
       .gte("data_compra", comprasCutoff)
@@ -149,6 +154,7 @@ export default async function RelatorioComprasParceladasPage({
       descricao: c.descricao,
       categoria: c.categoria,
       categoriaId: c.categoria_id,
+      categoriaIds: categoriasDaLinha(c),
       cartaoId: c.cartao_id,
       cartaoLabel,
       bancoIcone: banco?.icone ?? null,
@@ -192,10 +198,10 @@ export default async function RelatorioComprasParceladasPage({
     })
     .sort((a, b) => a.label.localeCompare(b.label));
 
-  // Só categorias efetivamente usadas por alguma compra parcelada
-  const categoriaIdsPresentes = new Set(
-    linhas.map((l) => l.categoriaId).filter((x): x is string => Boolean(x)),
-  );
+  // Só categorias efetivamente usadas por alguma compra parcelada — extras
+  // incluídas, pra dar pra filtrar por uma categoria que só aparece como
+  // adicional.
+  const categoriaIdsPresentes = new Set(linhas.flatMap((l) => l.categoriaIds));
   const categoriaOptions = categorias.filter((c) =>
     categoriaIdsPresentes.has(c.id),
   );

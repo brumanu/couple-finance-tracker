@@ -14,6 +14,11 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { formatBRL } from "@/lib/format";
+import { FiltroCategorias } from "@/components/filtro-categorias";
+import {
+  FILTRO_SEM_CATEGORIA,
+  passaNoFiltroDeCategorias,
+} from "@/lib/categorias-extras";
 import type { CategoriaOpcao } from "@/lib/categorias";
 
 export type LinhaTransacao = {
@@ -35,9 +40,6 @@ export type CategoriaResumo = {
   qtd: number;
   pct: number;
 };
-
-const TODOS = "__todos__";
-const SEM_CATEGORIA = "__sem_cat__";
 
 type SortKey = "valor_desc" | "valor_asc" | "data_desc" | "data_asc";
 
@@ -69,16 +71,19 @@ export function RelatorioGastosPorCategoriaClient({
   temSemCategoria,
   mesLabel,
 }: Props) {
-  const [categoriaId, setCategoriaId] = useState<string>(TODOS);
+  const [categoriasSel, setCategoriasSel] = useState<string[]>([]);
+  const [apenasUma, setApenasUma] = useState(false);
   const [sort, setSort] = useState<SortKey>("valor_desc");
 
   const filtradas = useMemo(() => {
-    let arr = transacoes;
-    if (categoriaId !== TODOS) {
-      if (categoriaId === SEM_CATEGORIA)
-        arr = arr.filter((t) => !t.categoriaId);
-      else arr = arr.filter((t) => t.categoriaId === categoriaId);
-    }
+    // Só a principal: este relatório soma por categoria, e contar a extra
+    // poria a mesma compra em dois totais.
+    const arr = transacoes.filter((t) =>
+      passaNoFiltroDeCategorias(
+        categoriasSel,
+        t.categoriaId ? [t.categoriaId] : [],
+      ),
+    );
 
     const sorted = [...arr];
     switch (sort) {
@@ -97,27 +102,26 @@ export function RelatorioGastosPorCategoriaClient({
         break;
     }
     return sorted;
-  }, [transacoes, categoriaId, sort]);
+  }, [transacoes, categoriasSel, sort]);
 
   const grandTotal = transacoes.reduce((s, t) => s + t.valor, 0);
   const maiorCategoria = categoriaResumo[0];
 
-  const algumFiltroAtivo = categoriaId !== TODOS;
-  const limparFiltros = () => setCategoriaId(TODOS);
+  const algumFiltroAtivo = categoriasSel.length > 0;
+  const limparFiltros = () => setCategoriasSel([]);
 
-  const categoriaSelecionada = categoriaOptions.find(
-    (c) => c.id === categoriaId,
-  );
-
+  // Tocar num cartão do resumo: com "Apenas uma" troca a categoria do
+  // filtro; sem, soma ou tira ela da seleção.
   function toggleCategoria(id: string | null) {
-    const alvo = id === null ? SEM_CATEGORIA : id;
-    setCategoriaId((atual) => (atual === alvo ? TODOS : alvo));
+    const alvo = id === null ? FILTRO_SEM_CATEGORIA : id;
+    setCategoriasSel((atual) => {
+      if (atual.includes(alvo)) return atual.filter((c) => c !== alvo);
+      return apenasUma ? [alvo] : [...atual, alvo];
+    });
   }
 
   function categoriaAtiva(cat: CategoriaResumo): boolean {
-    if (categoriaId === TODOS) return false;
-    if (categoriaId === SEM_CATEGORIA) return cat.id === null;
-    return cat.id === categoriaId;
+    return categoriasSel.includes(cat.id ?? FILTRO_SEM_CATEGORIA);
   }
 
   return (
@@ -125,70 +129,14 @@ export function RelatorioGastosPorCategoriaClient({
       <Card>
         <div className="flex flex-col gap-3 p-4 md:p-5">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-              <Label
-                htmlFor="f-categoria"
-                className="text-[10px] uppercase tracking-widest text-muted-foreground"
-              >
-                Categoria
-              </Label>
-              <Select
-                value={categoriaId}
-                onValueChange={(v) => v && setCategoriaId(v)}
-              >
-                <SelectTrigger id="f-categoria" className="w-full">
-                  <SelectValue>
-                    {categoriaId === SEM_CATEGORIA ? (
-                      <span className="text-muted-foreground">
-                        Sem categoria
-                      </span>
-                    ) : categoriaSelecionada ? (
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{
-                            backgroundColor: categoriaSelecionada.cor,
-                            color: "#fff",
-                          }}
-                          aria-hidden
-                        >
-                          {categoriaSelecionada.emoji ??
-                            categoriaSelecionada.nome[0]?.toUpperCase() ??
-                            "?"}
-                        </span>
-                        <span>{categoriaSelecionada.nome}</span>
-                      </span>
-                    ) : (
-                      <span>Todas as categorias</span>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={TODOS}>Todas as categorias</SelectItem>
-                  {temSemCategoria && (
-                    <SelectItem value={SEM_CATEGORIA}>
-                      <span className="text-muted-foreground">
-                        Sem categoria
-                      </span>
-                    </SelectItem>
-                  )}
-                  {categoriaOptions.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      <span className="inline-flex items-center gap-2">
-                        <span
-                          className="flex size-4 shrink-0 items-center justify-center rounded-full text-[10px]"
-                          style={{ backgroundColor: c.cor, color: "#fff" }}
-                          aria-hidden
-                        >
-                          {c.emoji ?? c.nome[0]?.toUpperCase() ?? "?"}
-                        </span>
-                        <span>{c.nome}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <FiltroCategorias
+              categorias={categoriaOptions}
+              value={categoriasSel}
+              onValueChange={setCategoriasSel}
+              temSemCategoria={temSemCategoria}
+              apenasUma={apenasUma}
+              onApenasUmaChange={setApenasUma}
+            />
 
             <div className="flex min-w-[200px] flex-col gap-1.5">
               <Label

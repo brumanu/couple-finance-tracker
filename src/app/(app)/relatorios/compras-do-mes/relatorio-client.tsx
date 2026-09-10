@@ -13,7 +13,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { CategoriasMultiSelect } from "@/components/categorias-multi-select";
+import { FiltroCategorias } from "@/components/filtro-categorias";
+import { FILTRO_SEM_CATEGORIA as SEM_CATEGORIA } from "@/lib/categorias-extras";
 import { cn } from "@/lib/utils";
 import { formatBRL } from "@/lib/format";
 import type { CategoriaOpcao } from "@/lib/categorias";
@@ -104,7 +105,6 @@ export type LinhaCompra =
     };
 
 const TODOS = "__todos__";
-const SEM_CATEGORIA = "__sem_cat__";
 const SEM_QUEM = "__sem_quem__";
 
 type ModoCategoria = "qualquer" | "todas";
@@ -396,26 +396,12 @@ export function RelatorioComprasDoMesClient({
       <Card>
         <div className="flex flex-col gap-3 p-4 md:p-5">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="flex min-w-[220px] flex-1 flex-col gap-1.5">
-              <Label
-                htmlFor="f-categoria"
-                className="text-[10px] uppercase tracking-widest text-muted-foreground"
-              >
-                Categoria
-              </Label>
-              <CategoriasMultiSelect
-                id="f-categoria"
-                categorias={categoriaOptions}
-                value={categoriasSel}
-                onValueChange={setCategoriasSel}
-                opcaoEspecial={
-                  temSemCategoria
-                    ? { valor: SEM_CATEGORIA, rotulo: "Sem categoria" }
-                    : undefined
-                }
-                placeholder="Todas as categorias"
-              />
-            </div>
+            <FiltroCategorias
+              categorias={categoriaOptions}
+              value={categoriasSel}
+              onValueChange={setCategoriasSel}
+              temSemCategoria={temSemCategoria}
+            />
 
             {/*
               Com uma categoria só marcada os dois modos dão o mesmo

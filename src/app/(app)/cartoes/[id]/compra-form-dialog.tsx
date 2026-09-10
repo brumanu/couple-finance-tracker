@@ -13,13 +13,12 @@ import {
   valoresParcelas,
 } from "@/lib/cartao-calc";
 import { hojeISO } from "@/lib/mes";
-import { NENHUMA_CATEGORIA, type CategoriaOpcao } from "@/lib/categorias";
-import { CategoriaSelectField } from "@/components/categoria-select";
-import { CategoriasMultiSelect } from "@/components/categorias-multi-select";
+import type { CategoriaOpcao } from "@/lib/categorias";
+import { CategoriasComPrincipal } from "@/components/categorias-com-principal";
 import {
-  CAMPO_CATEGORIAS_EXTRAS,
-  idsDeExtras,
+  selecaoDaLinha,
   type ExtraDeCategoria,
+  type SelecaoCategorias,
 } from "@/lib/categorias-extras";
 import { NENHUM_QUEM, type MembroOpcao } from "@/lib/membros";
 import { QuemGastouSelectField } from "@/components/quem-gastou-select";
@@ -106,8 +105,7 @@ export function CompraFormDialog({
       parcelas: String(compra?.parcelas ?? 1),
       em_andamento: (compra?.parcelas_ja_pagas ?? 0) > 0,
       parcela_atual: String((compra?.parcelas_ja_pagas ?? 0) + 1),
-      categoriaId: compra?.categoria_id ?? NENHUMA_CATEGORIA,
-      extras: idsDeExtras(compra),
+      categorias: selecaoDaLinha(compra),
       quemGastou: compra?.quem_gastou ?? NENHUM_QUEM,
     }),
     [
@@ -131,17 +129,10 @@ export function CompraFormDialog({
   const [parcelaAtualRaw, setParcelaAtualRaw] = useState(
     defaults.parcela_atual,
   );
-  const [categoriaId, setCategoriaId] = useState(defaults.categoriaId);
-  const [extras, setExtras] = useState<string[]>(defaults.extras);
+  const [selCategorias, setSelCategorias] = useState<SelecaoCategorias>(
+    defaults.categorias,
+  );
   const [quemGastou, setQuemGastou] = useState(defaults.quemGastou);
-
-  // Extra é categoria ADICIONAL: sem uma principal ela não tem o que
-  // complementar, e o lançamento ficaria exibindo categorias na lista
-  // enquanto conta como "sem categoria" nos relatórios de soma.
-  function onCategoriaChange(nova: string) {
-    setCategoriaId(nova);
-    if (nova === NENHUMA_CATEGORIA) setExtras([]);
-  }
 
   const ctrl = useFormDialog<CompraFormState>({
     action: isEdit ? updateCompra.bind(null, compra!.id) : createCompra,
@@ -155,8 +146,7 @@ export function CompraFormDialog({
       setParcelasRaw(defaults.parcelas);
       setEmAndamento(defaults.em_andamento);
       setParcelaAtualRaw(defaults.parcela_atual);
-      setCategoriaId(defaults.categoriaId);
-      setExtras(defaults.extras);
+      setSelCategorias(defaults.categorias);
       setQuemGastou(defaults.quemGastou);
     },
   });
@@ -358,28 +348,11 @@ export function CompraFormDialog({
         )}
       </div>
 
-      <CampoForm htmlFor="categoria_id" rotulo="Categoria (opcional)">
-        <CategoriaSelectField
+      <CampoForm htmlFor="categorias" rotulo="Categorias (opcional)">
+        <CategoriasComPrincipal
           categorias={categorias}
-          value={categoriaId}
-          onValueChange={onCategoriaChange}
-        />
-      </CampoForm>
-
-      <CampoForm htmlFor="categorias_extras" rotulo="Outras categorias (opcional)">
-        <CategoriasMultiSelect
-          id="categorias_extras"
-          nomeCampo={CAMPO_CATEGORIAS_EXTRAS}
-          categorias={categorias}
-          excluir={categoriaId}
-          value={extras}
-          onValueChange={setExtras}
-          disabled={categoriaId === NENHUMA_CATEGORIA}
-          placeholder={
-            categoriaId === NENHUMA_CATEGORIA
-              ? "Escolha uma categoria primeiro"
-              : "Nenhuma"
-          }
+          value={selCategorias}
+          onValueChange={setSelCategorias}
         />
       </CampoForm>
 
