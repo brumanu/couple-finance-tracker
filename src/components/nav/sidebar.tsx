@@ -10,7 +10,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { NAV_ITEMS } from "./nav-items";
+import { NAV_GROUPS, isNavItemAtivo, type NavItem } from "./nav-items";
 import { signOut } from "@/lib/auth-actions";
 import { LinkPendingDot } from "./link-pending-dot";
 import { ThemeToggle } from "./theme-toggle";
@@ -41,6 +41,56 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
 
   // No mobile o rail não existe: o drawer sempre abre por extenso.
   const railDesktop = collapsed;
+
+  function renderItem(item: NavItem) {
+    const active = isNavItemAtivo(item, pathname);
+    const Icon = item.icon;
+    const base = cn(
+      // No drawer do celular o item é alvo de dedo: py-3 dá ~46px. No desktop
+      // o cursor não precisa disso, e o compacto faz os grupos caberem numa
+      // tela de notebook sem rolar.
+      "flex items-center gap-3 rounded-full py-3 text-[15px] transition-colors md:py-2",
+      railDesktop ? "md:justify-center md:px-0" : "px-4",
+    );
+    return item.disabled ? (
+      <span
+        key={item.href}
+        className={cn(base, "text-muted-foreground/50")}
+        title="Em breve"
+      >
+        <Icon className="size-[18px] shrink-0" strokeWidth={2.75} />
+        <span className={cn(railDesktop && "md:hidden")}>{item.label}</span>
+        <span
+          className={cn(
+            "ml-auto text-[10px] uppercase tracking-wide",
+            railDesktop && "md:hidden",
+          )}
+        >
+          em breve
+        </span>
+      </span>
+    ) : (
+      <Link
+        key={item.href}
+        href={item.href}
+        title={item.label}
+        aria-current={active ? "page" : undefined}
+        onClick={() => setMobileOpen(false)}
+        className={cn(
+          base,
+          active
+            ? "bg-primary text-primary-foreground"
+            : "text-neutral-800 hover:bg-sidebar-accent hover:text-foreground active:bg-sidebar-accent",
+        )}
+      >
+        <Icon className="size-[18px] shrink-0" strokeWidth={2.75} />
+        <span className={cn(railDesktop && "md:hidden")}>{item.label}</span>
+        <LinkPendingDot
+          className={cn("ml-auto", railDesktop && "md:hidden")}
+        />
+      </Link>
+    );
+  }
 
   return (
     <>
@@ -137,59 +187,39 @@ export function Sidebar({ nomeUsuario, emailUsuario, nomeCasal }: Props) {
           </span>
         </button>
 
-        <nav className="flex flex-1 flex-col gap-1.5">
-          {NAV_ITEMS.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
-            const Icon = item.icon;
-            const base = cn(
-              "flex items-center gap-3 rounded-full py-2.5 text-[15px] transition-colors",
-              railDesktop ? "md:justify-center md:px-0" : "px-4",
-            );
-            return item.disabled ? (
-              <span
-                key={item.href}
-                className={cn(base, "text-muted-foreground/50")}
-                title="Em breve"
-              >
-                <Icon className="size-[18px] shrink-0" strokeWidth={2.75} />
-                <span className={cn(railDesktop && "md:hidden")}>
-                  {item.label}
-                </span>
-                <span
-                  className={cn(
-                    "ml-auto text-[10px] uppercase tracking-wide",
-                    railDesktop && "md:hidden",
-                  )}
-                >
-                  em breve
-                </span>
-              </span>
-            ) : (
-              <Link
-                key={item.href}
-                href={item.href}
-                title={item.label}
-                onClick={() => setMobileOpen(false)}
-                className={cn(
-                  base,
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-neutral-800 hover:bg-sidebar-accent hover:text-foreground",
-                )}
-              >
-                <Icon className="size-[18px] shrink-0" strokeWidth={2.75} />
-                <span className={cn(railDesktop && "md:hidden")}>
-                  {item.label}
-                </span>
-                <LinkPendingDot
-                  className={cn("ml-auto", railDesktop && "md:hidden")}
-                />
-              </Link>
-            );
-          })}
+        <nav className="flex flex-1 flex-col gap-4 select-none [-webkit-touch-callout:none]">
+          {NAV_GROUPS.map((grupo, i) => (
+            <div
+              key={grupo.titulo ?? i}
+              role={grupo.titulo ? "group" : undefined}
+              aria-labelledby={grupo.titulo ? `nav-grupo-${i}` : undefined}
+              className="flex flex-col gap-1"
+            >
+              {grupo.titulo && (
+                <>
+                  <p
+                    id={`nav-grupo-${i}`}
+                    className={cn(
+                      "px-4 pb-0.5 text-[13px] font-semibold text-neutral-700",
+                      railDesktop && "md:sr-only",
+                    )}
+                  >
+                    {grupo.titulo}
+                  </p>
+                  {/* No rail não cabe o título: uma linha fina marca onde o
+                      grupo começa. */}
+                  <div
+                    aria-hidden
+                    className={cn(
+                      "mx-auto hidden h-px w-8 bg-sidebar-border",
+                      railDesktop && "md:block",
+                    )}
+                  />
+                </>
+              )}
+              {grupo.itens.map(renderItem)}
+            </div>
+          ))}
         </nav>
 
         <div

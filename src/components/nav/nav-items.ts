@@ -8,6 +8,7 @@ import {
   CreditCardIcon,
   HandCoinsIcon,
   TagIcon,
+  LandmarkIcon,
   BarChart3Icon,
   CalculatorIcon,
   ReceiptTextIcon,
@@ -19,43 +20,85 @@ export type NavItem = {
   label: string;
   icon: LucideIcon;
   disabled?: boolean;
-  /** Se true, aparece só no sidebar (desktop) — não no bottom-nav mobile */
-  desktopOnly?: boolean;
+  /** Se true, também ocupa um dos slots fixos do bottom-nav mobile. */
+  barraInferior?: boolean;
 };
 
-export const NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "Início", icon: HomeIcon },
-  { href: "/recorrentes", label: "Contas", icon: FileTextIcon },
-  { href: "/cartoes", label: "Cartões", icon: CreditCardIcon },
-  { href: "/despesas", label: "Despesas", icon: ShoppingCartIcon },
-  // A lista de mercado é a tela mais mobile do app: usada em pé, no corredor,
-  // com uma mão só. Deixá-la a dois toques no menu lateral contrariaria o
-  // motivo dela existir, então ela ocupa um dos 6 slots fixos do bottom-nav.
-  // Quem saiu foi Rendas, que se cadastra uma vez e se revisa quando muda de
-  // salário — ela continua no menu lateral, que abre no mobile também.
-  { href: "/mercado", label: "Mercado", icon: ShoppingBasketIcon },
-  { href: "/dividas", label: "Dívidas", icon: HandCoinsIcon },
+export type NavGroup = {
+  /** Sem título, o grupo aparece solto no topo do menu (só o Início). */
+  titulo?: string;
+  itens: NavItem[];
+};
+
+// O app começou só com as finanças do mês e foi ganhando ferramentas que não
+// são controle de gasto (MEI, CLT, mercado). Os grupos separam por assunto
+// pra que cada função nova tenha onde cair sem virar mais um item solto no
+// meio das contas — "Casa" existe pras próximas coisas do casal que não são
+// dinheiro, mesmo tendo só o Mercado por enquanto.
+export const NAV_GROUPS: NavGroup[] = [
   {
-    href: "/compras-futuras",
-    label: "Quero comprar",
-    icon: ShoppingBagIcon,
-    // O bottom-nav mobile é um grid de 6 colunas fixas — item novo entra
-    // pelo menu lateral, que agora abre no mobile também.
-    desktopOnly: true,
+    itens: [{ href: "/", label: "Início", icon: HomeIcon, barraInferior: true }],
   },
   {
-    href: "/faturamento-mei",
-    label: "Faturamento MEI",
-    icon: ReceiptTextIcon,
-    desktopOnly: true,
+    titulo: "Mês",
+    itens: [
+      {
+        href: "/recorrentes",
+        label: "Contas",
+        icon: FileTextIcon,
+        barraInferior: true,
+      },
+      {
+        href: "/cartoes",
+        label: "Cartões",
+        icon: CreditCardIcon,
+        barraInferior: true,
+      },
+      // Fora do bottom-nav: no celular despesa se lança pelo FAB, que já
+      // aparece em todas as telas.
+      { href: "/despesas", label: "Despesas", icon: ShoppingCartIcon },
+      { href: "/rendas", label: "Rendas", icon: WalletIcon },
+    ],
   },
   {
-    href: "/salario-liquido",
-    label: "Salário líquido",
-    icon: CalculatorIcon,
-    desktopOnly: true,
+    titulo: "Planos",
+    itens: [
+      { href: "/dividas", label: "Dívidas", icon: HandCoinsIcon },
+      { href: "/compras-futuras", label: "Quero comprar", icon: ShoppingBagIcon },
+      { href: "/relatorios", label: "Relatórios", icon: BarChart3Icon },
+    ],
   },
-  { href: "/rendas", label: "Rendas", icon: WalletIcon, desktopOnly: true },
-  { href: "/categorias", label: "Categorias", icon: TagIcon, desktopOnly: true },
-  { href: "/relatorios", label: "Relatórios", icon: BarChart3Icon, desktopOnly: true },
+  {
+    titulo: "Casa",
+    itens: [
+      // A lista de mercado é a tela mais mobile do app: usada em pé, no
+      // corredor, com uma mão só — por isso fica no bottom-nav.
+      {
+        href: "/mercado",
+        label: "Mercado",
+        icon: ShoppingBasketIcon,
+        barraInferior: true,
+      },
+    ],
+  },
+  {
+    titulo: "Trabalho",
+    itens: [
+      { href: "/faturamento-mei", label: "Faturamento MEI", icon: ReceiptTextIcon },
+      { href: "/salario-liquido", label: "Salário líquido", icon: CalculatorIcon },
+    ],
+  },
+  {
+    titulo: "Ajustes",
+    itens: [
+      { href: "/categorias", label: "Categorias", icon: TagIcon },
+      { href: "/bancos", label: "Bancos", icon: LandmarkIcon },
+    ],
+  },
 ];
+
+export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.itens);
+
+export function isNavItemAtivo(item: NavItem, pathname: string): boolean {
+  return item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+}
