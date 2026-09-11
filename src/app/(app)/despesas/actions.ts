@@ -1,7 +1,10 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { campo, parseForm } from "@/lib/parse-form";
+import { avisarCompra } from "@/lib/push/aviso-compra-server";
+import type { CompraLancada } from "@/lib/push/aviso-compra";
 import {
   clienteAutenticado,
   erroAmigavel,
@@ -26,9 +29,15 @@ const COMUM = {
 
 const ROTAS_DESPESA = ["/despesas", "/relatorios/compras-do-mes", "/"];
 
+// `aviso` é o que o push pro outro precisa (ver `avisarCompra`).
 type Entrada =
-  | { tipo: "compra_cartao"; cartaoId: string; linha: Record<string, unknown> }
-  | { tipo: "despesa"; linha: Record<string, unknown> };
+  | {
+      tipo: "compra_cartao";
+      cartaoId: string;
+      linha: Record<string, unknown>;
+      aviso: CompraLancada;
+    }
+  | { tipo: "despesa"; linha: Record<string, unknown>; aviso: CompraLancada };
 
 /**
  * Lê o formulário e decide em qual tabela a linha vai cair.
@@ -63,6 +72,12 @@ function lerFormulario(formData: FormData): Entrada | string {
         parcelas,
         parcelas_ja_pagas: 0,
       },
+      aviso: {
+        tipo: "cartao",
+        cartaoId: dados.cartao_id,
+        descricao: dados.descricao,
+        valor: dados.valor,
+      },
     };
   }
 
@@ -81,6 +96,7 @@ function lerFormulario(formData: FormData): Entrada | string {
       data_referencia: `${dados.data.slice(0, 7)}-01`,
       quinzena: quinzena.quinzena,
     },
+    aviso: { tipo: "despesa", descricao: dados.descricao, valor: dados.valor },
   };
 }
 
@@ -94,6 +110,8 @@ export async function createDespesa(
   const sessao = await clienteAutenticado();
   if ("erro" in sessao) return { error: sessao.erro };
   const { supabase } = sessao;
+  const avisarOOutro = () =>
+    after(() => avisarCompra(supabase, sessao.userId, entrada.aviso));
 
   const classificacao = await resolverClassificacao(
     supabase,
@@ -127,6 +145,7 @@ export async function createDespesa(
       "/cartoes",
       `/cartoes/${entrada.cartaoId}`,
     );
+    avisarOOutro();
     return { ok: true };
   }
 
@@ -145,6 +164,7 @@ export async function createDespesa(
   if (erroExtras) return { error: erroExtras };
 
   revalidar(...ROTAS_DESPESA);
+  avisarOOutro();
   return { ok: true };
 }
 

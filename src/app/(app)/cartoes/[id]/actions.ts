@@ -1,7 +1,9 @@
 "use server";
 
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { campo, parseForm } from "@/lib/parse-form";
+import { avisarCompra } from "@/lib/push/aviso-compra-server";
 import {
   clienteAutenticado,
   erroAmigavel,
@@ -105,6 +107,14 @@ export async function createCompra(
   if (erroExtras) return { error: erroExtras };
 
   revalidar(...rotas(linha.cartao_id));
+  after(() =>
+    avisarCompra(sessao.supabase, sessao.userId, {
+      tipo: "cartao",
+      cartaoId: linha.cartao_id,
+      descricao: linha.descricao,
+      valor: linha.valor_total,
+    }),
+  );
   return { ok: true };
 }
 
