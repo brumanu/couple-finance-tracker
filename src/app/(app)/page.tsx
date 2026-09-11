@@ -445,11 +445,6 @@ export default async function DashboardPage({
       pagamentosMes.set(l.conta_recorrente_id, l);
     }
   }
-  const despesasAvulsasMes = lancsMesAtual
-    .filter((l) => l.tipo === "despesa_avulsa")
-    .sort((a, b) =>
-      (b.data_pagamento ?? "").localeCompare(a.data_pagamento ?? ""),
-    );
   const rendaExtraMes = lancsMesAtual
     .filter((l) => l.tipo === "renda_extra")
     .sort((a, b) =>
@@ -457,7 +452,6 @@ export default async function DashboardPage({
     );
 
   const quinzenaAtual: 15 | 30 = noMesAtual && hojeDia > 15 ? 30 : 15;
-  const quinzenaAtualDados = quinzenaAtual === 15 ? q15 : q30;
 
   // A seção de faturas é do mês inteiro, não da quinzena: como checklist de
   // "o que falta pagar", esconder metade dos cartões só porque vencem na
@@ -481,16 +475,6 @@ export default async function DashboardPage({
   const contasEmAtraso = noMesAtual
     ? [...q15.contas, ...q30.contas].filter(estaAtrasada)
     : [];
-
-  // A checklist mostra a quinzena atual mais o que ficou pendente na outra.
-  const outraQuinzenaDados = quinzenaAtual === 15 ? q30 : q15;
-  const pendentesOutraQuinzena = noMesAtual
-    ? outraQuinzenaDados.contas.filter(estaAtrasada)
-    : [];
-  const contasChecklist = [
-    ...pendentesOutraQuinzena,
-    ...quinzenaAtualDados.contas,
-  ];
 
   const primeiroNome = session.nome.split(/\s+/)[0];
   const contextoHoje = noMesAtual ? saudacaoContexto(hojeDia) : null;
@@ -587,16 +571,19 @@ export default async function DashboardPage({
             {/* minmax(0,1fr): sem isso a track "auto" do mobile assume a largura
                 min-content das linhas (texto nowrap + valor + botão) e a página
                 inteira passa a rolar de lado em telas de 360-375px. */}
-            <div className="grid gap-4 grid-cols-[minmax(0,1fr)] md:grid-cols-[1.1fr_1fr]">
-              <ContasQuinzenaCard
-                quinzena={quinzenaAtual}
-                contas={contasChecklist}
-                pagamentos={pagamentosMes}
-                mes={mes}
-                hojeDia={hojeDia}
-                noMesAtual={noMesAtual}
-              />
-              <UltimasDespesasCard despesas={despesasAvulsasMes.slice(0, 6)} />
+            <div className="grid gap-4 grid-cols-[minmax(0,1fr)] md:grid-cols-2">
+              {[q15, q30].map((q) => (
+                <ContasQuinzenaCard
+                  key={q.quinzena}
+                  quinzena={q.quinzena}
+                  contas={q.contas}
+                  pagamentos={pagamentosMes}
+                  mes={mes}
+                  hojeDia={hojeDia}
+                  noMesAtual={noMesAtual}
+                  ehAtual={noMesAtual && quinzenaAtual === q.quinzena}
+                />
+              ))}
             </div>
 
             <FaturasCartaoCard
@@ -1047,6 +1034,7 @@ function ContasQuinzenaCard({
   mes,
   hojeDia,
   noMesAtual,
+  ehAtual,
 }: {
   quinzena: 15 | 30;
   contas: RecorrenteRow[];
@@ -1054,6 +1042,7 @@ function ContasQuinzenaCard({
   mes: { primeiroDia: string; label: string; chave: string };
   hojeDia: number;
   noMesAtual: boolean;
+  ehAtual: boolean;
 }) {
   const total = contas.length;
   const pagas = contas.filter((c) => pagamentos.has(c.id)).length;
@@ -1062,7 +1051,16 @@ function ContasQuinzenaCard({
   return (
     <section className="flex flex-col gap-3.5">
       <div className="flex items-baseline justify-between px-1">
-        <h3 className="font-heading text-[22px]">Contas da quinzena</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-heading text-[22px]">
+            Contas da {quinzena === 15 ? "1ª" : "2ª"} quinzena
+          </h3>
+          {ehAtual && (
+            <Badge variant="secondary" className="text-[10px]">
+              atual
+            </Badge>
+          )}
+        </div>
         {!semItens && (
           <span className="text-[13px] text-neutral-700">
             {pagas} de {total} {total === 1 ? "paga" : "pagas"}
@@ -1277,53 +1275,6 @@ function FaturasCartaoCard({
               </div>
             );
           })}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function UltimasDespesasCard({ despesas }: { despesas: LancamentoRow[] }) {
-  return (
-    <section className="flex flex-col gap-3.5">
-      <div className="flex items-baseline justify-between px-1">
-        <h3 className="font-heading text-[22px]">Últimas despesas</h3>
-        <Link
-          href="/despesas"
-          className="text-[13px] text-primary hover:underline"
-        >
-          ver todas
-        </Link>
-      </div>
-      {despesas.length === 0 ? (
-        <div className="rounded-[26px] bg-surface-soft px-6 py-8 text-center text-sm text-muted-foreground">
-          Nenhuma despesa lançada neste mês.
-        </div>
-      ) : (
-        <div className="rounded-[26px] bg-surface-soft px-6">
-          <ul className="flex flex-col divide-y divide-border/60">
-            {despesas.map((d) => (
-              <li key={d.id} className="flex items-center gap-3.5 py-3.5">
-                <div className="flex size-[34px] shrink-0 items-center justify-center rounded-full bg-card font-heading text-xs text-neutral-800">
-                  {d.descricao[0]?.toUpperCase() ?? "?"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[15px] font-semibold">
-                    {d.descricao}
-                  </p>
-                  <p className="text-[13px] text-neutral-700">
-                    {d.data_pagamento
-                      ? formatDataCurta(d.data_pagamento)
-                      : ""}
-                    {d.categoria ? ` · ${d.categoria}` : ""}
-                  </p>
-                </div>
-                <span className="tabular-nums text-[15px] font-medium">
-                  {formatBRL(d.valor)}
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
     </section>
